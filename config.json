@@ -1,0 +1,3 @@
+{
+    "EXCLUDED_ELEMENTS": ["Li", "Na", "Mg", "K", "Ca", "Rb", "Sr", "Cs", "Ba", "Cu", "Ag", "Au", "Pt"]
+}
