@@ -31,7 +31,10 @@ def cluster(traj):
                 compound_atom_pairs.append(((comp1, atom1), (comp2, atom2)))
 
     # Prompt user if cluster graphs should be drawn
-    isDrawGraphs = prompt("Draw cluster graphs to PDF?", "No").lower().startswith('y')
+    visFormat = prompt("Visualize cluster graphs?", "No").lower().startswith('y')
+    if(visFormat):
+        isDrawSVG = prompt("Save cluster graphs in SVG (Y) or PNG (N) format?", "Yes").lower().startswith('y')
+        visFormat = "svg" if isDrawSVG else "png"
     isSaveXYZ = prompt("Save cluster coordinates as XYZ files?", "No").lower().startswith('y')
     isSaveWhole = False
     if (isSaveXYZ):
@@ -59,17 +62,15 @@ def cluster(traj):
             for comp_id, compound in enumerate(traj.compounds.values(), start=1):
                 for label in compound_atom_labels[comp_id]:
                     atom_coords[comp_id][label].extend(compound.get_coords(label))
-#                    print(atom_coords[comp_id][label])
                 for molecule in compound.members:
-                    for label in compound_atom_labels[comp_id]:
-                        molecule_mapping[comp_id][label].append(molecule)
-               #         if label in molecule.label_to_id:
-               #             atom_coords[comp_id][label].append(molecule.coords[molecule.label_to_id[label]])
-               #             molecule_mapping[comp_id][label].append(molecule)
+                    for user_label in compound_atom_labels[comp_id]:  # User-specified prefixes
+                        # Find all molecule labels that start with the user-specified label
+                        matching_labels = [label for label in molecule.label_to_id.keys() if label.startswith(user_label)]
+                        for label in matching_labels:  # Iterate over all matching labels
+                            molecule_mapping[comp_id][user_label].append(molecule)  # Append once per matching label
+#                            idx = molecule.label_to_id[label]
+#                            atom_coords[comp_id][user_label].append(molecule.coords[idx])
 
-#            for comp_id, compound in enumerate(traj.compounds.values(), start=1):
-#                for label in compound_atom_labels[comp_id]:
-#                    print(atom_coords[comp_id][label])
 
             # Convert lists to numpy arrays
             for comp_id in atom_coords:
@@ -119,7 +120,7 @@ def cluster(traj):
         print(f"Composition {composition}: {count} occurrences")
 
     # Post-process cluster to compute populations
-    post_process_clusters(cluster_histogram, graph_list, isDrawGraphs)
+    post_process_clusters(cluster_histogram, graph_list, visFormat)
 
 
 def write_xyz(filename, mols, isSaveWhole, compound_atom_labels, boxsize):
@@ -221,6 +222,7 @@ def identify_clusters(atom_coords, compound_atom_labels, cutoff_distances, boxsi
 
                 mols = set()
                 for c in cluster:
+                    # c[0]: comp_id, c[1]: atom_label, c[2]: particle_idx
                     mol = molecule_mapping[c[0]][c[1]][c[2]]
                     mols.add(mol)
 
@@ -241,20 +243,20 @@ def get_graph_id(graph):
     return hashlib.md5(graph_string.encode()).hexdigest()
 
 
-def post_process_clusters(cluster_histogram, graph_list, isDrawGraphs):
+def post_process_clusters(cluster_histogram, graph_list, visFormat):
     # Create a mapping from (composition, graph_id) to graph
     graph_dict = {(composition, graph_id): graph for composition, graph_id, graph in graph_list}
 
     # Sort clusters once (by occurrences descending, then by composition and graph_id ascending)
-    sorted_clusters = sorted(cluster_histogram.items(), key=lambda item: (-item[1], item[0], item[1]))
+    sorted_clusters = sorted(cluster_histogram.items(), key=lambda item: (-item[1], item[0][0], item[0][1]))
 
     # Save images for visualization if requested
-    if isDrawGraphs:
+    if visFormat:
         for i, ((composition, graph_id), count) in enumerate(sorted_clusters):
             if i > 100:
                 break
             if (composition, graph_id) in graph_dict:
-                filename = f"graph{i}_{composition}.svg"
+                filename = f"graph{i}_{composition}.{visFormat}"
                 draw_graph(graph_dict[(composition, graph_id)], filename)
 
     # Save cluster occurrences
@@ -342,7 +344,7 @@ def draw_graph(graph, filename="graph.png"):
     nx.draw(graph, pos, with_labels=True, labels=node_labels, node_size=node_sizes, node_color=node_colors, edge_color="black", font_weight="bold", font_size=10, width=2.0)
 
     # Save file
-    plt.savefig(filename, format="svg", dpi=300)
+    plt.savefig(filename, dpi=300)
     plt.close()
 
 
