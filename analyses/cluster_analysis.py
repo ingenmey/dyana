@@ -102,6 +102,11 @@ def cluster(traj):
             print(f"Processed frame {num_frames}")
 
             traj.read_frame()
+
+        except Exception as e:
+            print(e)
+            break
+
         except ValueError:
             # End of trajectory file
             break
@@ -146,12 +151,19 @@ def write_xyz(filename, mols, isSaveWhole, compound_atom_labels, boxsize):
             coords.extend(mol.coords)
         else:
             # Save only the atoms involved in clustering
+            # TODO: Saves all atoms with matching labels, instead of only coordinating ones
             for comp_id, labels in compound_atom_labels.items():
                 for label in labels:
-                    if label in mol.label_to_id:
-                        idx = mol.label_to_id[label]
-                        symbols.append(mol.symbols[idx])
-                        coords.append(mol.coords[idx])
+                    # TODO: Unsafe, will match O10, O11, O12, etc. if atom label O1 is used
+                    for key in mol.label_to_id.keys():
+                        if key.startswith(label):
+                            idx = mol.label_to_id[key]
+                            symbols.append(mol.symbols[idx])
+                            coords.append(mol.coords[idx])
+#                    if label in mol.label_to_id:
+#                        idx = mol.label_to_id[label]
+#                        symbols.append(mol.symbols[idx])
+#                        coords.append(mol.coords[idx])
 
     coords = np.array(coords)
     coords = unwrap_coords(coords, boxsize)

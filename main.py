@@ -1,5 +1,6 @@
 import argparse
 import os
+import constants
 from core.trajectory_loader import load_trajectory
 from analyses.rdf_analysis import rdf
 from analyses.adf_analysis import adf
@@ -9,7 +10,7 @@ from analyses.percolation import percolation
 from analyses.cluster_analysis import cluster
 from utils import prompt, set_input_file, set_log_file, close_log_file
 
-available_analyses = {
+AVAILABLE_ANALYSES = {
     'rdf': ('Radial distribution function analysis', rdf),
     'adf': ('Angular distribution function analysis', adf),
     'dens': ('Particle density analysis', density),
@@ -18,50 +19,37 @@ available_analyses = {
     'cluster': ('Cluster composition histogram', cluster)
 }
 
-def list_analyses():
-    print("\nAvailable analyses:")
-    for key, (description, _) in available_analyses.items():
-        print(f"{key}: {description}")
-
-def determine_format(traj_file):
+def determine_traj_format(traj_file):
     _, ext = os.path.splitext(traj_file)
     ext = ext.lower()
-    if ext == '.xyz':
+    if ext in constants.EXT_XYZ:
         return 'xyz'
-    elif ext in ['.lmp', '.lammpstrj']:
+    elif ext in constants.EXT_LAMMPS:
         return 'lammps'
     else:
         raise ValueError(f"Unsupported file extension: {ext}")
 
-def main(traj_file):
-    format = determine_format(traj_file)
-
-    if format == 'xyz':
+def get_cell_vectors(traj_format):
+    if traj_format == 'xyz':
         dimx = float(prompt("Enter cell vector length in X dimension (in Å): "))
         dimy = float(prompt("Enter cell vector length in Y dimension (in Å): "))
         dimz = float(prompt("Enter cell vector length in Z dimension (in Å): "))
-        cell_vectors = [dimx, dimy, dimz]
+        return [dimx, dimy, dimz]
     else:
-        cell_vectors = [0, 0, 0]
+        return [0, 0, 0]
 
-    with open(traj_file, 'r') as fin:
-        traj = load_trajectory(fin, format, cell_vectors)
-        traj.read_frame()
+def process_compounds(traj):
         traj.guess_molecules()
-
-        boxsize = traj.boxsize
-        print(f"\n\nCell vectors: a = {boxsize[0]}, b = {boxsize[1]}, c = {boxsize[2]}\n")
 
         # Print the list of different molecule types
         for i, compound in enumerate(traj.compounds.values()):
             count = len(compound.members)
             print(f"Compound {i + 1}: {compound.rep}, Number: {count}")
 
-        draw_compounds = prompt("Draw compounds to PDF?", "No").lower().startswith('y')
-        if (draw_compounds):
+        should_draw_compounds = prompt("Draw compounds to PDF?", "No").lower().startswith('y')
+        if (should_draw_compounds):
             for compound in traj.compounds.values():
                 compound.members[0].draw_graph(compound.comp_id+1)
-
 
         for i, compound in enumerate(traj.compounds.values()):
             compound.average_bond_lengths()
@@ -87,16 +75,36 @@ def main(traj_file):
                 row = " ".join(f"{val:>8}" for val in matrix[idx])
                 print(f"{label:>5} {row}")
 
-        # List available analyses and prompt the user to choose one
-        list_analyses()
-        while True:
-            analysis_choice = prompt("\nChoose an analysis: ")
-            if analysis_choice in available_analyses:
-                _, analysis_func = available_analyses[analysis_choice]
-                analysis_func(traj)
-                break
-            else:
-                print("Invalid choice. Please choose an analysis from the above list.")
+
+def choose_analysis():
+    # List available analyses and prompt the user to choose one
+    print("\nAvailable analyses:")
+    for key, (description, _) in AVAILABLE_ANALYSES.items():
+        print(f"{key}: {description}")
+
+    while True:
+        analysis_choice = prompt("\nChoose an analysis: ")
+        if analysis_choice in AVAILABLE_ANALYSES:
+            _, analysis_func = AVAILABLE_ANALYSES[analysis_choice]
+            return analysis_func
+        else:
+            print("Invalid choice. Please choose an analysis from the above list.")
+
+
+def main(traj_file):
+    traj_format = determine_traj_format(traj_file)
+    cell_vectors = get_cell_vectors(traj_format)
+
+    with open(traj_file, 'r') as fin:
+        traj = load_trajectory(fin, traj_format, cell_vectors)
+        traj.read_frame()
+
+        boxsize = traj.boxsize
+        print(f"\n\nCell vectors: a = {boxsize[0]}, b = {boxsize[1]}, c = {boxsize[2]}\n")
+
+        process_compounds(traj)
+        analysis_func = choose_analysis()
+        analysis_func(traj)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Molecular dynamics trajectory analyzer.")

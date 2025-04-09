@@ -168,6 +168,7 @@ class Compound:
         for mol in self.members:
             mol.update_com(boxsize)
 
+    # TODO: Unsafe, will match O10, O11, O12, etc. if atom label O1 is used
     def get_coords(self, ref_label):
         coords = []
         for molecule in self.members:
