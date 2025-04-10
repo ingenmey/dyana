@@ -122,8 +122,8 @@ def process_frame(traj, z0, z1):
         for molecule in compound.members:
             molecule.update_coords(traj.coords)
 
-    dimx = traj.boxsize[0]
-    dimy = traj.boxsize[1]
+    dimx = traj.box_size[0]
+    dimy = traj.box_size[1]
 
     adlayer, domains_red = get_surface_atoms(traj, z0, z1)
 

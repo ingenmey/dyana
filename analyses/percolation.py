@@ -21,11 +21,11 @@ def percolation(traj):
             for compound in traj.compounds.values():
                 for molecule in compound.members:
                     molecule.update_coords(traj.coords)
-                compound.update_coms(traj.boxsize)
+                compound.update_coms(traj.box_size)
 
             # Perform the percolation calculation for the current frame
             compound = list(traj.compounds.values())[compound_index]
-            percolation_result = calculate_percolation(compound, acceptor_labels, donor_labels, traj.boxsize, max_cutoff, max_distance)
+            percolation_result = calculate_percolation(compound, acceptor_labels, donor_labels, traj.box_size, max_cutoff, max_distance)
 
             if len(percolation_result) > 0:
                 percolation_accumulator += percolation_result
@@ -50,8 +50,8 @@ def percolation(traj):
     for i, value in enumerate(percolation_average):
         print(f"Depth: {i+1}, Count: {value:.4f}")
 
-def calculate_percolation(compound, acceptor_labels, donor_labels, boxsize, max_cutoff, max_distance):
-    dimx, dimy, dimz = boxsize
+def calculate_percolation(compound, acceptor_labels, donor_labels, box_size, max_cutoff, max_distance):
+    dimx, dimy, dimz = box_size
 
     acceptor_coords = np.array([molecule.coords[molecule.label_to_id[label.strip()]] for molecule in compound.members for label in acceptor_labels])
     donor_coords = np.array([molecule.coords[molecule.label_to_id[label.strip()]] for molecule in compound.members for label in donor_labels])
@@ -60,8 +60,8 @@ def calculate_percolation(compound, acceptor_labels, donor_labels, boxsize, max_
         print("No acceptor or donor atoms found in the specified labels.")
         return np.zeros(max_cutoff)
 
-    acceptor_tree = cKDTree(acceptor_coords, boxsize=boxsize)
-    donor_tree = cKDTree(donor_coords, boxsize=boxsize)
+    acceptor_tree = cKDTree(acceptor_coords, boxsize=box_size)
+    donor_tree = cKDTree(donor_coords, boxsize=box_size)
 
     results = []
 

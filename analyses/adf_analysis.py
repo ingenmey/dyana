@@ -25,21 +25,21 @@ def adf(traj):
 
     ref_compound = list(traj.compounds.values())[ref_index]
     obs_compound = list(traj.compounds.values())[obs_index]
-    boxsize = traj.boxsize
+    box_size = traj.box_size
 
     # Loop through all frames
     while True:
         try:
             # Update the coordinates for each compound
             print("update")
-            update_coords(traj, boxsize)
+            update_coords(traj, box_size)
 
             # Calculate the vectors for the current frame
             print("vectors")
             ref_vectors, obs_vectors = compute_vectors(
                 ref_compound, obs_compound, ref_base_label, ref_tip_label,
                 obs_base_label, obs_tip_label, ref_base_source, ref_tip_source,
-                obs_base_source, obs_tip_source, boxsize
+                obs_base_source, obs_tip_source, box_size
             )
 
             # Calculate ADF for the current frame
@@ -67,14 +67,14 @@ def adf(traj):
         angle = (i + 0.5) * (180 / bin_count)
         print(f"Angle: {angle:.2f}°, ADF: {value:.8f}")
 
-def update_coords(traj, boxsize):
+def update_coords(traj, box_size):
     for compound in traj.compounds.values():
         for molecule in compound.members:
-            molecule.update_coords(traj.coords, boxsize)
+            molecule.update_coords(traj.coords, box_size)
 
 def compute_vectors(ref_compound, obs_compound, ref_base_label, ref_tip_label,
                     obs_base_label, obs_tip_label, ref_base_source, ref_tip_source,
-                    obs_base_source, obs_tip_source, boxsize):
+                    obs_base_source, obs_tip_source, box_size):
     ref_vectors = []
     obs_vectors = []
 
@@ -92,17 +92,17 @@ def compute_vectors(ref_compound, obs_compound, ref_base_label, ref_tip_label,
             obs_base = obs_mol.coords[obs_base_id] if obs_base_source == "o" else ref_mol.coords[obs_base_id]
             obs_tip  = obs_mol.coords[obs_tip_id]  if obs_tip_source  == "o" else ref_mol.coords[obs_tip_id]
 
-            ref_base = np.mod(ref_base, boxsize)
-            ref_tip  = np.mod(ref_tip, boxsize)
-            obs_base = np.mod(obs_base, boxsize)
-            obs_tip  = np.mod(obs_tip, boxsize)
+            ref_base = np.mod(ref_base, box_size)
+            ref_tip  = np.mod(ref_tip, box_size)
+            obs_base = np.mod(obs_base, box_size)
+            obs_tip  = np.mod(obs_tip, box_size)
 
             # Apply minimum image convention
             ref_vector = ref_tip - ref_base
-            ref_vector -= np.round(ref_vector / boxsize) * boxsize
+            ref_vector -= np.round(ref_vector / box_size) * box_size
 
             obs_vector = obs_tip - obs_base
-            obs_vector -= np.round(obs_vector / boxsize) * boxsize
+            obs_vector -= np.round(obs_vector / box_size) * box_size
 
             ref_vectors.append(ref_vector)
             obs_vectors.append(obs_vector)

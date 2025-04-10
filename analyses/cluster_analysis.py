@@ -1,9 +1,10 @@
 import os
 import numpy as np
+import re
 from scipy.spatial import cKDTree
 from collections import Counter
 from itertools import combinations
-from utils import prompt
+from utils import label_matches, prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
 import networkx as nx
 import hashlib
@@ -25,35 +26,47 @@ def cluster(traj):
     for (comp1, atoms1), (comp2, atoms2) in combinations(compound_atom_labels.items(), 2):
         for atom1 in atoms1:
             for atom2 in atoms2:
-                cutoff = float(prompt(f"Enter the cut-off distance for {atom1} in compound {comp1} and {atom2} in compound {comp2} (in Å): ", 0.0))
+                cutoff = prompt_float(f"Enter the cut-off distance for {atom1} in compound {comp1} and {atom2} in compound {comp2} (in Å): ", 0.0, minval=0.0)
                 cutoff_distances[((comp1, atom1), (comp2, atom2))] = cutoff
                 cutoff_distances[((comp2, atom2), (comp1, atom1))] = cutoff  # Ensure symmetry
                 compound_atom_pairs.append(((comp1, atom1), (comp2, atom2)))
 
     # Prompt user if cluster graphs should be drawn
-    visFormat = prompt("Visualize cluster graphs?", "No").lower().startswith('y')
-    if(visFormat):
-        isDrawSVG = prompt("Save cluster graphs in SVG (Y) or PNG (N) format?", "Yes").lower().startswith('y')
-        visFormat = "svg" if isDrawSVG else "png"
-    isSaveXYZ = prompt("Save cluster coordinates as XYZ files?", "No").lower().startswith('y')
+    visFormat = prompt_yn("Visualize cluster graphs?", False)
+    if visFormat:
+        visFormat = prompt_choice("Save cluster in which format?", ["svg", "png"], "svg")
+    isSaveXYZ = prompt_yn("Save cluster coordinates as XYZ files?", False)
     isSaveWhole = False
-    if (isSaveXYZ):
-        isSaveWhole = prompt("Save whole molecules (Y) or only specified atom types (N)?", "No").lower().startswith('y')
+    if isSaveXYZ:
+        isSaveWhole = prompt_yn("Save whole molecules (Y) or only specified atom types (N)?", False)
+
+    start_frame =  prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
+    nframes =      prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
+    frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
+    frame_idx = 0
+    processed_frames = 0
 
     # Initialize histogram
     cluster_histogram = Counter()
-    num_frames = 0
 
     # Loop through all frames
     graph_list = []
     seen_graphs = set()  # Track unique graphs
-    while True:
+
+    if (start_frame > 1):
+        print(f"Skipping forward to frame {start_frame}.")
+        while (frame_idx < start_frame - 1):
+            traj.read_frame()
+            frame_idx += 1
+
+
+    while (nframes != 0):
         try:
             # Update coordinates for compounds
             for compound in traj.compounds.values():
                 for molecule in compound.members:
                     molecule.update_coords(traj.coords)
-                compound.update_coms(traj.boxsize)
+                compound.update_coms(traj.box_size)
 
             # Get atom coordinates per compound
             atom_coords = {comp_id: {label: [] for label in labels} for comp_id, labels in compound_atom_labels.items()}
@@ -62,14 +75,24 @@ def cluster(traj):
             for comp_id, compound in enumerate(traj.compounds.values(), start=1):
                 for label in compound_atom_labels[comp_id]:
                     atom_coords[comp_id][label].extend(compound.get_coords(label))
+
+                # --- step 1: determine matches once for the compound ---
+                representative_molecule = compound.members[0]
+                molecule_labels = list(representative_molecule.label_to_id.keys())
+
+                # Build map: user_label -> number of matches
+                matching_counts = {user_label: 0 for user_label in compound_atom_labels[comp_id]}
+
+                for user_label in compound_atom_labels[comp_id]:
+                    for label in molecule_labels:
+                        if label_matches(user_label, label):
+                            matching_counts[user_label] += 1  # Count how many matches exist
+
+                # --- step 2: for each molecule, append it for each match ---
                 for molecule in compound.members:
-                    for user_label in compound_atom_labels[comp_id]:  # User-specified prefixes
-                        # Find all molecule labels that start with the user-specified label
-                        matching_labels = [label for label in molecule.label_to_id.keys() if label.startswith(user_label)]
-                        for label in matching_labels:  # Iterate over all matching labels
-                            molecule_mapping[comp_id][user_label].append(molecule)  # Append once per matching label
-#                            idx = molecule.label_to_id[label]
-#                            atom_coords[comp_id][user_label].append(molecule.coords[idx])
+                    for user_label, count in matching_counts.items():
+                        for _ in range(count):
+                            molecule_mapping[comp_id][user_label].append(molecule)
 
 
             # Convert lists to numpy arrays
@@ -82,7 +105,7 @@ def cluster(traj):
 
 
             # Identify clusters as graphs
-            clusters = identify_clusters(atom_coords, compound_atom_labels, cutoff_distances, traj.boxsize, molecule_mapping)
+            clusters = identify_clusters(atom_coords, compound_atom_labels, cutoff_distances, traj.box_size, molecule_mapping)
 
             if isSaveXYZ and not os.path.exists("xyz"):
                 os.makedirs("xyz")
@@ -94,18 +117,21 @@ def cluster(traj):
                 if (composition, graph_id) not in seen_graphs:
                     seen_graphs.add((composition, graph_id))
                     graph_list.append((composition, graph_id, graph))  # Store graph alongside its ID
-                if (isSaveXYZ):
+                if isSaveXYZ:
                     if (len(mols) > 1):
-                        write_xyz(f"{composition}_{graph_id}.xyz", mols, isSaveWhole, compound_atom_labels, traj.boxsize)
+                        write_xyz(f"{composition}_{graph_id}.xyz", mols, isSaveWhole, compound_atom_labels, traj.box_size)
 
-            num_frames += 1
-            print(f"Processed frame {num_frames}")
+            print(f"Processed {processed_frames} frames (current frame {frame_idx+1})")
+            processed_frames += 1
 
-            traj.read_frame()
+            for i in range(frame_stride):
+                frame_idx += 1
+                nframes -= 1
+                traj.read_frame()
 
-        except Exception as e:
-            print(e)
-            break
+#        except Exception as e:
+#            print(e)
+#            break
 
         except ValueError:
             # End of trajectory file
@@ -128,14 +154,14 @@ def cluster(traj):
     post_process_clusters(cluster_histogram, graph_list, visFormat)
 
 
-def write_xyz(filename, mols, isSaveWhole, compound_atom_labels, boxsize):
-    def unwrap_coords(coords, boxsize):
+def write_xyz(filename, mols, isSaveWhole, compound_atom_labels, box_size):
+    def unwrap_coords(coords, box_size):
         """Unwrap molecule coordinates to avoid broken bonds due to periodic boundary conditions."""
         unwrapped_coords = np.copy(coords)
 
         for i in range(1, len(unwrapped_coords)):
             delta = unwrapped_coords[i] - unwrapped_coords[i - 1]
-            delta -= boxsize * np.round(delta / boxsize)  # Adjust for periodic boundaries
+            delta -= box_size * np.round(delta / box_size)  # Adjust for periodic boundaries
             unwrapped_coords[i] = unwrapped_coords[i - 1] + delta
 
         return unwrapped_coords
@@ -146,27 +172,24 @@ def write_xyz(filename, mols, isSaveWhole, compound_atom_labels, boxsize):
     coords = []
 
     for mol in mols:
-        if (isSaveWhole):
+        if isSaveWhole:
             symbols.extend(mol.symbols)
             coords.extend(mol.coords)
         else:
-            # Save only the atoms involved in clustering
+#            # Save only the atoms involved in clustering
+#            # TODO: Saves all atoms with matching labels, instead of only coordinating ones
+            molecule_labels = mol.label_to_id.keys()
             # TODO: Saves all atoms with matching labels, instead of only coordinating ones
             for comp_id, labels in compound_atom_labels.items():
-                for label in labels:
-                    # TODO: Unsafe, will match O10, O11, O12, etc. if atom label O1 is used
-                    for key in mol.label_to_id.keys():
-                        if key.startswith(label):
-                            idx = mol.label_to_id[key]
+                for user_label in labels:
+                    for label in molecule_labels:
+                        if label_matches(user_label, label):
+                            idx = mol.label_to_id[label]
                             symbols.append(mol.symbols[idx])
                             coords.append(mol.coords[idx])
-#                    if label in mol.label_to_id:
-#                        idx = mol.label_to_id[label]
-#                        symbols.append(mol.symbols[idx])
-#                        coords.append(mol.coords[idx])
 
     coords = np.array(coords)
-    coords = unwrap_coords(coords, boxsize)
+    coords = unwrap_coords(coords, box_size)
 
     coords = np.vstack(coords)  # Convert list of arrays to a single array
     cog = np.mean(coords, axis=0)  # Compute COG
@@ -179,9 +202,9 @@ def write_xyz(filename, mols, isSaveWhole, compound_atom_labels, boxsize):
             f.write(f"{symbol} {coord[0]:.6f} {coord[1]:.6f} {coord[2]:.6f}\n")
 
 
-def identify_clusters(atom_coords, compound_atom_labels, cutoff_distances, boxsize, molecule_mapping):
+def identify_clusters(atom_coords, compound_atom_labels, cutoff_distances, box_size, molecule_mapping):
     kdtrees = {
-        (comp_id, label): cKDTree(atom_coords[comp_id][label], boxsize=boxsize)
+        (comp_id, label): cKDTree(atom_coords[comp_id][label], boxsize=box_size)
         for comp_id, labels in compound_atom_labels.items()
         for label in labels
     }

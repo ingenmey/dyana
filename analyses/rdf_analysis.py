@@ -23,12 +23,12 @@ def rdf(traj):
             for compound in traj.compounds.values():
                 for molecule in compound.members:
                     molecule.update_coords(traj.coords)
-                compound.update_coms(traj.boxsize)
+                compound.update_coms(traj.box_size)
 
             # Perform the RDF calculation for the current frame
             ref_compound = list(traj.compounds.values())[ref_index]
             obs_compound = list(traj.compounds.values())[obs_index]
-            rdf_result = calculate_rdf(ref_compound, obs_compound, ref_label, obs_label, traj.boxsize, max_distance, bin_count)
+            rdf_result = calculate_rdf(ref_compound, obs_compound, ref_label, obs_label, traj.box_size, max_distance, bin_count)
 
             # Accumulate the RDF results
             for i, (distance, value) in enumerate(rdf_result):
@@ -54,8 +54,8 @@ def rdf(traj):
 
 
 
-def calculate_rdf(ref_compound, obs_compound, ref_label, obs_label, boxsize, max_distance, bin_count):
-    dimx, dimy, dimz = boxsize
+def calculate_rdf(ref_compound, obs_compound, ref_label, obs_label, box_size, max_distance, bin_count):
+    dimx, dimy, dimz = box_size
     bin_width = max_distance / bin_count
     rdf = np.zeros(bin_count)
 
@@ -63,7 +63,7 @@ def calculate_rdf(ref_compound, obs_compound, ref_label, obs_label, boxsize, max
     obs_coords = obs_compound.get_coords(obs_label)
 
     # Use KDTree for efficient distance calculations
-    obs_tree = cKDTree(obs_coords, boxsize=boxsize)
+    obs_tree = cKDTree(obs_coords, boxsize=box_size)
 
     for ref_coord in ref_coords:
         distances, indices = obs_tree.query(ref_coord, k=len(obs_coords), distance_upper_bound=max_distance)

@@ -99,8 +99,8 @@ def main(traj_file):
         traj = load_trajectory(fin, traj_format, cell_vectors)
         traj.read_frame()
 
-        boxsize = traj.boxsize
-        print(f"\n\nCell vectors: a = {boxsize[0]}, b = {boxsize[1]}, c = {boxsize[2]}\n")
+        box_size = traj.box_size
+        print(f"\n\nCell vectors: a = {box_size[0]}, b = {box_size[1]}, c = {box_size[2]}\n")
 
         process_compounds(traj)
         analysis_func = choose_analysis()

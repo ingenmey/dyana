@@ -11,7 +11,7 @@ def density(traj):
     step_size = float(prompt("Enter the step size for density calculation (in Å): ", 0.1))
 
     # Initialize the density accumulator
-    num_bins = int(np.ceil(traj.boxsize[axis_index] / step_size))
+    num_bins = int(np.ceil(traj.box_size[axis_index] / step_size))
     densities = {compound_name: np.zeros(num_bins) for compound_name in traj.compounds.keys()}
     num_frames = 0
 
@@ -22,7 +22,7 @@ def density(traj):
             for compound in traj.compounds.values():
                 for molecule in compound.members:
                     molecule.update_coords(traj.coords)
-                compound.update_coms(traj.boxsize)
+                compound.update_coms(traj.box_size)
 
             # Perform the density calculation for the current frame
             frame_densities = calculate_density(traj, axis_index, step_size, num_bins)

@@ -3,21 +3,22 @@
 import os
 import json
 import numpy as np
+import itertools
 from abc import ABC, abstractmethod
 from scipy.spatial import cKDTree
 from atomic_properties import elem_masses, elem_vdW, elem_covalent, elem_number, elem_color  # Import atomic properties
-
+from utils import label_matches
 
 # Load the configuration
 config_file_path = os.path.join(os.path.dirname(__file__), "../config.json")
 with open(config_file_path, 'r') as config_file:
     config = json.load(config_file)
 
-EXCLUDED = config["EXCLUDED_ELEMENTS"]
+EXCLUDED_ELEMENTS = config["EXCLUDED_ELEMENTS"]
 
 class Atom:
-    def __init__(self, element, idx):
-        self.element = element
+    def __init__(self, elem_number, idx):
+        self.elem_number = elem_number
         self.idx = idx
         self.bonds = []
         self.ec = 0
@@ -40,26 +41,29 @@ class Molecule:
         self.com = [0, 0, 0]
         self.bonds_internal = []
         self.atoms = []
+        self.id_to_label = {}
+        self.label_to_id = {}
+        self.label_to_global_id = {}
 
-    def update_coords(self, coords: np.ndarray, boxsize: np.ndarray=None):
+    def update_coords(self, coords: np.ndarray, box_size: np.ndarray=None):
         self.coords = coords[self.atom_ids]
-        if (boxsize):
-            self.coords = np.mod(self.coords, boxsize)  # Ensure coordinates are within the box
+        if (box_size):
+            self.coords = np.mod(self.coords, box_size)  # Ensure coordinates are within the box
 
-    def update_com(self, boxsize):
+    def update_com(self, box_size):
         base_coord = self.coords[0]
         adjusted_coords = self.coords.copy()
 
         for i in range(1, len(adjusted_coords)):
             for dim in range(3):
                 delta = adjusted_coords[i][dim] - base_coord[dim]
-                if delta > 0.5 * boxsize[dim]:
-                    adjusted_coords[i][dim] -= boxsize[dim]
-                elif delta < -0.5 * boxsize[dim]:
-                    adjusted_coords[i][dim] += boxsize[dim]
+                if delta > 0.5 * box_size[dim]:
+                    adjusted_coords[i][dim] -= box_size[dim]
+                elif delta < -0.5 * box_size[dim]:
+                    adjusted_coords[i][dim] += box_size[dim]
 
         self.com = np.average(adjusted_coords, axis=0, weights=self.atomic_masses)
-        self.com = np.mod(self.com, boxsize)  # Ensure COM is within the box
+        self.com = np.mod(self.com, box_size)  # Ensure COM is within the box
 
     def convert_bonds_to_internal_ids(self):
         self.internal_ids = {global_id: i for i, global_id in enumerate(self.atom_ids)}
@@ -78,7 +82,7 @@ class Molecule:
             atoms[b].bonds.append(a)
 
         for atom in atoms:
-            atom.ec = atom.element * 10 + len(atom.bonds)
+            atom.ec = atom.elem_number * 10 + len(atom.bonds)
             atom.parent_molecule = self
 
         iteration = 0
@@ -101,22 +105,19 @@ class Molecule:
             iteration += 1
 
         # Assign labels based on EC values and element type
-        element_groups = {}
+        symbol_groups = {}
         for i, atom in enumerate(atoms):
-            element = self.symbols[i]
-            if element not in element_groups:
-                element_groups[element] = []
-            element_groups[element].append((atom.ec, i))
+            symbol = self.symbols[i]
+            if symbol not in symbol_groups:
+                symbol_groups[symbol] = []
+            symbol_groups[symbol].append((atom.ec, i))
 
-        self.id_to_label = {}
-        self.label_to_id = {}
-        self.label_to_global_id = {}
-        for element, group in element_groups.items():
+        for symbol, group in symbol_groups.items():
             group.sort(reverse=True, key=lambda x: x[0])
             for index, (_, internal_id) in enumerate(group, 1):
-                self.id_to_label[internal_id] = f"{element}{index}"
-                self.label_to_id[f"{element}{index}"] = internal_id
-                self.label_to_global_id[f"{element}{index}"] = self.atom_ids[internal_id]
+                self.id_to_label[internal_id] = f"{symbol}{index}"
+                self.label_to_id[f"{symbol}{index}"] = internal_id
+                self.label_to_global_id[f"{symbol}{index}"] = self.atom_ids[internal_id]
 
         self.bond_lengths_table = {}
         for i, (a, b) in enumerate(self.bonds_internal):
@@ -164,17 +165,26 @@ class Compound:
         self.atomic_masses = []
         self.atomic_radii = []
 
-    def update_coms(self, boxsize):
+    def update_coms(self, box_size):
         for mol in self.members:
-            mol.update_com(boxsize)
+            mol.update_com(box_size)
 
-    # TODO: Unsafe, will match O10, O11, O12, etc. if atom label O1 is used
     def get_coords(self, ref_label):
-        coords = []
-        for molecule in self.members:
-            atom_ids = [id for label, id in molecule.label_to_id.items() if label.startswith(ref_label)]
-            coords.extend([molecule.coords[id] for id in atom_ids])
-        return np.array(coords)
+        # Step 1: Precompute matching labels using the first molecule
+        matching_labels = [
+            label for label in self.members[0].label_to_id.keys()
+            if label_matches(ref_label, label)
+        ]
+
+        # Step 2: Generator that yields coordinates directly
+        coord_iterators = (
+            (molecule.coords[molecule.label_to_id[label]] for label in matching_labels)
+            for molecule in self.members
+        )
+
+        flattened_coords = itertools.chain.from_iterable(coord_iterators)
+
+        return np.array(list(flattened_coords))
 
     def average_bond_lengths(self):
         sum_dict = {key: 0 for key in self.members[0].bond_lengths_table.keys()}
@@ -187,10 +197,10 @@ class Compound:
 
 
 class BaseTrajectory(ABC):
-    def __init__(self, fin, boxsize):
+    def __init__(self, fin, box_size):
         self.fin = fin
-        self.boxsize = boxsize
-        self.dimx, self.dimy, self.dimz = boxsize
+        self.box_size = box_size
+        self.dimx, self.dimy, self.dimz = box_size
         self.natoms = 0
         self.symbols = []
         self.coords = []
@@ -212,7 +222,7 @@ class BaseTrajectory(ABC):
         symbols = self.symbols
         coords = self.coords
 
-        kdtree = cKDTree(coords, boxsize=self.boxsize)
+        kdtree = cKDTree(coords, boxsize=self.box_size)
         molecules = self._identify_molecules(symbols, coords, kdtree)
         self._classify_molecules(symbols, molecules)
 
@@ -230,7 +240,7 @@ class BaseTrajectory(ABC):
             bonds = []
             bond_lengths_sq = []
 
-            if symbols[i] not in EXCLUDED:
+            if symbols[i] not in EXCLUDED_ELEMENTS:
                 while stack:
                     current_atom = stack.pop()
                     rad1 = elem_covalent.get(symbols[current_atom], 0.0)
@@ -240,7 +250,7 @@ class BaseTrajectory(ABC):
 
                     for neighbor in neighbors:
                         rad2 = elem_covalent.get(symbols[neighbor], 0.0)
-                        if symbols[neighbor] not in EXCLUDED and (neighbor not in visited or (neighbor in molecule and (current_atom, neighbor) not in bonds)):
+                        if symbols[neighbor] not in EXCLUDED_ELEMENTS and (neighbor not in visited or (neighbor in molecule and (current_atom, neighbor) not in bonds)):
                             if r_sq := self.are_connected(coords[current_atom], coords[neighbor], rad1, rad2):
                                 # Ensure atoms are only added once to `molecule`
                                 if neighbor not in visited:
@@ -265,13 +275,13 @@ class BaseTrajectory(ABC):
         compounds = {}
 
         for mol in molecules:
-            element_count = {}
+            symbol_count = {}
             for atom_index in mol.atom_ids:
-                element = symbols[atom_index]
-                element_count[element] = element_count.get(element, 0) + 1
+                symbol = symbols[atom_index]
+                symbol_count[symbol] = symbol_count.get(symbol, 0) + 1
 
-            sorted_elements = sorted(element_count.items())
-            form_str = ''.join([f"{element}{count}" if count > 1 else element for element, count in sorted_elements])
+            sorted_symbols = sorted(symbol_count.items())
+            form_str = ''.join([f"{symbol}{count}" if count > 1 else symbol for symbol, count in sorted_symbols])
 
             bond_str = tuple(sorted((symbols[a], symbols[b]) if symbols[a] <= symbols[b] else (symbols[b], symbols[a]) for a, b in mol.bonds))
             compound_key = (form_str, bond_str)
@@ -334,13 +344,13 @@ class LAMMPSTrajectory(BaseTrajectory):
                 raise ValueError("End of file reached before finding BOX BOUNDS")
             line = self.fin.readline().strip()
 
-        self.boxsize = []
+        self.box_size = []
         for _ in range(3):
             dim = list(map(float, self.fin.readline().strip().split()))
             length = dim[1] - dim[0]
-            self.boxsize.append(length)
-        self.boxsize = np.array(self.boxsize)
-        self.dimx, self.dimy, self.dimz = self.boxsize
+            self.box_size.append(length)
+        self.box_size = np.array(self.box_size)
+        self.dimx, self.dimy, self.dimz = self.box_size
 
         line = self.fin.readline().strip()
         while not line.startswith("ITEM: ATOMS"):
@@ -378,13 +388,13 @@ class LAMMPSTrajectory(BaseTrajectory):
         self.symbols = symbols
         self.coords = np.array(coords)
 
-def load_trajectory(fin, format, boxsize):
-    if format == 'xyz':
-        return XYZTrajectory(fin, boxsize)
-    elif format == 'lammps':
-        return LAMMPSTrajectory(fin, boxsize)
+def load_trajectory(fin, traj_format, box_size):
+    if traj_format == 'xyz':
+        return XYZTrajectory(fin, box_size)
+    elif traj_format == 'lammps':
+        return LAMMPSTrajectory(fin, box_size)
     else:
-        raise ValueError(f"Unsupported trajectory format: {format}")
+        raise ValueError(f"Unsupported trajectory format: {traj_format}")
 
 
 
