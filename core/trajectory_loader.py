@@ -23,6 +23,7 @@ class Atom:
         self.bonds = []
         self.ec = 0
         self.tec = 0
+        self.coord = None
         self.parent_molecule = None
 
 class Molecule:
@@ -49,6 +50,10 @@ class Molecule:
         self.coords = coords[self.atom_ids]
         if (box_size):
             self.coords = np.mod(self.coords, box_size)  # Ensure coordinates are within the box
+
+        # Update atom coords
+        for i, atom in enumerate(self.atoms):
+            atom.coord = self.coords[i]
 
     def update_com(self, box_size):
         base_coord = self.coords[0]
