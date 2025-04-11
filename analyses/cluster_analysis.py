@@ -73,8 +73,8 @@ def cluster(traj):
             molecule_mapping = {comp_id: {label: [] for label in labels} for comp_id, labels in compound_atom_labels.items()}
 
             for comp_id, compound in enumerate(traj.compounds.values(), start=1):
-                for label in compound_atom_labels[comp_id]:
-                    atom_coords[comp_id][label].extend(compound.get_coords(label))
+                for user_label in compound_atom_labels[comp_id]:
+                    atom_coords[comp_id][user_label].extend(compound.get_coords(user_label))
 
                 # --- step 1: determine matches once for the compound ---
                 representative_molecule = compound.members[0]
