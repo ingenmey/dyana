@@ -68,63 +68,40 @@ def cluster(traj):
                     molecule.update_coords(traj.coords)
                 compound.update_coms(traj.box_size)
 
-            # Get atom coordinates per compound
-            atom_coords = {comp_id: {label: [] for label in labels} for comp_id, labels in compound_atom_labels.items()}
-            molecule_mapping = {comp_id: {label: [] for label in labels} for comp_id, labels in compound_atom_labels.items()}
+
+            # Gather Atoms per compound/label
+            atom_groups = {comp_id: {label: [] for label in labels} for comp_id, labels in compound_atom_labels.items()}
 
             for comp_id, compound in enumerate(traj.compounds.values(), start=1):
-                for user_label in compound_atom_labels[comp_id]:
-                    atom_coords[comp_id][user_label].extend(compound.get_coords(user_label))
-
-                # --- step 1: determine matches once for the compound ---
-                representative_molecule = compound.members[0]
-                molecule_labels = list(representative_molecule.label_to_id.keys())
-
-                # Build map: user_label -> number of matches
-                matching_counts = {user_label: 0 for user_label in compound_atom_labels[comp_id]}
-
-                for user_label in compound_atom_labels[comp_id]:
-                    for label in molecule_labels:
-                        if label_matches(user_label, label):
-                            matching_counts[user_label] += 1  # Count how many matches exist
-
-                # --- step 2: for each molecule, append it for each match ---
                 for molecule in compound.members:
-                    for user_label, count in matching_counts.items():
-                        for _ in range(count):
-                            molecule_mapping[comp_id][user_label].append(molecule)
-
-
-            # Convert lists to numpy arrays
-            for comp_id in atom_coords:
-                for label in atom_coords[comp_id]:
-                    if atom_coords[comp_id][label]:  # Avoid empty lists
-                        atom_coords[comp_id][label] = np.array(atom_coords[comp_id][label])
-                    else:
-                        atom_coords[comp_id][label] = np.empty((0, 3))  # Ensure compatibility with KDTree
+                    for label, idx in molecule.label_to_id.items():
+                        for user_label in compound_atom_labels[comp_id]:
+                            if label_matches(user_label, label):
+                                atom_groups[comp_id][user_label].append(molecule.atoms[idx])
 
 
             # Identify clusters as graphs
-            clusters = identify_clusters(atom_coords, compound_atom_labels, cutoff_distances, traj.box_size, molecule_mapping)
+            clusters = identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, traj.box_size)
 
             if isSaveXYZ and not os.path.exists("xyz"):
                 os.makedirs("xyz")
 
             # Store graphs and their occurrences
-            for composition, graph, mols in clusters:
+            for composition, graph, cluster_atoms in clusters:
                 graph_id = get_graph_id(graph)
                 cluster_histogram[(composition, graph_id)] += 1
                 if (composition, graph_id) not in seen_graphs:
                     seen_graphs.add((composition, graph_id))
-                    graph_list.append((composition, graph_id, graph))  # Store graph alongside its ID
+                    graph_list.append((composition, graph_id, graph))
                 if isSaveXYZ:
-                    if (len(mols) > 1):
-                        write_xyz(f"{composition}_{graph_id}.xyz", mols, isSaveWhole, compound_atom_labels, traj.box_size)
+                    if len(cluster_atoms) > 1:
+                        write_xyz(f"{composition}_{graph_id}.xyz", cluster_atoms, isSaveWhole, traj.box_size)
+
 
             print(f"Processed {processed_frames} frames (current frame {frame_idx+1})")
             processed_frames += 1
 
-            for i in range(frame_stride):
+            for _ in range(frame_stride):
                 frame_idx += 1
                 nframes -= 1
                 traj.read_frame()
@@ -154,115 +131,97 @@ def cluster(traj):
     post_process_clusters(cluster_histogram, graph_list, visFormat)
 
 
-def write_xyz(filename, mols, isSaveWhole, compound_atom_labels, box_size):
+def write_xyz(filename, atoms, isSaveWhole, box_size):
     def unwrap_coords(coords, box_size):
         """Unwrap molecule coordinates to avoid broken bonds due to periodic boundary conditions."""
-        unwrapped_coords = np.copy(coords)
+        unwrapped = np.copy(coords)
+        for i in range(1, len(unwrapped)):
+            delta = unwrapped[i] - unwrapped[i - 1]
+            delta -= box_size * np.round(delta / box_size)
+            unwrapped[i] = unwrapped[i - 1] + delta
+        return unwrapped
 
-        for i in range(1, len(unwrapped_coords)):
-            delta = unwrapped_coords[i] - unwrapped_coords[i - 1]
-            delta -= box_size * np.round(delta / box_size)  # Adjust for periodic boundaries
-            unwrapped_coords[i] = unwrapped_coords[i - 1] + delta
-
-        return unwrapped_coords
-
-
-    """Append a new frame to an XYZ trajectory file."""
     symbols = []
     coords = []
 
-    for mol in mols:
-        if isSaveWhole:
-            symbols.extend(mol.symbols)
-            coords.extend(mol.coords)
-        else:
-#            # Save only the atoms involved in clustering
-#            # TODO: Saves all atoms with matching labels, instead of only coordinating ones
-            molecule_labels = mol.label_to_id.keys()
-            # TODO: Saves all atoms with matching labels, instead of only coordinating ones
-            for comp_id, labels in compound_atom_labels.items():
-                for user_label in labels:
-                    for label in molecule_labels:
-                        if label_matches(user_label, label):
-                            idx = mol.label_to_id[label]
-                            symbols.append(mol.symbols[idx])
-                            coords.append(mol.coords[idx])
+    if isSaveWhole:
+        # Collect entire molecules but avoid duplicates
+        written_molecules = set()
+        for atom in atoms:
+            mol = atom.parent_molecule
+            if mol not in written_molecules:
+                written_molecules.add(mol)
+                symbols.extend(mol.symbols)
+                coords.extend(mol.coords)
+    else:
+        # Only save the exact atoms participating
+        for atom in atoms:
+            symbols.append(atom.parent_molecule.symbols[atom.parent_molecule.atoms.index(atom)])
+            coords.append(atom.coord)
 
     coords = np.array(coords)
     coords = unwrap_coords(coords, box_size)
+    cog = np.mean(coords, axis=0)
+    coords -= cog
 
-    coords = np.vstack(coords)  # Convert list of arrays to a single array
-    cog = np.mean(coords, axis=0)  # Compute COG
-    coords = np.array(coords) - cog  # Shift all coordinates
-
-    with open("xyz/"+filename, 'a') as f:
+    with open("xyz/" + filename, 'a') as f:
         f.write(f"{len(symbols)}\n")
         f.write("Generated by cluster analysis\n")
         for symbol, coord in zip(symbols, coords):
             f.write(f"{symbol} {coord[0]:.6f} {coord[1]:.6f} {coord[2]:.6f}\n")
 
 
-def identify_clusters(atom_coords, compound_atom_labels, cutoff_distances, box_size, molecule_mapping):
+def identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, box_size):
     kdtrees = {
-        (comp_id, label): cKDTree(atom_coords[comp_id][label], boxsize=box_size)
+        (comp_id, label): cKDTree([atom.coord for atom in atoms], boxsize=box_size)
         for comp_id, labels in compound_atom_labels.items()
-        for label in labels
+        for label, atoms in atom_groups[comp_id].items()
     }
+
 
     visited = set()
     clusters = []
 
-    def grow_cluster(comp_id, atom_label, particle_idx, cluster, graph, atom_counts):
-        if (comp_id, atom_label, particle_idx) in visited:
+    def grow_cluster(comp_id, atom_label, atom_idx, cluster, graph, atom_counts):
+        atom = atom_groups[comp_id][atom_label][atom_idx]
+        if atom in visited:
             return
-        visited.add((comp_id, atom_label, particle_idx))
+        visited.add(atom)
 
         # Assign a unique identifier for the atom node
-        atom_id = f"{comp_id}-{atom_label}-{particle_idx}"  # Use a unique ID based on the atom's position
+        atom_id = f"{comp_id}-{atom_label}-{atom_idx}"  # Use a unique ID based on the atom's position
         graph.add_node(atom_id, element=atom_label)
 
-        cluster.append((comp_id, atom_label, particle_idx))
+        cluster.append(atom)
 
         # Track atom counts for composition
         key = f"{comp_id}-{atom_label}"
         atom_counts[key] = atom_counts.get(key, 0) + 1
 
         # Find neighbors and add edges
-        for (other_comp, other_atom) in kdtrees.keys():
-            if ((comp_id, atom_label), (other_comp, other_atom)) in cutoff_distances:
-                neighbors = kdtrees[(other_comp, other_atom)].query_ball_point(
-                    atom_coords[comp_id][atom_label][particle_idx],
-                    cutoff_distances[((comp_id, atom_label), (other_comp, other_atom))]
+        for (other_comp, other_atom_label) in kdtrees.keys():
+            if ((comp_id, atom_label), (other_comp, other_atom_label)) in cutoff_distances:
+                neighbors = kdtrees[(other_comp, other_atom_label)].query_ball_point(
+                    atom.coord,
+                    cutoff_distances[((comp_id, atom_label), (other_comp, other_atom_label))]
                 )
-                for neighbor in neighbors:
-                    neighbor_id = f"{other_comp}-{other_atom}-{neighbor}"  # Use unique ID for neighbors as well
-                    if not graph.has_node(neighbor_id):
-                        graph.add_node(neighbor_id, element=other_atom)  # Add the neighbor to the graph if not already present
-                    graph.add_edge(atom_id, neighbor_id)  # Add the edge between the current node and the neighbor
-                    grow_cluster(other_comp, other_atom, neighbor, cluster, graph, atom_counts)
+                for neighbor_idx in neighbors:
+                    grow_cluster(other_comp, other_atom_label, neighbor_idx, cluster, graph, atom_counts)
+                    graph.add_edge(atom_id, f"{other_comp}-{other_atom_label}-{neighbor_idx}")
+
 
 
     # Identify clusters and create graphs
-    for (comp_id, atom_label) in kdtrees.keys():
-        for i in range(len(atom_coords[comp_id][atom_label])):
-            if (comp_id, atom_label, i) not in visited:
+    for (comp_id, atom_label), tree in kdtrees.items():
+        for idx in range(len(atom_groups[comp_id][atom_label])):
+            if atom_groups[comp_id][atom_label][idx] not in visited:
                 cluster = []
-                atom_counts = {}  # Track atom composition
+                atom_counts = {}
                 graph = nx.Graph()
+                grow_cluster(comp_id, atom_label, idx, cluster, graph, atom_counts)
 
-                grow_cluster(comp_id, atom_label, i, cluster, graph, atom_counts)
-
-                # Generate human-readable composition
                 composition = "_".join(f"{key}-{count}" for key, count in sorted(atom_counts.items()))
-
-                mols = set()
-                for c in cluster:
-                    # c[0]: comp_id, c[1]: atom_label, c[2]: particle_idx
-                    mol = molecule_mapping[c[0]][c[1]][c[2]]
-                    mols.add(mol)
-
-                clusters.append((composition, graph, mols))
-
+                clusters.append((composition, graph, cluster))
 
     return clusters
 
