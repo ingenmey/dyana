@@ -20,6 +20,7 @@ class Atom:
     def __init__(self, elem_number, idx):
         self.elem_number = elem_number
         self.idx = idx
+#        self.comp_id = None
         self.bonds = []
         self.ec = 0
         self.tec = 0
@@ -34,6 +35,7 @@ class Molecule:
         self.mol_id = mol_id
         self.atom_ids = atom_ids
         self.symbols = symbols
+        self.comp_id = None
         self.atomic_masses = [elem_masses[s] for s in symbols]
         self.atomic_radii = [elem_vdW[s] for s in symbols]
         self.coords = []
@@ -294,6 +296,7 @@ class BaseTrajectory(ABC):
             if compound_key not in compounds:
                 compounds[compound_key] = Compound(len(compounds), form_str)
 
+            mol.comp_id = compounds[compound_key].comp_id
             compounds[compound_key].members.append(mol)
 
             for atom_index, atom in zip(mol.atom_ids, mol.atoms):
