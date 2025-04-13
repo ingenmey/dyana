@@ -1,18 +1,22 @@
 import argparse
 import os
 import constants
+import numpy as np
 from core.trajectory_loader import load_trajectory
 from analyses.rdf_analysis import rdf
 from analyses.adf_analysis import adf
+from analyses.adf_threebody_analysis import adf_threebody
 from analyses.density_analysis import density
 from analyses.surface_voronoi import surface_voronoi
 from analyses.percolation import percolation
 from analyses.cluster_analysis import cluster
-from utils import prompt, set_input_file, set_log_file, close_log_file
+from utils import set_input_file, set_log_file, close_log_file
+from utils import prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
 AVAILABLE_ANALYSES = {
     'rdf': ('Radial distribution function analysis', rdf),
     'adf': ('Angular distribution function analysis', adf),
+    'adf_3b': ('Threebody Angular distribution function analysis', adf_threebody),
     'dens': ('Particle density analysis', density),
     'voro2d': ('2D surface voronoi analysis', surface_voronoi),
     'percolation': ('Hydrogen bond percolation analysis', percolation),
@@ -31,49 +35,98 @@ def determine_traj_format(traj_file):
 
 def get_cell_vectors(traj_format):
     if traj_format == 'xyz':
-        dimx = float(prompt("Enter cell vector length in X dimension (in Å): "))
-        dimy = float(prompt("Enter cell vector length in Y dimension (in Å): "))
-        dimz = float(prompt("Enter cell vector length in Z dimension (in Å): "))
-        return [dimx, dimy, dimz]
+        dimx = prompt_float("Enter cell vector length in X dimension (in Å): ")
+        dimy = prompt_float("Enter cell vector length in Y dimension (in Å): ")
+        dimz = prompt_float("Enter cell vector length in Z dimension (in Å): ")
+        return np.array([dimx, dimy, dimz])
     else:
-        return [0, 0, 0]
+        return np.array([0, 0, 0])
 
 def process_compounds(traj):
         traj.guess_molecules()
 
-        # Print the list of different molecule types
-        for i, compound in enumerate(traj.compounds.values()):
-            count = len(compound.members)
-            print(f"Compound {i + 1}: {compound.rep}, Number: {count}")
+        while True:
+            # Print the list of different molecule types
+            for i, compound in enumerate(traj.compounds.values()):
+                count = len(compound.members)
+                print(f"Compound {i + 1}: {compound.rep}, Number: {count}")
 
-        should_draw_compounds = prompt("Draw compounds to PDF?", "No").lower().startswith('y')
-        if (should_draw_compounds):
-            for compound in traj.compounds.values():
-                compound.members[0].draw_graph(compound.comp_id+1)
+            for i, compound in enumerate(traj.compounds.values()):
+                compound.average_bond_lengths()
+                print(f"\nCompound {i + 1} Bond Length Matrix:")
 
-        for i, compound in enumerate(traj.compounds.values()):
-            compound.average_bond_lengths()
-            print(f"\nCompound {i + 1} Bond Length Matrix:")
+                # Extract labels and initialize the matrix
+                labels = list(compound.members[0].label_to_id.keys())
+                size = len(labels)
+                matrix = [["-  " for _ in range(size)] for _ in range(size)]
+                label_to_index = {label: idx for idx, label in enumerate(labels)}
 
-            # Extract labels and initialize the matrix
-            labels = list(compound.members[0].label_to_id.keys())
-            size = len(labels)
-            matrix = [["-  " for _ in range(size)] for _ in range(size)]
-            label_to_index = {label: idx for idx, label in enumerate(labels)}
+                # Fill the matrix with bond lengths
+                for bond, length in compound.bond_lengths.items():
+                    label1, label2 = bond.split()
+                    idx1, idx2 = label_to_index[label1], label_to_index[label2]
+                    matrix[idx1][idx2] = f"{length:.4f}"
+                    matrix[idx2][idx1] = f"{length:.4f}"  # Ensure the matrix is symmetric
 
-            # Fill the matrix with bond lengths
-            for bond, length in compound.bond_lengths.items():
-                label1, label2 = bond.split()
-                idx1, idx2 = label_to_index[label1], label_to_index[label2]
-                matrix[idx1][idx2] = f"{length:.4f}"
-                matrix[idx2][idx1] = f"{length:.4f}"  # Ensure the matrix is symmetric
+                # Print the matrix
+                header = " ".join(f"{label:>8}" for label in labels)
+                print(f"     {header}")
+                for idx, label in enumerate(labels):
+                    row = " ".join(f"{val:>8}" for val in matrix[idx])
+                    print(f"{label:>5} {row}")
 
-            # Print the matrix
-            header = " ".join(f"{label:>8}" for label in labels)
-            print(f"     {header}")
-            for idx, label in enumerate(labels):
-                row = " ".join(f"{val:>8}" for val in matrix[idx])
-                print(f"{label:>5} {row}")
+            should_draw_compounds = prompt_yn("Draw compounds to PDF?", False)
+            if (should_draw_compounds):
+                for compound in traj.compounds.values():
+                    compound.members[0].draw_graph(compound.comp_id+1)
+
+            is_keep_compounds = prompt_yn("Accept these molecules (y) or change something (n)", True)
+
+            if is_keep_compounds:
+                break
+
+            # Otherwise allow user to break bonds
+            break_bonds(traj)
+
+            # Re-guess molecules with forbidden bonds
+            traj.guess_molecules()
+
+
+def break_bonds(traj):
+    while True:
+        print("\nCurrent Compounds:")
+        for i, compound in enumerate(traj.compounds.values(), start=1):
+            print(f"{i}: {compound.rep}")
+
+        comp_id = prompt_int("Which compound to modify?", -1, "[done]") - 1
+
+        if comp_id < 0:
+            break
+
+        try:
+            compound = list(traj.compounds.values())[comp_id]
+        except (ValueError, IndexError):
+            print("Invalid compound number.")
+            continue
+
+        atom1 = prompt("First atom label to break bond (e.g., O1): ").strip()
+        atom2 = prompt("Second atom label to break bond (e.g., H2): ").strip()
+
+        # Look up global atom indices
+        try:
+            idx1 = compound.members[0].label_to_global_id[atom1]
+            idx2 = compound.members[0].label_to_global_id[atom2]
+        except KeyError:
+            print("Invalid atom label(s). Try again.")
+            continue
+
+        # Add forbidden bond for all molecules
+        for molecule in compound.members:
+            global_idx1 = molecule.label_to_global_id[atom1]
+            global_idx2 = molecule.label_to_global_id[atom2]
+            traj.forbidden_bonds.add((min(global_idx1, global_idx2), max(global_idx1, global_idx2)))
+
+        print(f"Added forbidden bond between {atom1} and {atom2}.")
 
 
 def choose_analysis():

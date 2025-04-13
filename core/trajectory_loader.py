@@ -4,6 +4,7 @@ import os
 import json
 import numpy as np
 import itertools
+from collections import Counter
 from abc import ABC, abstractmethod
 from scipy.spatial import cKDTree
 from atomic_properties import elem_masses, elem_vdW, elem_covalent, elem_number, elem_color  # Import atomic properties
@@ -33,29 +34,29 @@ class Molecule:
     """
     def __init__(self, mol_id: int, atom_ids: list, symbols: list):
         self.mol_id = mol_id
-        self.atom_ids = atom_ids
+        self.atom_ids = np.array(atom_ids, dtype=np.int32)
         self.symbols = symbols
         self.comp_id = None
         self.atomic_masses = [elem_masses[s] for s in symbols]
         self.atomic_radii = [elem_vdW[s] for s in symbols]
-        self.coords = []
+        self.coords = None
         self.bonds = []  # List of (atom_id1, atom_id2) tuples
         self.bond_lengths_sq = []
         self.com = [0, 0, 0]
-        self.bonds_internal = []
         self.atoms = []
         self.id_to_label = {}
         self.label_to_id = {}
         self.label_to_global_id = {}
 
-    def update_coords(self, coords: np.ndarray, box_size: np.ndarray=None):
+    def update_coords(self, coords: np.ndarray, box_size: np.ndarray = None):
         self.coords = coords[self.atom_ids]
-        if (box_size):
-            self.coords = np.mod(self.coords, box_size)  # Ensure coordinates are within the box
+        if box_size is not None:
+            np.mod(self.coords, box_size, out=self.coords)  # In-place modulo, faster
 
         # Update atom coords
-        for i, atom in enumerate(self.atoms):
-            atom.coord = self.coords[i]
+        for atom, coord in zip(self.atoms, self.coords):
+            atom.coord = coord
+
 
     def update_com(self, box_size):
         base_coord = self.coords[0]
@@ -72,19 +73,11 @@ class Molecule:
         self.com = np.average(adjusted_coords, axis=0, weights=self.atomic_masses)
         self.com = np.mod(self.com, box_size)  # Ensure COM is within the box
 
-    def convert_bonds_to_internal_ids(self):
-        self.internal_ids = {global_id: i for i, global_id in enumerate(self.atom_ids)}
-        self.bonds_internal = [(self.internal_ids[a], self.internal_ids[b]) for a, b in self.bonds]
-
     def calculate_extended_connectivity(self):
         # Create atoms with initial EC values
-        self.convert_bonds_to_internal_ids()
-        atoms = []
+        atoms = [Atom(elem_number[s], idx) for s, idx in zip(self.symbols, self.atom_ids)]
 
-        for s,idx in zip(self.symbols, self.atom_ids):
-            atoms.append(Atom(elem_number[s], idx))
-
-        for a, b in self.bonds_internal:
+        for a, b in self.bonds:
             atoms[a].bonds.append(b)
             atoms[b].bonds.append(a)
 
@@ -127,7 +120,7 @@ class Molecule:
                 self.label_to_global_id[f"{symbol}{index}"] = self.atom_ids[internal_id]
 
         self.bond_lengths_table = {}
-        for i, (a, b) in enumerate(self.bonds_internal):
+        for i, (a, b) in enumerate(self.bonds):
             label_a = self.id_to_label[a]
             label_b = self.id_to_label[b]
             bond_length_sq = self.bond_lengths_sq[i]
@@ -145,7 +138,7 @@ class Molecule:
         for label in self.label_to_id.keys():
             g.add_node(label)
 
-        for a, b in self.bonds_internal:
+        for a, b in self.bonds:
             g.add_edge(self.id_to_label[a], self.id_to_label[b])
 
         node_sizes = [elem_vdW.get(self.symbols[id], 1) * 2000 for id in self.id_to_label.keys()]
@@ -207,12 +200,14 @@ class BaseTrajectory(ABC):
     def __init__(self, fin, box_size):
         self.fin = fin
         self.box_size = box_size
+        self.half_box_size = self.box_size / 2
         self.dimx, self.dimy, self.dimz = box_size
         self.natoms = 0
         self.symbols = []
         self.coords = []
         self.atoms = {}
         self.compounds = {}
+        self.forbidden_bonds = set()  # (atom_idx1, atom_idx2) pairs to prevent bonding
 
     @abstractmethod
     def read_frame(self):
@@ -221,11 +216,12 @@ class BaseTrajectory(ABC):
     # TODO: Use pre-calculated bond distance list
     def are_connected(self, coord1: np.ndarray, coord2: np.ndarray, rad1: float, rad2: float) -> bool:
         dist = np.abs(coord1 - coord2)
-        dist = np.where(dist > np.array([self.dimx, self.dimy, self.dimz]) / 2, np.abs(dist - np.array([self.dimx, self.dimy, self.dimz])), dist)
+        dist = np.where(dist > self.half_box_size, np.abs(dist - self.box_size), dist)
         distance_sq = np.sum(dist**2)
         return distance_sq if distance_sq < ((rad1 + rad2) * 1.4)**2 else False
 
     def guess_molecules(self):
+        self.atoms = {}
         symbols = self.symbols
         coords = self.coords
 
@@ -252,53 +248,67 @@ class BaseTrajectory(ABC):
                     current_atom = stack.pop()
                     rad1 = elem_covalent.get(symbols[current_atom], 0.0)
 
-                    neighbors = sorted(kdtree.query_ball_point(coords[current_atom], r=elem_vdW.get(symbols[current_atom], 0.0) ))
-                    #neighbors = kdtree.query_ball_point(coords[current_atom], r=elem_vdW.get(symbols[current_atom], 0.0))
+                    neighbors = sorted(kdtree.query_ball_point(coords[current_atom], r=elem_vdW.get(symbols[current_atom], 0.0)))
 
                     for neighbor in neighbors:
+                        if (min(current_atom, neighbor), max(current_atom, neighbor)) in self.forbidden_bonds:
+                            continue
                         rad2 = elem_covalent.get(symbols[neighbor], 0.0)
                         if symbols[neighbor] not in EXCLUDED_ELEMENTS and (neighbor not in visited or (neighbor in molecule and (current_atom, neighbor) not in bonds)):
                             if r_sq := self.are_connected(coords[current_atom], coords[neighbor], rad1, rad2):
-                                # Ensure atoms are only added once to `molecule`
                                 if neighbor not in visited:
                                     stack.append(neighbor)
                                     molecule.append(neighbor)
                                     visited.add(neighbor)
-
-                                # Ensure bonds are always recorded, even for cycles
                                 if (current_atom, neighbor) not in bonds and (neighbor, current_atom) not in bonds:
                                     bonds.append((current_atom, neighbor))
                                     bond_lengths_sq.append(r_sq)
 
-
+            # Now: safe mapping
             mol = Molecule(len(molecules), molecule, [symbols[i] for i in molecule])
-            mol.bonds = bonds
+
+            global_to_local = {global_idx: local_idx for local_idx, global_idx in enumerate(molecule)}
+
+            # Only remap bonds now that you have full mapping!
+            mol.bonds = [(global_to_local[a], global_to_local[b]) for (a, b) in bonds]
             mol.bond_lengths_sq = bond_lengths_sq
             mol.calculate_extended_connectivity()
             molecules.append(mol)
+
         return molecules
+
 
     def _classify_molecules(self, symbols: list, molecules: list):
         compounds = {}
 
         for mol in molecules:
-            symbol_count = {}
-            for atom_index in mol.atom_ids:
-                symbol = symbols[atom_index]
-                symbol_count[symbol] = symbol_count.get(symbol, 0) + 1
+            # --- Count symbols using Counter ---
+            symbol_counter = Counter(symbols[atom_index] for atom_index in mol.atom_ids)
 
-            sorted_symbols = sorted(symbol_count.items())
-            form_str = ''.join([f"{symbol}{count}" if count > 1 else symbol for symbol, count in sorted_symbols])
+            # Build formula string, e.g., "BF4"
+            sorted_symbols = sorted(symbol_counter.items())
+            form_str = ''.join(f"{symbol}{count}" if count > 1 else symbol for symbol, count in sorted_symbols)
 
-            bond_str = tuple(sorted((symbols[a], symbols[b]) if symbols[a] <= symbols[b] else (symbols[b], symbols[a]) for a, b in mol.bonds))
-            compound_key = (form_str, bond_str)
+            # --- Build bond types ---
+            bond_types = []
+            for a, b in mol.bonds:
+                sym1 = mol.symbols[a]
+                sym2 = mol.symbols[b]
+                if sym1 > sym2:
+                    sym1, sym2 = sym2, sym1
+                bond_types.append((sym1, sym2))
 
+            bond_types.sort()  # Sort bonds globally
+            compound_key = (form_str, tuple(bond_types))
+
+            # --- Assign to compound ---
             if compound_key not in compounds:
                 compounds[compound_key] = Compound(len(compounds), form_str)
 
             mol.comp_id = compounds[compound_key].comp_id
             compounds[compound_key].members.append(mol)
 
+            # --- Update trajectory atom mapping ---
             for atom_index, atom in zip(mol.atom_ids, mol.atoms):
                 self.atoms[atom_index] = atom
 
@@ -309,6 +319,7 @@ class BaseTrajectory(ABC):
         for comp in self.compounds.values():
             for mol in comp.members:
                 mol.update_coords(self.coords)
+            comp.update_coms(self.box_size)
 
 class XYZTrajectory(BaseTrajectory):
     def read_frame(self):
@@ -358,6 +369,7 @@ class LAMMPSTrajectory(BaseTrajectory):
             length = dim[1] - dim[0]
             self.box_size.append(length)
         self.box_size = np.array(self.box_size)
+        self.half_box_size = self.box_size / 2
         self.dimx, self.dimy, self.dimz = self.box_size
 
         line = self.fin.readline().strip()

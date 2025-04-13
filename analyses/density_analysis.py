@@ -1,61 +1,90 @@
 import numpy as np
-from utils import prompt
+from utils import prompt, prompt_int, prompt_float, prompt_choice
 
 def density(traj):
     # Prompt user for density analysis parameters
-    axis = prompt("Choose the axis for density analysis (x, y, z): ", "z").lower()
-    if axis not in ['x', 'y', 'z']:
-        raise ValueError("Invalid axis. Choose either 'x', 'y', or 'z'.")
-
+    axis = prompt_choice("Choose the axis for density analysis", ["x", "y", "z"], "z")
     axis_index = {'x': 0, 'y': 1, 'z': 2}[axis]
-    step_size = float(prompt("Enter the step size for density calculation (in Å): ", 0.1))
+    step_size = prompt_float("Enter the step size for density calculation (in Å): ", 0.1)
 
-    # Initialize the density accumulator
-    num_bins = int(np.ceil(traj.box_size[axis_index] / step_size))
-    densities = {compound_name: np.zeros(num_bins) for compound_name in traj.compounds.keys()}
-    num_frames = 0
+    box_length = traj.box_size[axis_index]
+    num_bins = int(np.ceil(box_length / step_size))
+    bin_centers = (np.arange(num_bins) + 0.5) * step_size
 
-    # Loop through all frames
-    while True:
+    # Initialize density accumulators
+    densities = {comp_id: np.zeros(num_bins) for comp_id in traj.compounds.keys()}
+
+    start_frame =  prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
+    nframes =      prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
+    frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
+    frame_idx = 0
+    processed_frames = 0
+
+    if (start_frame > 1):
+        print(f"Skipping forward to frame {start_frame}.")
+        while (frame_idx < start_frame - 1):
+            traj.read_frame()
+            frame_idx += 1
+
+    while (nframes != 0):
         try:
-            # Update the coordinates and COMs for each compound
+            # Update coords
             for compound in traj.compounds.values():
                 for molecule in compound.members:
                     molecule.update_coords(traj.coords)
                 compound.update_coms(traj.box_size)
 
-            # Perform the density calculation for the current frame
-            frame_densities = calculate_density(traj, axis_index, step_size, num_bins)
-            for compound_name in densities.keys():
-                densities[compound_name] += frame_densities[compound_name]
+            # Precompute COMs
+            coms_per_compound = {
+                comp_id: np.array([mol.com[axis_index] for mol in comp.members])
+                for comp_id, comp in traj.compounds.items()
+            }
 
-            num_frames += 1
-            print(f"Frame {num_frames} processed.")
+            frame_densities = calculate_density(coms_per_compound, num_bins, step_size)
 
-            # Read the next frame
-            traj.read_frame()
+            # Accumulate
+            for comp_id in densities.keys():
+                densities[comp_id] += frame_densities[comp_id]
+
+            processed_frames += 1
+            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
+
+            for _ in range(frame_stride):
+                frame_idx += 1
+                nframes -= 1
+                traj.read_frame()
+
+
         except ValueError:
-            # End of the trajectory file
+            # End of trajectory file
             break
 
-    # Average the density results over all frames
-    for compound_name in densities.keys():
-        densities[compound_name] /= num_frames
+        except KeyboardInterrupt:
+            # Graceful exit when user presses Ctrl+C
+            print("\nInterrupt received! Exiting main loop and post-processing data...")
+            break
 
-    # Output the averaged density results
-    print("\nAveraged Density Results:")
-    bin_positions = np.arange(num_bins) * step_size #+ step_size / 2
-    header = "r (Å)" + ''.join([f"    {compound.rep}" for compound in traj.compounds.values()])
-    print(header)
-    for i in range(num_bins):
-        row = f"{bin_positions[i]:.4f}" + ''.join([f"    {densities[compound_name][i]:.4f}" for compound_name in densities.keys()])
-        print(row)
 
-def calculate_density(traj, axis_index, step_size, num_bins):
-    density = {compound_name: np.zeros(num_bins) for compound_name in traj.compounds.keys()}
+    print()
 
-    for compound_name, compound in traj.compounds.items():
-        coms = np.array([molecule.com[axis_index] for molecule in compound.members])
+    # Normalize
+    for comp_id in densities.keys():
+        densities[comp_id] /= processed_frames
+
+    # Save to file
+    with open("density.dat", "w") as f:
+        header = "r/Å" + ''.join([f"    {traj.compounds[k].rep}" for k in sorted(densities.keys())])
+        f.write(f"{header}\n")
+        for i in range(num_bins):
+            row = f"{bin_centers[i]:.4f}" + ''.join([f"    {densities[k][i]:.4f}" for k in sorted(densities.keys())])
+            f.write(f"{row}\n")
+
+    print("\nDensity data saved to 'density.dat'.")
+
+def calculate_density(coms_per_compound, num_bins, step_size):
+    density = {comp_id: np.zeros(num_bins) for comp_id in coms_per_compound.keys()}
+
+    for comp_id, coms in coms_per_compound.items():
         lower_bins = np.floor(coms / step_size).astype(int)
         upper_bins = lower_bins + 1
 
@@ -65,11 +94,11 @@ def calculate_density(traj, axis_index, step_size, num_bins):
         lower_weights = (upper_bin_pos - coms) / step_size
         upper_weights = (coms - lower_bin_pos) / step_size
 
-        valid_lower_bins = (lower_bins >= 0) & (lower_bins < num_bins)
-        valid_upper_bins = (upper_bins >= 0) & (upper_bins < num_bins)
+        valid_lower = (lower_bins >= 0) & (lower_bins < num_bins)
+        valid_upper = (upper_bins >= 0) & (upper_bins < num_bins)
 
-        np.add.at(density[compound_name], lower_bins[valid_lower_bins], lower_weights[valid_lower_bins])
-        np.add.at(density[compound_name], upper_bins[valid_upper_bins], upper_weights[valid_upper_bins])
+        np.add.at(density[comp_id], lower_bins[valid_lower], lower_weights[valid_lower])
+        np.add.at(density[comp_id], upper_bins[valid_upper], upper_weights[valid_upper])
 
     return density
 
