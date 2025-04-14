@@ -1,7 +1,7 @@
 # analyses/rdf_analysis.py
 import numpy as np
 from scipy.spatial import cKDTree
-from utils import prompt
+from utils import label_matches, prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
 def rdf(traj):
     # Prompt user for RDF parameters
@@ -14,10 +14,22 @@ def rdf(traj):
 
     # Initialize the RDF accumulator
     rdf_accumulator = [0] * bin_count
-    num_frames = 0
+
+    start_frame =  prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
+    nframes =      prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
+    frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
+    frame_idx = 0
+    processed_frames = 0
 
     # Loop through all frames
-    while True:
+    if (start_frame > 1):
+        print(f"Skipping forward to frame {start_frame}.")
+        while (frame_idx < start_frame - 1):
+            traj.read_frame()
+            frame_idx += 1
+
+
+    while (nframes != 0):
         try:
             # Update the coordinates and COMs for each compound
             for compound in traj.compounds.values():
@@ -34,17 +46,25 @@ def rdf(traj):
             for i, (distance, value) in enumerate(rdf_result):
                 rdf_accumulator[i] += value
 
-            num_frames += 1
-            print(num_frames)
+            processed_frames += 1
+            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
 
-            # Read the next frame
-            traj.read_frame()
+            for _ in range(frame_stride):
+                frame_idx += 1
+                nframes -= 1
+                traj.read_frame()
+
         except ValueError:
-            # End of the trajectory file
+            # End of trajectory file
+            break
+
+        except KeyboardInterrupt:
+            # Graceful exit when user presses Ctrl+C
+            print("\nInterrupt received! Exiting main loop and post-processing data...")
             break
 
     # Average the RDF results over all frames
-    rdf_average = [value / num_frames for value in rdf_accumulator]
+    rdf_average = [value / processed_frames for value in rdf_accumulator]
 
     # Output the averaged RDF results
     print("\nAveraged RDF Results:")

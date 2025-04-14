@@ -98,8 +98,8 @@ def cluster(traj):
                         write_xyz(f"{composition}_{graph_id}.xyz", cluster_atoms, isSaveWhole, traj.box_size)
 
 
-            print(f"Processed {processed_frames} frames (current frame {frame_idx+1})")
             processed_frames += 1
+            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
 
             for _ in range(frame_stride):
                 frame_idx += 1
