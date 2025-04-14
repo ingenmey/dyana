@@ -17,8 +17,11 @@ def adf_threebody(traj):
     neighbor1_label = prompt("Label of first neighbor atom: ")
     neighbor2_label = prompt("Label of second neighbor atom: ")
 
-    cutoff1 = prompt_float("Cutoff for center - neighbor1 (Å): ", 3.5)
-    cutoff2 = prompt_float("Cutoff for center - neighbor2 (Å): ", 3.5)
+    cutoffs = np.zeros((2,2))
+    cutoffs[0,0] = prompt_float("Minimum distance for center - neighbor1 (Å): ", 0.0)
+    cutoffs[0,1] = prompt_float("Maximum distance for center - neighbor1 (Å): ", 3.5)
+    cutoffs[1,0] = prompt_float("Minimum distance for center - neighbor2 (Å): ", 0.0)
+    cutoffs[1,1] = prompt_float("Maximum distance for center - neighbor2 (Å): ", 3.5)
 
     enforce_threebody = prompt_yn("Enforce that neighbor1 and neighbor2 come from different molecules?", True)
 
@@ -72,14 +75,15 @@ def adf_threebody(traj):
 
             vec1, vec2 = compute_threebody_vectors_fast(
                 traj, center_ids, neighbor1_ids, neighbor2_ids,
-                cutoff1, cutoff2, box_size, enforce_threebody
+                cutoffs, box_size, enforce_threebody
             )
 
-            adf_result = calculate_adf(vec1, vec2, bin_count)
-            adf_accumulator += adf_result
+            if vec1.any() and vec2.any():
+                adf_result = calculate_adf(vec1, vec2, bin_count)
+                adf_accumulator += adf_result
 
             processed_frames += 1
-            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
+#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
 
             # Move to next frame
             for _ in range(frame_stride):
@@ -114,10 +118,12 @@ def find_matching_labels(mol, user_label):
     return [atom_idx for label, atom_idx in mol.label_to_global_id.items() if label_matches(user_label, label)]
 
 
-def compute_threebody_vectors_fast(traj, center_ids, neighbor1_ids, neighbor2_ids, cutoff1, cutoff2, box_size, enforce_threebody):
+def compute_threebody_vectors_fast(traj, center_ids, neighbor1_ids, neighbor2_ids, cutoffs, box_size, enforce_threebody):
     """
-    Fast KDTree-based threebody vector computation with correct triplet structure.
+    Fast KDTree-based threebody vector computation with correct triplet structure
+    and min/max distance cutoff handling.
     """
+
     coords = traj.coords
     box_size = np.asarray(box_size)
 
@@ -132,23 +138,42 @@ def compute_threebody_vectors_fast(traj, center_ids, neighbor1_ids, neighbor2_id
     vectors2 = []
 
     for idx_center, center in enumerate(center_coords):
-        neighbor1_indices = kdtree_n1.query_ball_point(center, cutoff1)
+        # Neighbor 1 search
+        neighbor1_candidates = kdtree_n1.query_ball_point(center, cutoffs[0,1])
+        neighbor1_indices = []
+        for idx in neighbor1_candidates:
+            disp = neighbor1_coords[idx] - center
+            disp -= np.round(disp / box_size) * box_size  # Minimum image convention
+            dist = np.linalg.norm(disp)
+            if dist >= cutoffs[0,0]:  # Apply min cutoff
+                neighbor1_indices.append(idx)
 
+        # Neighbor 2 search
+        neighbor2_candidates = kdtree_n2.query_ball_point(center, cutoffs[1,1])
+        neighbor2_indices = []
+        for idx in neighbor2_candidates:
+            disp = neighbor2_coords[idx] - center
+            disp -= np.round(disp / box_size) * box_size
+            dist = np.linalg.norm(disp)
+            if dist >= cutoffs[1,0]:  # Apply min cutoff
+                neighbor2_indices.append(idx)
+
+        # Loop over all valid neighbor pairs
         for n1_idx in neighbor1_indices:
-            neighbor1 = neighbor1_coords[n1_idx]
-
-            neighbor2_indices = kdtree_n2.query_ball_point(center, cutoff2)
-
             for n2_idx in neighbor2_indices:
                 if neighbor1_ids[n1_idx] == neighbor2_ids[n2_idx]:
-                    continue  # skip if neighbor1 and neighbor2 are the same atom
+                    continue  # Skip if neighbor1 and neighbor2 are the same atom
 
                 idx1 = neighbor1_ids[n1_idx]
                 idx2 = neighbor2_ids[n2_idx]
 
-                if enforce_threebody and (traj.atoms[idx1].parent_molecule == traj.atoms[idx2].parent_molecule):
-                    continue
+                if enforce_threebody:
+                    mol1 = traj.atoms[idx1].parent_molecule
+                    mol2 = traj.atoms[idx2].parent_molecule
+                    if mol1 == mol2:
+                        continue  # Skip if neighbor1 and neighbor2 are from same molecule
 
+                neighbor1 = neighbor1_coords[n1_idx]
                 neighbor2 = neighbor2_coords[n2_idx]
 
                 # Build center-to-neighbor vectors
@@ -189,4 +214,5 @@ def calculate_adf(vec1, vec2, bin_count):
     adf *= norm_factors
 
     return adf
+
 
