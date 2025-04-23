@@ -32,6 +32,7 @@ def cluster(traj):
                 compound_atom_pairs.append(((comp1, atom1), (comp2, atom2)))
 
     # Prompt user if cluster graphs should be drawn
+    shouldHash = prompt_yn("Count clusters by composition (n) or by composition and graph hash (y)?", True)
     visFormat = prompt_yn("Visualize cluster graphs?", False)
     if visFormat:
         visFormat = prompt_choice("Save cluster in which format?", ["svg", "png"], "svg")
@@ -88,7 +89,10 @@ def cluster(traj):
 
             # Store graphs and their occurrences
             for composition, graph, cluster_atoms in clusters:
-                graph_id = get_graph_id(graph)
+                if shouldHash:
+                    graph_id = get_graph_id(graph)
+                else:
+                    graph_id = 0
                 cluster_histogram[(composition, graph_id)] += 1
                 if (composition, graph_id) not in seen_graphs:
                     seen_graphs.add((composition, graph_id))
@@ -255,7 +259,7 @@ def post_process_clusters(cluster_histogram, graph_list, visFormat):
     # Save images for visualization if requested
     if visFormat:
         for i, ((composition, graph_id), count) in enumerate(sorted_clusters):
-            if i > 100:
+            if i > 200:
                 break
             if (composition, graph_id) in graph_dict:
                 filename = f"graph{i}_{composition}.{visFormat}"

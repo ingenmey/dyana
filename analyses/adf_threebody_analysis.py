@@ -83,7 +83,7 @@ def adf_threebody(traj):
                 adf_accumulator += adf_result
 
             processed_frames += 1
-#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
+            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
 
             # Move to next frame
             for _ in range(frame_stride):

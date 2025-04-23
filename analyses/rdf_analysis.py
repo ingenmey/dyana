@@ -67,11 +67,13 @@ def rdf(traj):
     rdf_average = [value / processed_frames for value in rdf_accumulator]
 
     # Output the averaged RDF results
-    print("\nAveraged RDF Results:")
-    for i, value in enumerate(rdf_average):
-        distance = (i + 0.5) * (max_distance / bin_count)
-        print(f"Distance: {distance:.4f} Å, RDF: {value:.4f}")
+    with open(f"rdf_{ref_label}_{obs_label}.dat", "w") as f:
+        f.write("r/pm   g(r)\n")
+        for i, value in enumerate(rdf_average):
+            distance = (i + 0.5) * (max_distance / bin_count)
+            f.write(f"{distance:.4f} {value:.8f}\n")
 
+    print(f"\nRDF results saved to rdf_{ref_label}_{obs_label}.dat")
 
 
 def calculate_rdf(ref_compound, obs_compound, ref_label, obs_label, box_size, max_distance, bin_count):
