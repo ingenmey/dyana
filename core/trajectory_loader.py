@@ -213,6 +213,12 @@ class BaseTrajectory(ABC):
     def read_frame(self):
         pass
 
+    def update_molecule_coords(self):
+        for comp in self.compounds.values():
+            for mol in comp.members:
+                mol.update_coords(self.coords)
+            comp.update_coms(self.box_size)
+
     # TODO: Use pre-calculated bond distance list
     def are_connected(self, coord1: np.ndarray, coord2: np.ndarray, rad1: float, rad2: float) -> bool:
         dist = np.abs(coord1 - coord2)
@@ -314,12 +320,6 @@ class BaseTrajectory(ABC):
 
         self.compounds = compounds
 
-
-    def update_molecule_coords(self):
-        for comp in self.compounds.values():
-            for mol in comp.members:
-                mol.update_coords(self.coords)
-            comp.update_coms(self.box_size)
 
 class XYZTrajectory(BaseTrajectory):
     def read_frame(self):

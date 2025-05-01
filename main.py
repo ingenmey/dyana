@@ -10,6 +10,8 @@ from analyses.density_analysis import density
 from analyses.surface_voronoi import surface_voronoi
 from analyses.percolation import percolation
 from analyses.cluster_analysis import cluster
+from analyses.dacf_analysis import dacf
+from analyses.top_analysis import tetrahedral_order
 from utils import set_input_file, set_log_file, close_log_file
 from utils import prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
@@ -20,7 +22,9 @@ AVAILABLE_ANALYSES = {
     'dens': ('Particle density analysis', density),
     'voro2d': ('2D surface voronoi analysis', surface_voronoi),
     'percolation': ('Hydrogen bond percolation analysis', percolation),
-    'cluster': ('Cluster composition histogram', cluster)
+    'cluster': ('Cluster composition histogram', cluster),
+    'dacf': ('Dimer existence auto-correlation function', dacf),
+    'top': ('Tetrahedral order parameter', tetrahedral_order),
 }
 
 def determine_traj_format(traj_file):

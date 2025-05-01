@@ -2,7 +2,7 @@ import os
 import numpy as np
 import re
 from scipy.spatial import cKDTree
-from collections import Counter, defaultdict
+from collections import Counter
 from itertools import combinations
 from utils import label_matches, prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
@@ -41,10 +41,6 @@ def cluster(traj):
     if isSaveXYZ:
         isSaveWhole = prompt_yn("Save whole molecules (Y) or only specified atom types (N)?", False)
 
-    compute_cacf = prompt_yn("Compute cluster autocorrelation functions?", True)
-    if (compute_cacf):
-        corr_depth = prompt_int("Maximum correlation depth (number of frames): ", 100, minval=1)
-
     start_frame =  prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
     nframes =      prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
     frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
@@ -57,8 +53,6 @@ def cluster(traj):
     # Loop through all frames
     graph_list = []
     seen_graphs = set()  # Track unique graphs
-    all_cluster_ids = set()  # 🆕 Track all known cluster instance IDs (composition, graph_id, atom_ids)
-    cluster_beta = defaultdict(lambda: defaultdict(list))  # 🆕 {(composition, graph_id): {frozenset(atom_idxs): [0,1,0,...]}}
 
     if (start_frame > 1):
         print(f"Skipping forward to frame {start_frame}.")
@@ -93,30 +87,19 @@ def cluster(traj):
             if isSaveXYZ and not os.path.exists("xyz"):
                 os.makedirs("xyz")
 
-            seen_this_frame = set()  # 🆕 Track clusters seen in this frame
-
             # Store graphs and their occurrences
             for composition, graph, cluster_atoms in clusters:
-                graph_id = get_graph_id(graph) if shouldHash else 0
+                if shouldHash:
+                    graph_id = get_graph_id(graph)
+                else:
+                    graph_id = 0
                 cluster_histogram[(composition, graph_id)] += 1
-
-                atom_ids = frozenset(atom.idx for atom in cluster_atoms)
-                seen_this_frame.add((composition, graph_id, atom_ids))
-                all_cluster_ids.add((composition, graph_id, atom_ids))
-                cluster_beta[(composition, graph_id)][atom_ids].append(1)  # 🆕 Exists in this frame
-
                 if (composition, graph_id) not in seen_graphs:
                     seen_graphs.add((composition, graph_id))
                     graph_list.append((composition, graph_id, graph))
-
-                if isSaveXYZ and len(cluster_atoms) > 1:
+                if isSaveXYZ:
+                    if len(cluster_atoms) > 1:
                         write_xyz(f"{composition}_{graph_id}.xyz", cluster_atoms, isSaveWhole, traj.box_size)
-
-            # 🆕 Pad 0s for any clusters not seen in this frame
-            for comp_graph, instance_dict in cluster_beta.items():
-                for atom_ids in instance_dict:
-                    if (comp_graph[0], comp_graph[1], atom_ids) not in seen_this_frame:
-                        cluster_beta[comp_graph][atom_ids].append(0)
 
 
             processed_frames += 1
@@ -146,34 +129,6 @@ def cluster(traj):
 
     # Post-process cluster to compute populations
     post_process_clusters(cluster_histogram, graph_list, visFormat)
-
-    # 🆕 --- Intermittent CACF Calculation ---
-    if compute_cacf:
-        print("\nComputing intermittent cluster autocorrelation functions...")
-        T = processed_frames
-        max_tau = min(corr_depth, T)
-
-        for (composition, graph_id), instances in cluster_beta.items():
-            cacf = np.zeros(max_tau)
-
-            for beta in instances.values():
-                b = np.array(beta)
-                if len(b) < T:
-                    b = np.pad(b, (0, T - len(b)), constant_values=0)
-
-                for tau in range(max_tau):
-                    cacf[tau] += np.sum(b[:T - tau] * b[tau:])
-
-            normalization = len(instances) * np.arange(T, T - max_tau, -1)
-            cacf /= normalization
-            cacf /= cacf[0]  # Normalize
-
-            with open(f"cacf_{composition}_{graph_id}.dat", "w") as f:
-                f.write("tau CACF\n")
-                for tau, val in enumerate(cacf):
-                    f.write(f"{tau} {val:.12f}\n")
-
-            print(f"Saved CACF for cluster type: {composition}, graph ID: {graph_id}")
 
 
 def write_xyz(filename, atoms, isSaveWhole, box_size):
