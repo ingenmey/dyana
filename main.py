@@ -12,6 +12,8 @@ from analyses.percolation import percolation
 from analyses.cluster_analysis import cluster
 from analyses.dacf_analysis import dacf
 from analyses.top_analysis import tetrahedral_order
+from analyses.pccf_analysis import proton_coupling
+from analyses.charge_msd import charge_transfer as charge_msd
 from utils import set_input_file, set_log_file, close_log_file
 from utils import prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
@@ -25,6 +27,8 @@ AVAILABLE_ANALYSES = {
     'cluster': ('Cluster composition histogram', cluster),
     'dacf': ('Dimer existence auto-correlation function', dacf),
     'top': ('Tetrahedral order parameter', tetrahedral_order),
+    'pccf': ('Proton coupling correlation function', proton_coupling),
+    'cmsd': ('Charge mean square displacement', charge_msd),
 }
 
 def determine_traj_format(traj_file):

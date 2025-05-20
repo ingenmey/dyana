@@ -254,7 +254,8 @@ class BaseTrajectory(ABC):
                     current_atom = stack.pop()
                     rad1 = elem_covalent.get(symbols[current_atom], 0.0)
 
-                    neighbors = sorted(kdtree.query_ball_point(coords[current_atom], r=elem_vdW.get(symbols[current_atom], 0.0)))
+                    #TODO: Find better solution for search radius
+                    neighbors = sorted(kdtree.query_ball_point(coords[current_atom], r=elem_vdW.get(symbols[current_atom], 0.0)*1.1))
 
                     for neighbor in neighbors:
                         if (min(current_atom, neighbor), max(current_atom, neighbor)) in self.forbidden_bonds:

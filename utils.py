@@ -52,25 +52,31 @@ def prompt(question, default=None, display_default=None):
         answer = _read_next_input_line()
         if answer is not None:
             print(question, answer)
-
-    if answer is None:
-        while True:
-            try:
-                answer = input(question + " ").strip()
-            except EOFError:
-                print("\nInput interrupted. Exiting.")
-                exit(1)
-
+            if log_file:
+                log_file.write(f"# {question.strip()}\n{answer}\n")
             if answer:
-                break
+                return answer
             elif default is not None:
-                answer = default
-                break
-            else:
-                print("Invalid input. Try again.")
+                return default
 
-    if log_file:
-        log_file.write(f"# {question.strip()}\n{answer}\n")
+    while True:
+        try:
+            answer = input(question + " ").strip()
+        except EOFError:
+            print("\nInput interrupted. Exiting.")
+            exit(1)
+
+        if answer:
+            if log_file:
+                log_file.write(f"# {question.strip()}\n{answer}\n")
+            return answer
+
+        elif default is not None:
+            if log_file:
+                log_file.write(f"# {question.strip()}\n\n")
+            return default
+        else:
+            print("Invalid input. Try again.")
 
     return answer
 
