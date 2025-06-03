@@ -14,6 +14,8 @@ from analyses.dacf_analysis import dacf
 from analyses.top_analysis import tetrahedral_order
 from analyses.pccf_analysis import proton_coupling
 from analyses.charge_msd import charge_transfer as charge_msd
+from analyses.cdf_analysis import cdf
+from analyses.neighbor_count import neighbor_count
 from utils import set_input_file, set_log_file, close_log_file
 from utils import prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
@@ -29,7 +31,11 @@ AVAILABLE_ANALYSES = {
     'top': ('Tetrahedral order parameter', tetrahedral_order),
     'pccf': ('Proton coupling correlation function', proton_coupling),
     'cmsd': ('Charge mean square displacement', charge_msd),
+    'cdf': ('Combined distribution function analysis', cdf),
+    'ncount': ('Neighbour-count probability', neighbor_count),
 }
+
+
 
 def determine_traj_format(traj_file):
     _, ext = os.path.splitext(traj_file)
@@ -51,6 +57,7 @@ def get_cell_vectors(traj_format):
         return np.array([0, 0, 0])
 
 def process_compounds(traj):
+        frame_idx = 0
         traj.guess_molecules()
 
         while True:
@@ -91,10 +98,17 @@ def process_compounds(traj):
             is_keep_compounds = prompt_yn("Accept these molecules (y) or change something (n)", True)
 
             if is_keep_compounds:
+                if frame_idx > 0:
+                    traj.reset_frame_idx()
                 break
 
-            # Otherwise allow user to break bonds
-            break_bonds(traj)
+            should_break = prompt_int("Break bonds (1) or repeat molecule recognition at specific frame (2)?", 1)
+
+            if should_break == 1:
+                # Otherwise allow user to break bonds
+                break_bonds(traj)
+            else:
+                frame_idx = skip_to_frame(traj, frame_idx)
 
             # Re-guess molecules with forbidden bonds
             traj.guess_molecules()
@@ -135,6 +149,23 @@ def break_bonds(traj):
             traj.forbidden_bonds.add((min(global_idx1, global_idx2), max(global_idx1, global_idx2)))
 
         print(f"Added forbidden bond between {atom1} and {atom2}.")
+
+
+def skip_to_frame(traj, frame_idx):
+    target_frame = prompt_int("Skip to which frame?", 0)
+
+    if target_frame > frame_idx:
+        nframes = target_frame - frame_idx
+    else:
+        traj.reset_frame_idx()
+        nframes = target_frame
+        frame_idx = 0
+
+    for _ in range(nframes):
+        frame_idx += 1
+        traj.read_frame()
+
+    return frame_idx
 
 
 def choose_analysis():

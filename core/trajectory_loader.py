@@ -213,6 +213,10 @@ class BaseTrajectory(ABC):
     def read_frame(self):
         pass
 
+    def reset_frame_idx(self):
+        self.fin.seek(0)
+        self.read_frame()
+
     def update_molecule_coords(self):
         for comp in self.compounds.values():
             for mol in comp.members:
@@ -255,7 +259,7 @@ class BaseTrajectory(ABC):
                     rad1 = elem_covalent.get(symbols[current_atom], 0.0)
 
                     #TODO: Find better solution for search radius
-                    neighbors = sorted(kdtree.query_ball_point(coords[current_atom], r=elem_vdW.get(symbols[current_atom], 0.0)*1.1))
+                    neighbors = sorted(kdtree.query_ball_point(coords[current_atom], r=elem_vdW.get(symbols[current_atom], 0.0)*1.164))
 
                     for neighbor in neighbors:
                         if (min(current_atom, neighbor), max(current_atom, neighbor)) in self.forbidden_bonds:

@@ -32,6 +32,19 @@ def cluster(traj):
                 compound_atom_pairs.append(((comp1, atom1), (comp2, atom2)))
 
     # Prompt user if cluster graphs should be drawn
+    max_depth = prompt_int("Enter maximum cluster search depth:", np.inf, "[inf]")
+
+    limit_seeds = prompt_yn("Limit cluster seeds to specific atom types?", False)
+    seed_atom_flags = {}  # (comp_id, atom_label) -> True/False
+    if limit_seeds:
+        for (comp_id, atom_label) in compound_atom_labels.items():
+            for label in atom_label:
+                use_as_seed = prompt_yn(f"Use {label} in compound {comp_id} as cluster seed?", False)
+                seed_atom_flags[(comp_id, label)] = use_as_seed
+    else:
+        # Default: all atom types are allowed as seeds
+        seed_atom_flags = {key: True for key in atom_groups.keys()}
+
     shouldHash = prompt_yn("Count clusters by composition (n) or by composition and graph hash (y)?", True)
     visFormat = prompt_yn("Visualize cluster graphs?", False)
     if visFormat:
@@ -88,7 +101,7 @@ def cluster(traj):
 
 
             # Identify clusters as graphs
-            clusters = identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, traj.box_size)
+            clusters = identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, traj.box_size, seed_atom_flags, max_depth)
 
             if isSaveXYZ and not os.path.exists("xyz"):
                 os.makedirs("xyz")
@@ -223,7 +236,7 @@ def write_xyz(filename, atoms, isSaveWhole, box_size):
             f.write(f"{symbol} {coord[0]:.6f} {coord[1]:.6f} {coord[2]:.6f}\n")
 
 
-def identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, box_size):
+def identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, box_size, seed_atom_flags, max_depth):
     # Build KDTree per (comp_id, label)
     kdtrees = {
         (comp_id, atom_label): cKDTree([atom.coord for atom in atoms], boxsize=box_size)
@@ -244,7 +257,7 @@ def identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, box_s
     visited = set()
     clusters = []
 
-    def grow_cluster(atom, comp_id, atom_label, atom_idx, cluster, graph, atom_counts):
+    def grow_cluster(atom, comp_id, atom_label, atom_idx, cluster, graph, atom_counts, max_depth, current_depth):
         if atom in visited:
             return
         visited.add(atom)
@@ -255,6 +268,9 @@ def identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, box_s
         key = f"{comp_id}-{atom_label}"
         atom_counts[key] = atom_counts.get(key, 0) + 1
 
+        if current_depth >= max_depth:
+            return
+
         for (other_comp, other_label) in valid_neighbors[(comp_id, atom_label)]:
             neighbors = kdtrees[(other_comp, other_label)].query_ball_point(
                 atom.coord,
@@ -263,18 +279,20 @@ def identify_clusters(atom_groups, compound_atom_labels, cutoff_distances, box_s
             for neighbor_idx in neighbors:
                 neighbor_atom = atom_groups[(other_comp, other_label)][neighbor_idx]
                 if neighbor_atom not in visited:
-                    grow_cluster(neighbor_atom, other_comp, other_label, neighbor_idx, cluster, graph, atom_counts)
+                    grow_cluster(neighbor_atom, other_comp, other_label, neighbor_idx, cluster, graph, atom_counts, max_depth, current_depth + 1)
                 # Always add the edge
                 graph.add_edge(atom, neighbor_atom)
 
     # Loop over atoms and grow clusters
     for (comp_id, atom_label), atoms in atom_groups.items():
         for idx, atom in enumerate(atoms):
+            if not seed_atom_flags.get((comp_id, atom_label), False):
+                continue
             if atom not in visited:
                 cluster = []
                 atom_counts = {}
                 graph = nx.Graph()
-                grow_cluster(atom, comp_id, atom_label, idx, cluster, graph, atom_counts)
+                grow_cluster(atom, comp_id, atom_label, idx, cluster, graph, atom_counts, max_depth, 0)
 
                 composition = "_".join(f"{key}-{count}" for key, count in sorted(atom_counts.items()))
                 clusters.append((composition, graph, cluster))

@@ -1,76 +1,78 @@
 # analyses/adf_analysis.py
 
 import numpy as np
-from utils import prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
-from utils import label_matches
+from utils import prompt, prompt_int, prompt_float, prompt_yn, prompt_choice, label_matches
+from analyses.metrics import Selector, AngleMetric
+from analyses.histogram import HistogramND
 
 def adf(traj):
-    # List compounds
     print("\nAvailable Compounds:")
     for i, compound in enumerate(traj.compounds.values(), start=1):
         print(f"{i}: {compound.rep} (Number: {len(compound.members)})")
 
-    # Prompt user
     ref_index = prompt_int("Choose the reference compound (number): ", 1, minval=1) - 1
     obs_index = prompt_int("Choose the observed compound (number): ", 1, minval=1) - 1
 
     ref_base_source = prompt_choice("Base atom of first vector?", ["r", "o"], "r")
-    ref_tip_source  = prompt_choice("Tip atom of first vector?", ["r", "o"], "r")
-    ref_base_label  = prompt("Which atom is at the base of the first vector? ")
-    ref_tip_label   = prompt("Which atom is at the tip of the first vector? ")
+    ref_tip_source = prompt_choice("Tip atom of first vector?", ["r", "o"], "r")
+    ref_base_label = prompt("Which atom is at the base of the first vector? ")
+    ref_tip_label = prompt("Which atom is at the tip of the first vector? ")
 
     obs_base_source = prompt_choice("Base atom of second vector?", ["r", "o"], "o")
-    obs_tip_source  = prompt_choice("Tip atom of second vector?", ["r", "o"], "o")
-    obs_base_label  = prompt("Which atom is at the base of the second vector? ")
-    obs_tip_label   = prompt("Which atom is at the tip of the second vector? ")
+    obs_tip_source = prompt_choice("Tip atom of second vector?", ["r", "o"], "o")
+    obs_base_label = prompt("Which atom is at the base of the second vector? ")
+    obs_tip_label = prompt("Which atom is at the tip of the second vector? ")
 
     enforce_shared_atom = False
     if ref_tip_label == obs_base_label:
         enforce_shared_atom = prompt_yn("Should the tip atom of the reference vector and the base atom of the observed vector be the same atom?", True)
 
     bin_count = prompt_int("Enter the number of bins for ADF calculation: ", 180, minval=1)
+    v1_cutoff = prompt_float("Enter maximum length for the first vector: ", None, "None", minval=0.0)
+    v2_cutoff = prompt_float("Enter maximum length for the second vector: ", None, "None", minval=0.0)
 
-    ref_compound = list(traj.compounds.values())[ref_index]
-    obs_compound = list(traj.compounds.values())[obs_index]
-    box_size = traj.box_size
-
-    # Precompute atom indices ONCE
-    ref_base_ids_per_mol = {}
-    ref_tip_ids_per_mol = {}
-    obs_base_ids_per_mol = {}
-    obs_tip_ids_per_mol = {}
-
-    for ref_mol in ref_compound.members:
-        for obs_mol in obs_compound.members:
-            if ref_mol == obs_mol:
-                continue
-
-            ref_base_mol = ref_mol if ref_base_source == "r" else obs_mol
-            ref_tip_mol  = ref_mol if ref_tip_source  == "r" else obs_mol
-            obs_base_mol = obs_mol if obs_base_source == "o" else ref_mol
-            obs_tip_mol  = obs_mol if obs_tip_source  == "o" else ref_mol
-
-            ref_base_ids_per_mol[(ref_mol, obs_mol)] = find_matching_labels(ref_base_mol, ref_base_label)
-            ref_tip_ids_per_mol[(ref_mol, obs_mol)]  = find_matching_labels(ref_tip_mol, ref_tip_label)
-            obs_base_ids_per_mol[(ref_mol, obs_mol)] = find_matching_labels(obs_base_mol, obs_base_label)
-            obs_tip_ids_per_mol[(ref_mol, obs_mol)]  = find_matching_labels(obs_tip_mol, obs_tip_label)
-
-    adf_accumulator = np.zeros(bin_count)
-
-    use_distance_cutoff = prompt_yn("Use a distance cutoff between tip atoms?", False)
-    if use_distance_cutoff:
-        cutoff_distance = prompt_float("Enter the tip-tip distance cutoff (Å): ", 5.0, minval=0.0)
-        cutoff_distance_sq = cutoff_distance**2
-    else:
-        cutoff_distance_sq = None
+    update_compounds = prompt_yn("Perform molecule recognition and update compound list in each frame?", False)
 
     start_frame = prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
     nframes = prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
     frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
 
+    ref_comp = list(traj.compounds.values())[ref_index]
+    obs_comp = list(traj.compounds.values())[obs_index]
+    ref_key = next(k for k, c in traj.compounds.items() if c is ref_comp)
+    obs_key = next(k for k, c in traj.compounds.items() if c is obs_comp)
+    box = traj.box_size
+
+
+    # Build global atom indices
+    ref_base_ids, ref_tip_ids, obs_base_ids, obs_tip_ids = build_vector_lists(
+        ref_comp, obs_comp,
+        ref_base_source, ref_tip_source,
+        obs_base_source, obs_tip_source,
+        ref_base_label, ref_tip_label,
+        obs_base_label, obs_tip_label,
+        enforce_shared_atom
+    )
+
+
+    # Create metric and histogram
+    metric = AngleMetric(
+        selector_ref_base=Selector(np.array(ref_base_ids)),
+        selector_ref_tip=Selector(np.array(ref_tip_ids)),
+        selector_obs_base=Selector(np.array(obs_base_ids)),
+        selector_obs_tip=Selector(np.array(obs_tip_ids)),
+        box=box,
+        enforce_shared_atom=enforce_shared_atom,
+        v1_cutoff=v1_cutoff,
+        v2_cutoff=v2_cutoff
+    )
+
+    angle_edges = np.linspace(0, 180, bin_count + 1)
+    hist = HistogramND([angle_edges])
+
+    # Frame loop
     frame_idx = 0
     processed_frames = 0
-
     if start_frame > 1:
         print(f"Skipping forward to frame {start_frame}.")
         while frame_idx < start_frame - 1:
@@ -79,128 +81,121 @@ def adf(traj):
 
     while nframes != 0:
         try:
-            traj.update_molecule_coords()
+            if update_compounds:
+                traj.guess_molecules()
+                traj.update_molecule_coords()
+                try:
+                    ref_comp = traj.compounds[ref_key]
+                    obs_comp = traj.compounds[obs_key]
+                except KeyError:
+                    # compound disappeared this frame – skip
+                    frame_idx += 1
+                    nframes -= 1
+                    traj.read_frame()
+                    continue
 
-            # Compute vectors for the current frame
-            ref_vectors, obs_vectors = compute_vectors_static(
-                ref_compound, obs_compound,
-                ref_base_ids_per_mol, ref_tip_ids_per_mol,
-                obs_base_ids_per_mol, obs_tip_ids_per_mol,
-                box_size, traj, enforce_shared_atom, cutoff_distance_sq
-            )
+                ref_base_ids, ref_tip_ids, obs_base_ids, obs_tip_ids = build_vector_lists(
+                    ref_comp, obs_comp,
+                    ref_base_source, ref_tip_source,
+                    obs_base_source, obs_tip_source,
+                    ref_base_label, ref_tip_label,
+                    obs_base_label, obs_tip_label,
+                    enforce_shared_atom
+                )
 
-            adf_result = calculate_adf(ref_vectors, obs_vectors, bin_count)
-            adf_accumulator += adf_result
+
+                if not all([ref_base_ids, ref_tip_ids, obs_base_ids, obs_tip_ids]):
+                # no valid triplets this frame
+                    frame_idx += 1
+                    nframes -= 1
+                    traj.read_frame()
+                    continue
+
+                metric = AngleMetric(
+                    selector_ref_base=Selector(np.array(ref_base_ids)),
+                    selector_ref_tip=Selector(np.array(ref_tip_ids)),
+                    selector_obs_base=Selector(np.array(obs_base_ids)),
+                    selector_obs_tip=Selector(np.array(obs_tip_ids)),
+                    box=box,
+                    enforce_shared_atom=enforce_shared_atom,
+                    v1_cutoff=v1_cutoff,
+                    v2_cutoff=v2_cutoff
+                )
+
+            else:
+                traj.update_molecule_coords()
+
+            angles = metric(traj.coords)
+            hist.add(angles)
 
             processed_frames += 1
-            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
+            if processed_frames % 100 == 0:
+                print(f"Processed {processed_frames} frames (current frame {frame_idx+1})")
+#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
 
             for _ in range(frame_stride):
                 frame_idx += 1
                 nframes -= 1
                 traj.read_frame()
 
-        except ValueError:
-            break  # End of trajectory
-
-        except KeyboardInterrupt:
-            print("\nInterrupt received! Exiting main loop.")
+        except (ValueError, KeyboardInterrupt):
+            print("\nTerminating early.")
             break
 
     print()
 
-    total_pairs = processed_frames * len(ref_compound.members) * len(obs_compound.members)
-    adf_average = adf_accumulator / total_pairs
+    # Normalize ADF: sin(θ) correction + per-frame + per-pair
+    bin_centers = 0.5 * (angle_edges[1:] + angle_edges[:-1])
+    radians = np.deg2rad(bin_centers)
+    sin_weights = 1.0 / np.sin(radians)
 
-    with open("adf.dat", "w") as f:
-        f.write("# Angle (deg)    ADF\n")
-        for i, value in enumerate(adf_average):
-            angle = (i + 0.5) * (180 / bin_count)
-            f.write(f"{angle:.4f} {value:.8f}\n")
-    print("\nADF results saved to adf.dat")
+    hist.counts = hist.counts.astype(np.float64)
+    hist.counts *= sin_weights
+    if processed_frames > 0:
+        hist.counts /= (processed_frames * len(ref_comp.members) * len(obs_comp.members))
+    hist.normalize("total", total=bin_count*100)
+
+    hist.save_all("adf")
+    print("ADF results saved to adf.dat / adf.npy")
 
 
 def find_matching_labels(mol, user_label):
-    return [atom_idx for label, atom_idx in mol.label_to_global_id.items() if label_matches(user_label, label)]
+    return [idx for label, idx in mol.label_to_global_id.items() if label_matches(user_label, label)]
 
-def compute_vectors_static(ref_compound, obs_compound,
-                            ref_base_ids_per_mol, ref_tip_ids_per_mol,
-                            obs_base_ids_per_mol, obs_tip_ids_per_mol,
-                            box_size, traj, enforce_shared_atom, cutoff_distance_sq):
-    ref_base_list = []
-    ref_tip_list = []
-    obs_base_list = []
-    obs_tip_list = []
 
-    for ref_mol in ref_compound.members:
-        for obs_mol in obs_compound.members:
+def build_vector_lists(ref_comp, obs_comp, ref_base_source, ref_tip_source,
+        obs_base_source, obs_tip_source, ref_base_label, ref_tip_label,
+        obs_base_label, obs_tip_label, enforce_shared_atom):
+
+    ref_base_ids, ref_tip_ids = [], []
+    obs_base_ids, obs_tip_ids = [], []
+
+    for ref_mol in ref_comp.members:
+        for obs_mol in obs_comp.members:
             if ref_mol == obs_mol:
                 continue
 
-            ref_base_ids = ref_base_ids_per_mol[(ref_mol, obs_mol)]
-            ref_tip_ids  = ref_tip_ids_per_mol[(ref_mol, obs_mol)]
-            obs_base_ids = obs_base_ids_per_mol[(ref_mol, obs_mol)]
-            obs_tip_ids  = obs_tip_ids_per_mol[(ref_mol, obs_mol)]
+            rb_mol = ref_mol if ref_base_source == "r" else obs_mol
+            rt_mol = ref_mol if ref_tip_source == "r" else obs_mol
+            ob_mol = obs_mol if obs_base_source == "o" else ref_mol
+            ot_mol = obs_mol if obs_tip_source == "o" else ref_mol
 
-            for ref_base_id in ref_base_ids:
-                for ref_tip_id in ref_tip_ids:
-                    for obs_base_id in obs_base_ids:
-                        if enforce_shared_atom and (ref_tip_id != obs_base_id):
+            rb_ids = find_matching_labels(rb_mol, ref_base_label)
+            rt_ids = find_matching_labels(rt_mol, ref_tip_label)
+            ob_ids = find_matching_labels(ob_mol, obs_base_label)
+            ot_ids = find_matching_labels(ot_mol, obs_tip_label)
+
+            for rb in rb_ids:
+                for rt in rt_ids:
+                    for ob in ob_ids:
+                        if enforce_shared_atom and rt != ob:
                             continue
-                        for obs_tip_id in obs_tip_ids:
-                            ref_base_list.append(ref_base_id)
-                            ref_tip_list.append(ref_tip_id)
-                            obs_base_list.append(obs_base_id)
-                            obs_tip_list.append(obs_tip_id)
+                        for ot in ot_ids:
+                            ref_base_ids.append(rb)
+                            ref_tip_ids.append(rt)
+                            obs_base_ids.append(ob)
+                            obs_tip_ids.append(ot)
 
-    ref_base = traj.coords[np.array(ref_base_list)]
-    ref_tip  = traj.coords[np.array(ref_tip_list)]
-    obs_base = traj.coords[np.array(obs_base_list)]
-    obs_tip  = traj.coords[np.array(obs_tip_list)]
-
-    # Compute vectors
-    ref_vectors = ref_tip - ref_base
-    obs_vectors = obs_tip - obs_base
-
-    # Apply minimum image convention
-    ref_vectors -= np.round(ref_vectors / box_size) * box_size
-    obs_vectors -= np.round(obs_vectors / box_size) * box_size
-
-    # Apply tip-tip distance cutoff
-    if cutoff_distance_sq is not None:
-        delta = ref_tip - obs_tip
-        delta -= np.round(delta / box_size) * box_size
-        dist_sq = np.sum(delta**2, axis=1)
-        mask = dist_sq <= cutoff_distance_sq
-
-        ref_vectors = ref_vectors[mask]
-        obs_vectors = obs_vectors[mask]
-
-    return ref_vectors, obs_vectors
-
-def calculate_adf(ref_vectors, obs_vectors, bin_count):
-    bin_width = 180 / bin_count
-    adf = np.zeros(bin_count)
-
-    # Normalize vectors
-    ref_vectors /= np.linalg.norm(ref_vectors, axis=1, keepdims=True)
-    obs_vectors /= np.linalg.norm(obs_vectors, axis=1, keepdims=True)
-
-    # Calculate angles
-    cos_angles = np.sum(ref_vectors * obs_vectors, axis=1)
-    cos_angles = np.clip(cos_angles, -1.0, 1.0)
-    angles = np.arccos(cos_angles)
-
-    # Histogram
-    bin_indices = np.floor(angles * (180 / np.pi) / bin_width).astype(int)
-    bin_indices = np.clip(bin_indices, 0, bin_count - 1)
-    np.add.at(adf, bin_indices, 1)
-
-    # Normalize by sin(theta)
-    angle_bin_centers = (np.arange(bin_count) + 0.5) * bin_width * (np.pi / 180)
-    norm_factors = 1 / np.sin(angle_bin_centers)
-
-    adf *= norm_factors
-    return adf
+    return ref_base_ids, ref_tip_ids, obs_base_ids, obs_tip_ids
 
 
