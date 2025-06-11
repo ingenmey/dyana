@@ -153,7 +153,7 @@ def proton_coupling(traj):
 #                if (processed_frames % 1000 == 0):
 #                    print(f"\n{frame_idx+1}")
 
-            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
+#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
 
             for _ in range(frame_stride):
                 frame_idx += 1
@@ -216,6 +216,7 @@ def proton_coupling(traj):
 
         fname = f"proton_chains_gap{gap}.dat"
         with open(fname, "w") as f:
+            f.write(f"# Total number of chains: {total_chains}\n")
             f.write("# n   C(n)\n")
             for i, val in enumerate(Cn):
                 if val > 0:

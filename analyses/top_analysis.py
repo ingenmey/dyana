@@ -32,32 +32,24 @@ def tetrahedral_order(traj):
         print(f"{i}: {compound.rep} (Number: {len(compound.members)})")
 
     ref_comp_idx = prompt_int("Choose the reference compound (number): ", 1, minval=1) - 1
-    ref_compound = list(traj.compounds.values())[ref_comp_idx]
 
     obs_comp_indices = prompt("Enter the observed compounds (comma-separated numbers): ").strip()
     obs_comp_indices = [int(x.strip()) - 1 for x in obs_comp_indices.split(',') if x.strip()]
-    obs_compounds = [list(traj.compounds.values())[idx] for idx in obs_comp_indices]
+
+    compound_list = list(traj.compounds.items())
+    ref_key, ref_compound = compound_list[ref_comp_idx]
+    obs_keys = [compound_list[idx][0] for idx in obs_comp_indices]
+    obs_compounds = [traj.compounds[k] for k in obs_keys]
 
     ref_label = prompt("Enter the reference atom label (e.g., O): ").strip()
     obs_atoms_per_compound = {}
-    for idx, comp in zip(obs_comp_indices, obs_compounds):
-        labels = prompt(f"Enter observed atom labels for compound {idx+1} ({comp.rep}) (comma-separated): ").strip()
+    for key, comp in zip(obs_keys, obs_compounds):
+        labels = prompt(f"Enter observed atom labels for compound {comp.comp_id+1} ({comp.rep}) (comma-separated): ").strip()
         labels = [l.strip() for l in labels.split(',') if l.strip()]
-        obs_atoms_per_compound[comp] = labels
+        obs_atoms_per_compound[key] = [l.strip() for l in labels]
 
     # Collect reference and observed atoms (global indices)
-    ref_atoms = []
-    for mol in ref_compound.members:
-        for label, idx in mol.label_to_global_id.items():
-            if label_matches(ref_label, label):
-                ref_atoms.append(idx)
-
-    obs_atoms = []
-    for comp, labels in obs_atoms_per_compound.items():
-        for mol in comp.members:
-            for label, idx in mol.label_to_global_id.items():
-                if any(label_matches(obs_label, label) for obs_label in labels):
-                    obs_atoms.append(idx)
+    ref_atoms, obs_atoms = build_atom_list(traj, ref_compound, ref_label, obs_keys, obs_atoms_per_compound)
 
     if len(obs_atoms) < 4:
         print("Not enough observed atoms to perform analysis.")
@@ -80,6 +72,8 @@ def tetrahedral_order(traj):
     bin_edges_s = np.linspace(0, 1, bin_count_s + 1)
     bin_width_s = bin_edges_s[1] - bin_edges_s[0]
 
+    update_compounds = prompt_yn("Perform molecule recognition and update compound list in each frame?", False)
+
     start_frame = prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
     nframes = prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
     frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
@@ -95,7 +89,31 @@ def tetrahedral_order(traj):
 
     while nframes != 0:
         try:
-            traj.update_molecule_coords()
+            if update_compounds:
+                traj.guess_molecules()
+                traj.update_molecule_coords()
+                try:
+                    # search and update compounds
+                    ref_compound = traj.compounds[ref_key]
+                    #obs_compounds = [traj.compounds[k] for k in obs_keys]
+                except KeyError:
+                    # compound disappeared this frame – skip
+                    frame_idx += 1
+                    nframes -= 1
+                    traj.read_frame()
+                    continue
+
+                ref_atoms, obs_atoms = build_atom_list(traj, ref_compound, ref_label, obs_keys, obs_atoms_per_compound)
+
+                if not ref_atoms or not obs_atoms:
+                    frame_idx += 1
+                    nframes -= 1
+                    traj.read_frame()
+                    continue
+
+            else:
+                traj.update_molecule_coords()
+
 
             coords = traj.coords
             box = traj.box_size
@@ -147,7 +165,9 @@ def tetrahedral_order(traj):
                     weighted_linear_bin(S, hist_s, bin_edges_s, bin_width_s)
 
             processed_frames += 1
-            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
+            if processed_frames % 100 == 0:
+                print(f"Processed {processed_frames} frames (current frame {frame_idx+1})")
+#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
 
             for _ in range(frame_stride):
                 frame_idx += 1
@@ -155,6 +175,7 @@ def tetrahedral_order(traj):
                 traj.read_frame()
 
         except ValueError:
+            print("\nReached end of trajectory.")
             break
         except KeyboardInterrupt:
             print("\nInterrupt received! Exiting main loop.")
@@ -187,4 +208,28 @@ def tetrahedral_order(traj):
         print("Tetrahedral translational order distribution saved to tetrahedral_s.dat")
     else:
         print("No valid S values were accumulated.")
+
+
+def build_atom_list(traj, ref_compound, ref_label, obs_keys, obs_atoms_per_compound):
+    # Update ref_atoms
+    ref_atoms = []
+    for mol in ref_compound.members:
+        for label, idx in mol.label_to_global_id.items():
+            if label_matches(ref_label, label):
+                ref_atoms.append(idx)
+
+    # Update obs_atoms
+    obs_atoms = []
+    for key in obs_keys:
+        try:
+            comp = traj.compounds[key]
+            for mol in comp.members:
+                for label, idx in mol.label_to_global_id.items():
+                    if any(label_matches(obs_label, label) for obs_label in obs_atoms_per_compound[key]):
+                        obs_atoms.append(idx)
+        except KeyError:
+            continue
+
+    return ref_atoms, obs_atoms
+
 
