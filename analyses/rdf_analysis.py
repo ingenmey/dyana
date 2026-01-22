@@ -1,167 +1,91 @@
 # analyses/rdf_analysis.py
 
 import numpy as np
-from utils import label_matches, prompt, prompt_int, prompt_float, prompt_yn
+from analyses.base_analysis import BaseAnalysis
+from utils import prompt, prompt_int, prompt_float, prompt_yn, label_matches
 from analyses.metrics import Selector, DistanceMetric
 from analyses.histogram import HistogramND
 
-def rdf(traj):
-    # Prompt user for RDF parameters
-    print("\nAvailable Compounds:")
-    for i, compound in enumerate(traj.compounds.values(), start=1):
-        print(f"{i}: {compound.rep} (Number: {len(compound.members)})")
+class RDF(BaseAnalysis):
+    def setup(self):
+        # --- User setup ---
+        ref_idx, self.ref_comp = self.compound_selection("reference")
+        obs_idx, self.obs_comp = self.compound_selection("observed")
 
-    ref_index = prompt_int("Choose the reference compound (number): ", 1, minval=1) - 1
-    obs_index = prompt_int("Choose the observed compound (number): ", 1, minval=1) - 1
-    ref_labels = [s.strip() for s in prompt("Which atom(s) in reference compound? (comma-separated) ").split(',')]
-    obs_labels = [s.strip() for s in prompt("Which atom(s) in observed compound? (comma-separated) ").split(',')]
-    max_distance = prompt_float("Enter the maximum distance for RDF calculation (in Å): ", 10.0, minval=0.1)
-    bin_count = prompt_int("Enter the number of bins for RDF calculation: ", 500, minval=1)
+        self.ref_labels = self.atom_selection("reference")
+        self.obs_labels = self.atom_selection("observed")
 
-    update_compounds = prompt_yn("Perform molecule recognition and update compound list in each frame?", False)
+        self.max_distance = prompt_float("Enter the maximum distance for RDF calculation (in Å): ", 10.0, minval=0.1)
+        self.bin_count = prompt_int("Enter the number of bins for RDF calculation: ", 500, minval=1)
 
-    start_frame = prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
-    nframes = prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
-    frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
+        self.ref_key = list(self.traj.compounds.keys())[ref_idx]
+        self.obs_key = list(self.traj.compounds.keys())[obs_idx]
 
-    # --- Precompute atom indices ---
-    ref_compound = list(traj.compounds.values())[ref_index]
-    obs_compound = list(traj.compounds.values())[obs_index]
-    ref_key = next(k for k, c in traj.compounds.items() if c is ref_compound)
-    obs_key = next(k for k, c in traj.compounds.items() if c is obs_compound)
+        # --- Index precomputation ---
+        self.update_selectors()
 
-    ref_indices = [
-        idx for mol in ref_compound.members
-        for label, idx in mol.label_to_global_id.items()
-        if any(label_matches(lab, label) for lab in ref_labels)
-    ]
-    obs_indices = [
-        idx for mol in obs_compound.members
-        for label, idx in mol.label_to_global_id.items()
-        if any(label_matches(lab, label) for lab in obs_labels)
-    ]
+        self.n_ref = len(self.ref_indices)
+        self.n_obs = len(self.obs_indices)
+        edges = np.linspace(0, self.max_distance, self.bin_count + 1)
+        self.hist = HistogramND([edges], "linear")
+        self.box_volume = np.prod(self.traj.box_size)
 
-    if not ref_indices or not obs_indices:
-        print("No atoms matched the given labels.")
-        return
+    def update_selectors(self):
+        self.ref_indices = self._get_indices(self.ref_comp, self.ref_labels)
+        self.obs_indices = self._get_indices(self.obs_comp, self.obs_labels)
 
-    # --- Setup metric and histogram ---
-    ref_sel = Selector(np.array(ref_indices))
-    obs_sel = Selector(np.array(obs_indices))
-    metric = DistanceMetric(ref_sel, obs_sel, traj.box_size, cutoff=max_distance)
+        self.ref_sel = Selector(np.array(self.ref_indices))
+        self.obs_sel = Selector(np.array(self.obs_indices))
 
-    n_ref = len(ref_indices)
-    n_obs = len(obs_indices)
-    edges = np.linspace(0, max_distance, bin_count + 1)
-    hist = HistogramND([edges])
+        self.metric = DistanceMetric(
+            self.ref_sel, self.obs_sel,
+            self.traj.box_size, cutoff=self.max_distance
+        )
 
-    # --- Frame loop ---
-    frame_idx = 0
-    processed_frames = 0
-    if start_frame > 1:
-        print(f"Skipping forward to frame {start_frame}.")
-        while frame_idx < start_frame - 1:
-            traj.read_frame()
-            frame_idx += 1
+    def _get_indices(self, compound, labels):
+        return [
+            idx for mol in compound.members
+            for label, idx in mol.label_to_global_id.items()
+            if any(label_matches(lab, label) for lab in labels)
+        ]
 
-    while nframes != 0:
+    def post_compound_update(self):
         try:
-            if update_compounds:
-                traj.guess_molecules()
-                traj.update_molecule_coords()
-                try:
-                    ref_compound = traj.compounds[ref_key]
-                    obs_compound = traj.compounds[obs_key]
-                except KeyError:
-                    # compound disappeared this frame – skip
-                    frame_idx += 1
-                    nframes -= 1
-                    traj.read_frame()
-                    continue
+            self.ref_comp = self.traj.compounds[self.ref_key]
+            self.obs_comp = self.traj.compounds[self.obs_key]
+        except KeyError:
+            # compound disappeared this frame – skip
+            return False
 
-                ref_indices = [
-                    idx for mol in ref_compound.members
-                    for label, idx in mol.label_to_global_id.items()
-                    if any(label_matches(lab, label) for lab in ref_labels)
-                ]
-                obs_indices = [
-                    idx for mol in obs_compound.members
-                    for label, idx in mol.label_to_global_id.items()
-                    if any(label_matches(lab, label) for lab in obs_labels)
-                    ]
+        self.update_selectors()
+        self.n_ref = (self.n_ref * self.processed_frames + len(self.ref_indices))/(self.processed_frames + 1)
+        self.n_obs = (self.n_obs * self.processed_frames + len(self.obs_indices))/(self.processed_frames + 1)
+        return True
 
-                if not ref_indices or not obs_indices:
-                    frame_idx += 1
-                    nframes -= 1
-                    traj.read_frame()
-                    continue
+    def process_frame(self):
+        values = self.metric(self.traj.coords)
+        self.hist.add(values)
 
-                ref_sel = Selector(np.array(ref_indices))
-                obs_sel = Selector(np.array(obs_indices))
-                metric = DistanceMetric(ref_sel, obs_sel, traj.box_size, cutoff=max_distance)
+    def postprocess(self):
+        # Normalize RDF
+        # Shell volumes per bin
+        bin_edges = self.hist.bin_edges[0]
+        bin_widths = np.diff(bin_edges)
+        shell_volumes = (4/3) * np.pi * (bin_edges[1:]**3 - bin_edges[:-1]**3)
 
-                n_ref = (n_ref * processed_frames + len(ref_indices))/(processed_frames + 1)
-                n_obs = (n_obs * processed_frames + len(obs_indices))/(processed_frames + 1)
+        # Normalize RDF manually
+        norm_factor = self.n_ref * self.n_obs * self.processed_frames
+        self.hist.counts = self.hist.counts / (shell_volumes * norm_factor / self.box_volume)
 
-            else:
-                traj.update_molecule_coords()
+        # Number Integral
+        obs_density = self.n_obs / self.box_volume
+        g_of_r = self.hist.counts
+        number_integral = obs_density * np.cumsum(g_of_r * shell_volumes)
+        self.hist.data["number_integral"] = number_integral
 
-            values = metric(traj.coords)  # distance array
-            hist.add(values)
+        label_str = lambda labels: "_".join(l.replace(" ", "") for l in labels)
+        fname = f"rdf_{label_str(self.ref_labels)}_{label_str(self.obs_labels)}.dat"
+        self.hist.save_txt(fname, ["r/Å", "g(r)", "N(r)"])
 
-            processed_frames += 1
-            if processed_frames % 100 == 0:
-                print(f"Processed {processed_frames} frames (current frame {frame_idx+1})")
-#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
-
-            for _ in range(frame_stride):
-                frame_idx += 1
-                nframes -= 1
-                traj.read_frame()
-
-        except ValueError:
-            # End of trajectory file
-            break
-
-        except KeyboardInterrupt:
-            # Graceful exit when user presses Ctrl+C
-            print("\nInterrupt received! Exiting main loop and post-processing data...")
-            break
-
-    print()
-
-    # --- Normalize and save ---
-    box_volume = np.prod(traj.box_size)
-#    hist.normalize(method="volume", box_volume=box_volume)
-    # Shell volumes per bin
-    bin_edges = hist.bin_edges[0]
-    bin_widths = np.diff(bin_edges)
-    shell_volumes = (4/3) * np.pi * (bin_edges[1:]**3 - bin_edges[:-1]**3)
-
-    # Normalize RDF manually
-    norm_factor = n_ref * n_obs * processed_frames
-    hist.counts = hist.counts / (shell_volumes * norm_factor / box_volume)
-
-    # Number Integral
-    obs_density = n_obs / box_volume                     # ρ  (atoms Å⁻³)
-    g_of_r = hist.counts                             # normalised RDF values
-    number_integral = obs_density * np.cumsum(g_of_r * shell_volumes)
-
-    # ---- write combined output -----------------------------------------
-    r_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-    label_str = lambda labels: "_".join(l.replace(" ", "") for l in labels)
-    fname = f"rdf_{label_str(ref_labels)}_{label_str(obs_labels)}.dat"
-    with open(fname, "w") as f:
-        f.write("#  r/Å     g(r)        N(r)\n")
-        for r, g, n in zip(r_centers, g_of_r, number_integral):
-            f.write(f"{r:8.4f}  {g:10.6f}  {n:12.6f}\n")
-
-    # still keep the binary counts array for post-processing
-#    hist.save_npy(f"rdf_{ref_label}_{obs_label}.npy")
-
-    print(f"RDF and number-integral saved to {fname} and .npy")
-
-
-#    hist.save_all(f"rdf_{ref_label}_{obs_label}")
-#    print(f"RDF results saved to rdf_{ref_label}_{obs_label}.dat / .npy")
+        print(f"RDF and number-integral saved to {fname}")
 

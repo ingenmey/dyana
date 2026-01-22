@@ -1,38 +1,40 @@
+#!/usr/bin/env python3
+
 import argparse
 import os
 import constants
 import numpy as np
 from core.trajectory_loader import load_trajectory
-from analyses.rdf_analysis import rdf
-from analyses.adf_analysis import adf
-from analyses.adf_threebody_analysis import adf_threebody
-from analyses.density_analysis import density
-from analyses.surface_voronoi import surface_voronoi
-from analyses.percolation import percolation
-from analyses.cluster_analysis import cluster
-from analyses.dacf_analysis import dacf
-from analyses.top_analysis import tetrahedral_order
-from analyses.pccf_analysis import proton_coupling
-from analyses.charge_msd import charge_transfer as charge_msd
-from analyses.cdf_analysis import cdf
-from analyses.neighbor_count import neighbor_count
+from analyses.rdf_analysis import RDF as rdf
+from analyses.adf_analysis import ADF as adf
+from analyses.adf3b_analysis import ADFThreeBody as adf3b
+from analyses.density_analysis import DensityAnalysis as density
+#from analyses.surface_voronoi import surface_voronoi
+from analyses.percolation_analysis import PercolationAnalysis as percolation
+from analyses.cluster_analysis import ClusterAnalysis as cluster
+from analyses.dacf_analysis import DACFAnalysis as dacf
+from analyses.top_analysis import TetrahedralOrderAnalysis as top
+from analyses.pccf_analysis import PCCFAnalysis as pccf
+from analyses.charge_msd_analysis import ChargeMSDAnalysis as cmsd
+#from analyses.cdf_analysis import cdf
+from analyses.neighbor_count_analysis import NeighborCountAnalysis as ncount
 from utils import set_input_file, set_log_file, close_log_file
 from utils import prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 
 AVAILABLE_ANALYSES = {
     'rdf': ('Radial distribution function analysis', rdf),
     'adf': ('Angular distribution function analysis', adf),
-    'adf_3b': ('Threebody Angular distribution function analysis', adf_threebody),
+    'adf3b': ('Threebody Angular distribution function analysis', adf3b),
     'dens': ('Particle density analysis', density),
-    'voro2d': ('2D surface voronoi analysis', surface_voronoi),
+#    'voro2d': ('2D surface voronoi analysis', surface_voronoi),
     'percolation': ('Hydrogen bond percolation analysis', percolation),
     'cluster': ('Cluster composition histogram', cluster),
     'dacf': ('Dimer existence auto-correlation function', dacf),
-    'top': ('Tetrahedral order parameter', tetrahedral_order),
-    'pccf': ('Proton coupling correlation function', proton_coupling),
-    'cmsd': ('Charge mean square displacement', charge_msd),
-    'cdf': ('Combined distribution function analysis', cdf),
-    'ncount': ('Neighbour-count probability', neighbor_count),
+    'top': ('Tetrahedral order parameter', top),
+    'pccf': ('Proton coupling correlation function', pccf),
+    'cmsd': ('Charge mean square displacement', cmsd),
+#    'cdf': ('Combined distribution function analysis', cdf),
+    'ncount': ('Neighbour-count probability', ncount),
 }
 
 
@@ -196,7 +198,9 @@ def main(traj_file):
 
         process_compounds(traj)
         analysis_func = choose_analysis()
-        analysis_func(traj)
+       # analysis_func(traj)
+        analysis = analysis_func(traj)
+        analysis.run()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Molecular dynamics trajectory analyzer.")

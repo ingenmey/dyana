@@ -1,235 +1,140 @@
+# analyses/tetrahedral_analysis.py
+
 import numpy as np
-from utils import prompt, prompt_int, prompt_float, prompt_yn
-from utils import label_matches
 from scipy.spatial import cKDTree
+from analyses.base_analysis import BaseAnalysis
+from analyses.histogram import HistogramND
+from utils import prompt, prompt_int, prompt_yn, prompt_float, label_matches
 
-def weighted_linear_bin(value, hist, bin_edges, bin_width):
-    """Distribute a value across two nearest bins using linear weighting."""
-    if not (bin_edges[0] <= value <= bin_edges[-1]):
-        return
-    bin_index = (value - bin_edges[0]) / bin_width
-    left = int(np.floor(bin_index))
-    right = left + 1
+class TetrahedralOrderAnalysis(BaseAnalysis):
+    def setup(self):
+        self.ref_idx, self.ref_comp = self.compound_selection("reference")
+        self.ref_labels = self.atom_selection("reference")
+        self.ref_key = list(self.traj.compounds.keys())[self.ref_idx]
 
-    if left < 0:
-        left = 0
-    if right >= len(hist):
-        right = len(hist) - 1
+        # Multi-compound observed selection
+        obs_selection = self.compound_selection("observed", multi=True)
+        self.obs_idxs = [idx for idx, _ in obs_selection]
+        self.obs_comps = [comp for _, comp in obs_selection]
+        self.obs_keys = [list(self.traj.compounds.keys())[idx] for idx in self.obs_idxs]
 
-    w_right = bin_index - left
-    w_left = 1.0 - w_right
+        # Prompt for atom labels per observed compound
+        self.obs_labels_per_compound = {}
+        for key, comp in zip(self.obs_keys, self.obs_comps):
+            self.obs_labels_per_compound[key] = self.atom_selection("observed", comp)
 
-    hist[left] += w_left
-    if right != left:  # Avoid double-count at boundaries
-        hist[right] += w_right
+        # Cutoff and histogram setup as before...
+        self.use_cutoff = prompt_yn("Use a maximum distance cutoff for neighbor search?", False)
+        self.cutoff = prompt_float("Enter the maximum cutoff distance (Å):", 5.0, minval=0.0) if self.use_cutoff else None
 
-def tetrahedral_order(traj):
-    print("\nTetrahedral Order Parameter Analysis")
+        self.bin_count_q = prompt_int("Enter the number of bins for angular tetrahedral order distribution q: ", 100, minval=1)
+        self.bin_count_s = prompt_int("Enter the number of bins for radial tetrahedral order distribution S: ", 10000, minval=1)
 
-    # List compounds
-    print("\nAvailable Compounds:")
-    for i, compound in enumerate(traj.compounds.values(), start=1):
-        print(f"{i}: {compound.rep} (Number: {len(compound.members)})")
+        self.bin_edges_q = np.linspace(0, 1, self.bin_count_q + 1)
+        self.hist_q = HistogramND([self.bin_edges_q], mode="linear")
+        self.bin_edges_s = np.linspace(0, 1, self.bin_count_s + 1)
+        self.hist_s = HistogramND([self.bin_edges_s], mode="linear")
 
-    ref_comp_idx = prompt_int("Choose the reference compound (number): ", 1, minval=1) - 1
+        self.update_selectors()
 
-    obs_comp_indices = prompt("Enter the observed compounds (comma-separated numbers): ").strip()
-    obs_comp_indices = [int(x.strip()) - 1 for x in obs_comp_indices.split(',') if x.strip()]
+    def update_selectors(self):
+        self.ref_indices = self._get_indices(self.ref_comp, self.ref_labels)
+        self.obs_indices = []
+        for key, comp in zip(self.obs_keys, self.obs_comps):
+            labels = self.obs_labels_per_compound[key]
+            self.obs_indices.extend(self._get_indices(comp, labels))
 
-    compound_list = list(traj.compounds.items())
-    ref_key, ref_compound = compound_list[ref_comp_idx]
-    obs_keys = [compound_list[idx][0] for idx in obs_comp_indices]
-    obs_compounds = [traj.compounds[k] for k in obs_keys]
+    def _get_indices(self, compound, labels):
+        return [
+            idx for mol in compound.members
+            for label, idx in mol.label_to_global_id.items()
+            if any(label_matches(lab, label) for lab in labels)
+        ]
 
-    ref_label = prompt("Enter the reference atom label (e.g., O): ").strip()
-    obs_atoms_per_compound = {}
-    for key, comp in zip(obs_keys, obs_compounds):
-        labels = prompt(f"Enter observed atom labels for compound {comp.comp_id+1} ({comp.rep}) (comma-separated): ").strip()
-        labels = [l.strip() for l in labels.split(',') if l.strip()]
-        obs_atoms_per_compound[key] = [l.strip() for l in labels]
-
-    # Collect reference and observed atoms (global indices)
-    ref_atoms, obs_atoms = build_atom_list(traj, ref_compound, ref_label, obs_keys, obs_atoms_per_compound)
-
-    if len(obs_atoms) < 4:
-        print("Not enough observed atoms to perform analysis.")
-        return
-
-    use_cutoff = prompt_yn("Use a maximum distance cutoff for neighbor search?", False)
-    if use_cutoff:
-        cutoff = prompt_float("Enter the maximum cutoff distance (Å):", 5.0, minval=0.0)
-    else:
-        cutoff = None
-
-    bin_count_q = prompt_int("Enter the number of bins for angular tetrahedral order distribution q: ", 100, minval=1)
-    bin_count_s = prompt_int("Enter the number of bins for radial tetrahedral order distribution S: ", 10000, minval=1)
-
-    hist_q = np.zeros(bin_count_q)
-    bin_edges_q = np.linspace(0, 1, bin_count_q + 1)
-    bin_width_q = bin_edges_q[1] - bin_edges_q[0]
-
-    hist_s = np.zeros(bin_count_s)
-    bin_edges_s = np.linspace(0, 1, bin_count_s + 1)
-    bin_width_s = bin_edges_s[1] - bin_edges_s[0]
-
-    update_compounds = prompt_yn("Perform molecule recognition and update compound list in each frame?", False)
-
-    start_frame = prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
-    nframes = prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
-    frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
-
-    frame_idx = 0
-    processed_frames = 0
-
-    if start_frame > 1:
-        print(f"Skipping forward to frame {start_frame}.")
-        while frame_idx < start_frame - 1:
-            traj.read_frame()
-            frame_idx += 1
-
-    while nframes != 0:
+    def post_compound_update(self):
         try:
-            if update_compounds:
-                traj.guess_molecules()
-                traj.update_molecule_coords()
-                try:
-                    # search and update compounds
-                    ref_compound = traj.compounds[ref_key]
-                    #obs_compounds = [traj.compounds[k] for k in obs_keys]
-                except KeyError:
-                    # compound disappeared this frame – skip
-                    frame_idx += 1
-                    nframes -= 1
-                    traj.read_frame()
-                    continue
-
-                ref_atoms, obs_atoms = build_atom_list(traj, ref_compound, ref_label, obs_keys, obs_atoms_per_compound)
-
-                if not ref_atoms or not obs_atoms:
-                    frame_idx += 1
-                    nframes -= 1
-                    traj.read_frame()
-                    continue
-
-            else:
-                traj.update_molecule_coords()
-
-
-            coords = traj.coords
-            box = traj.box_size
-            obs_coords = coords[obs_atoms]
-            kdtree = cKDTree(obs_coords, boxsize=box)
-
-            for r_idx in ref_atoms:
-                r_coord = coords[r_idx]
-
-                if use_cutoff:
-                    neighbor_idxs = kdtree.query_ball_point(r_coord, cutoff)
-                    neighbor_idxs = [i for i in neighbor_idxs if obs_atoms[i] != r_idx]
-                    if len(neighbor_idxs) < 4:
-                        continue
-                    neighbors = obs_coords[neighbor_idxs]
-                    distances = np.linalg.norm(neighbors - r_coord, axis=1)
-                    nearest = np.argsort(distances)[:4]
-                    four_nearest = neighbors[nearest]
-                    four_dists = distances[nearest]
-                else:
-                    distances, idxs = kdtree.query(r_coord, k=5)
-                    filtered = [(d, i) for d, i in zip(distances, idxs) if obs_atoms[i] != r_idx]
-                    if len(filtered) < 4:
-                        continue
-                    filtered = filtered[:4]
-                    four_nearest = obs_coords[[i for _, i in filtered]]
-                    four_dists = np.array([d for d, _ in filtered])
-
-                # Compute q
-                cosines = []
-                for j in range(3):
-                    for k in range(j + 1, 4):
-                        vj = four_nearest[j] - r_coord
-                        vk = four_nearest[k] - r_coord
-                        vj -= box * np.round(vj / box)
-                        vk -= box * np.round(vk / box)
-                        vj /= np.linalg.norm(vj)
-                        vk /= np.linalg.norm(vk)
-                        cos_angle = np.dot(vj, vk)
-                        cosines.append(cos_angle)
-
-                q = 1 - (3/8) * sum((cos + 1/3)**2 for cos in cosines)
-                weighted_linear_bin(q, hist_q, bin_edges_q, bin_width_q)
-
-                # Compute S
-                r_mean = np.mean(four_dists)
-                if r_mean > 1e-8:  # avoid divide-by-zero
-                    S = 1 - (1/3) * np.sum((four_dists - r_mean)**2) / (4 * r_mean**2)
-                    weighted_linear_bin(S, hist_s, bin_edges_s, bin_width_s)
-
-            processed_frames += 1
-            if processed_frames % 100 == 0:
-                print(f"Processed {processed_frames} frames (current frame {frame_idx+1})")
-#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
-
-            for _ in range(frame_stride):
-                frame_idx += 1
-                nframes -= 1
-                traj.read_frame()
-
-        except ValueError:
-            print("\nReached end of trajectory.")
-            break
-        except KeyboardInterrupt:
-            print("\nInterrupt received! Exiting main loop.")
-            break
-
-    print()
-
-    # Normalize and write q
-    total_q = np.sum(hist_q)
-    if total_q > 0:
-        with open("tetrahedral_q.dat", "w") as f:
-            f.write("# q     P(q)\n")
-            for i in range(bin_count_q):
-                center = 0.5 * (bin_edges_q[i] + bin_edges_q[i + 1])
-                probability = hist_q[i] / total_q * 100
-                f.write(f"{center:.5f} {probability:.8f}\n")
-        print("\nTetrahedral orientational order distribution saved to tetrahedral_q.dat")
-    else:
-        print("No valid q values were accumulated.")
-
-    # Normalize and write S
-    total_s = np.sum(hist_s)
-    if total_s > 0:
-        with open("tetrahedral_s.dat", "w") as f:
-            f.write("# S     P(S)\n")
-            for i in range(bin_count_s):
-                center = 0.5 * (bin_edges_s[i] + bin_edges_s[i + 1])
-                probability = hist_s[i] / total_s * 100
-                f.write(f"{center:.5f} {probability:.8f}\n")
-        print("Tetrahedral translational order distribution saved to tetrahedral_s.dat")
-    else:
-        print("No valid S values were accumulated.")
-
-
-def build_atom_list(traj, ref_compound, ref_label, obs_keys, obs_atoms_per_compound):
-    # Update ref_atoms
-    ref_atoms = []
-    for mol in ref_compound.members:
-        for label, idx in mol.label_to_global_id.items():
-            if label_matches(ref_label, label):
-                ref_atoms.append(idx)
-
-    # Update obs_atoms
-    obs_atoms = []
-    for key in obs_keys:
-        try:
-            comp = traj.compounds[key]
-            for mol in comp.members:
-                for label, idx in mol.label_to_global_id.items():
-                    if any(label_matches(obs_label, label) for obs_label in obs_atoms_per_compound[key]):
-                        obs_atoms.append(idx)
+            self.ref_comp = self.traj.compounds[self.ref_key]
+            self.obs_comps = [self.traj.compounds[k] for k in self.obs_keys]
         except KeyError:
-            continue
+            return False
+        self.update_selectors()
+        self.n_ref = (self.n_ref * self.processed_frames + len(self.ref_indices)) / (self.processed_frames + 1) if hasattr(self, 'n_ref') else len(self.ref_indices)
+        self.n_obs = (self.n_obs * self.processed_frames + len(self.obs_indices)) / (self.processed_frames + 1) if hasattr(self, 'n_obs') else len(self.obs_indices)
+        return True
 
-    return ref_atoms, obs_atoms
+    def process_frame(self):
+        coords = self.traj.coords
+        box = self.traj.box_size
+        obs_coords = coords[self.obs_indices]
+        kdtree = cKDTree(obs_coords, boxsize=box)
 
+        q_vals = []
+        s_vals = []
+
+        for r_idx in self.ref_indices:
+            r_coord = coords[r_idx]
+            if self.use_cutoff:
+                neighbor_idxs = kdtree.query_ball_point(r_coord, self.cutoff)
+                neighbor_idxs = [i for i in neighbor_idxs if self.obs_indices[i] != r_idx]
+                if len(neighbor_idxs) < 4:
+                    continue
+                neighbors = obs_coords[neighbor_idxs]
+                distances = np.linalg.norm(neighbors - r_coord, axis=1)
+                nearest = np.argsort(distances)[:4]
+                four_nearest = neighbors[nearest]
+                four_dists = distances[nearest]
+            else:
+                distances, idxs = kdtree.query(r_coord, k=5)
+                filtered = [(d, i) for d, i in zip(distances, idxs) if self.obs_indices[i] != r_idx]
+                if len(filtered) < 4:
+                    continue
+                filtered = filtered[:4]
+                four_nearest = obs_coords[[i for _, i in filtered]]
+                four_dists = np.array([d for d, _ in filtered])
+
+            # Compute q
+            cosines = []
+            for j in range(3):
+                for k in range(j + 1, 4):
+                    vj = four_nearest[j] - r_coord
+                    vk = four_nearest[k] - r_coord
+                    vj -= box * np.round(vj / box)
+                    vk -= box * np.round(vk / box)
+                    vj /= np.linalg.norm(vj)
+                    vk /= np.linalg.norm(vk)
+                    cos_angle = np.dot(vj, vk)
+                    cosines.append(cos_angle)
+            q = 1 - (3/8) * sum((cos + 1/3)**2 for cos in cosines)
+            q_vals.append(q)
+
+            # Compute S
+            r_mean = np.mean(four_dists)
+            if r_mean > 1e-8:  # avoid divide-by-zero
+                S = 1 - (1/3) * np.sum((four_dists - r_mean)**2) / (4 * r_mean**2)
+                s_vals.append(S)
+
+        # Add values to histograms
+        if q_vals:
+            self.hist_q.add(np.array(q_vals))
+        if s_vals:
+            self.hist_s.add(np.array(s_vals))
+
+    def postprocess(self):
+        # Normalize and write q
+        total_q = self.hist_q.counts.sum()
+        if total_q > 0:
+            self.hist_q.normalize("total", total=100)
+            self.hist_q.save_txt("tetrahedral_q.dat", ["q", "P(q)"])
+            print("\nTetrahedral orientational order distribution saved to tetrahedral_q.dat")
+        else:
+            print("No valid q values were accumulated.")
+
+        # Normalize and write S
+        total_s = self.hist_s.counts.sum()
+        if total_s > 0:
+            self.hist_s.normalize("total", total=100)
+            self.hist_s.save_txt("tetrahedral_s.dat", ["S", "P(S)"])
+            print("Tetrahedral translational order distribution saved to tetrahedral_s.dat")
+        else:
+            print("No valid S values were accumulated.")
 

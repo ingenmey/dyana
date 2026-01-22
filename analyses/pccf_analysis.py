@@ -1,226 +1,332 @@
-# analyses/proton_coupling.py
+# analyses/pccf_analysis.py
 
 import numpy as np
-from collections import defaultdict, Counter, deque
+from collections import defaultdict
 from scipy.spatial import cKDTree
-from utils import prompt, prompt_int, prompt_float, prompt_yn, label_matches
 
-def proton_coupling(traj):
-    print("\n--- Proton Coupling Correlation Function Analysis ---")
-
-    # === Protons ===
-    proton_comp_indices = prompt("Enter compound numbers with transferable protons (comma-separated): ").strip()
-    proton_comp_indices = [int(x.strip()) - 1 for x in proton_comp_indices.split(',') if x.strip()]
-    proton_compounds = [list(traj.compounds.values())[idx] for idx in proton_comp_indices]
-
-    protons_per_compound = {}
-    for idx, comp in zip(proton_comp_indices, proton_compounds):
-        labels = prompt(f"Enter transferable proton labels for compound {idx+1} ({comp.rep}) (comma-separated): ").strip()
-        labels = [l.strip() for l in labels.split(',') if l.strip()]
-        protons_per_compound[comp] = labels
-
-    # === Acceptors ===
-    acceptor_comp_indices = prompt("Enter compound numbers that may accept protons (comma-separated): ").strip()
-    acceptor_comp_indices = [int(x.strip()) - 1 for x in acceptor_comp_indices.split(',') if x.strip()]
-    acceptor_compounds = [list(traj.compounds.values())[idx] for idx in acceptor_comp_indices]
-
-    acceptors_per_compound = {}
-    for idx, comp in zip(acceptor_comp_indices, acceptor_compounds):
-        labels = prompt(f"Enter acceptor atom labels for compound {idx+1} ({comp.rep}) (comma-separated): ").strip()
-        labels = [l.strip() for l in labels.split(',') if l.strip()]
-        acceptors_per_compound[comp] = labels
-
-    is_molecule_mode = prompt_yn("Track proton transfers by molecule [y] or atom [n]?", True)
-
-    protons = []
-    acceptors = []
-
-    for comp, labels in protons_per_compound.items():
-        for mol in comp.members:
-            for label, idx in mol.label_to_global_id.items():
-                if any(label_matches(lab, label) for lab in labels):
-                    protons.append(idx)
-
-    for comp, labels in acceptors_per_compound.items():
-        for mol in comp.members:
-            for label, idx in mol.label_to_global_id.items():
-                if any(label_matches(lab, label) for lab in labels):
-                    acceptors.append(idx)
-
-    if not protons or not acceptors:
-        print("No protons or acceptors found.")
-        return []
-
-    atom_to_mol = {}
-    seen_molecules = {}
-    acceptor_molecules = []
-
-    for i,idx in enumerate(acceptors):  # `acceptors` contains global atom indices
-        atom = traj.atoms[idx]
-        mol = atom.parent_molecule
-
-        if mol not in seen_molecules:
-            matrix_col = len(acceptor_molecules)
-            acceptor_molecules.append(mol)
-            seen_molecules[mol] = matrix_col  # register new column index
-
-        atom_to_mol[i] = seen_molecules[mol]
+from analyses.base_analysis import BaseAnalysis
+from utils import (
+    prompt,
+    prompt_int,
+    prompt_float,
+    prompt_yn,
+    label_matches,
+)
 
 
-    # === Map proton/acceptor indices to their positions in traj.coords ===
-    proton_indices = np.array(protons, dtype=int)
-    acceptor_indices = np.array(acceptors, dtype=int)
-    n_protons = len(protons)
-    n_acceptors = len(seen_molecules) if is_molecule_mode else len(acceptors) # Isn't really necessary, as len(acceptors) is always larger
+class PCCFAnalysis(BaseAnalysis):
+    """
+    Proton transfer chain / proton coupling analysis.
 
-    # === Parameters ===
-    bond_cutoff = prompt_float("Enter maximum proton-acceptor bond distance (in Å): ", 1.2, minval=0.1)
-    dwell_threshold = prompt_int("Enter minimum dwell time on an acceptor (in frames): ", 2, minval=0)
-    max_chain_gaps = prompt("Enter one or more max chain gaps (in frames, comma-separated): ", 100).strip()
-    max_chain_gaps = [int(x.strip()) for x in max_chain_gaps.split(',') if x.strip().isdigit()]
+    IMPORTANT: This analysis assumes a *static* molecular topology:
+      - Protons have been cut off from acceptors during the initial molecule
+        recognition (in the interactive preprocessing step).
+      - Molecules and their atoms (traj.compounds, traj.atoms) are not re-built
+        per frame.
 
-    transfer_events = []  # (frame_idx, donor_acc, acceptor_acc)
-    last_acceptor = np.full(n_protons, fill_value=-1, dtype=int)
-    dwell_counters = np.zeros(n_protons, dtype=int)
+    Consequently, per-frame molecule recognition is *disabled* for this analysis.
+    We only update coordinates each frame and track proton–acceptor distances.
+    """
 
-    # === Prepare for trajectory iteration ===
-    bond_matrices = []  # List of binary bond matrices per frame
-
-    start_frame = prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
-    nframes = prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
-    frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)
-
-    frame_idx = 0
-    processed_frames = 0
-
-    if start_frame > 1:
-        print(f"Skipping forward to frame {start_frame}.")
-        while frame_idx < start_frame - 1:
-            traj.read_frame()
-            frame_idx += 1
-
-    while nframes != 0:
-        try:
-            traj.update_molecule_coords()
-            coords = traj.coords
+    def setup(self):
+        print("\n--- Proton Coupling Correlation Function Analysis ---")
+        print("NOTE: This analysis assumes that transferable protons have been")
+        print("      cut off from acceptor molecules during the initial")
+        print("      compound recognition. Molecules are treated as static;")
+        print("      per-frame molecule recognition is disabled.\n")
 
 
-            # Build KDTree over acceptor coordinates
-            acceptor_coords = coords[acceptor_indices]
-            tree = cKDTree(acceptor_coords, boxsize=traj.box_size)
+        # === Protons ===
+        proton_selection = self.compound_selection(
+            role="proton",
+            multi=True,
+            prompt_text="Choose the compounds with transferable protons (comma-separated): "
+        )
+        # proton_selection: list of (idx, Compound)
 
-#            print(len(acceptor_coords), len(acceptor_indices), len(atom_to_mol))
-#            input()
-            # Initialize binary matrix
-            bond_matrix = np.zeros((n_protons, n_acceptors), dtype=bool)
+        protons_per_compound = {}
+        for idx, comp in proton_selection:
+            labels = self.atom_selection(
+                role="proton",
+                compound=comp,
+                prompt_text=("Enter transferable proton labels for {role} compound "
+                             "{compound_num} ({compound_name}) (comma-separated): ")
+            )
+            protons_per_compound[comp] = labels
 
-            for i, p_idx in enumerate(proton_indices):
-                p_coord = coords[p_idx]
-                neighbors = tree.query_ball_point(p_coord, bond_cutoff)
+        # === Acceptors ===
+        acceptor_selection = self.compound_selection(
+            role="acceptor",
+            multi=True,
+            prompt_text="Choose the compounds that may accept protons (comma-separated): "
+        )
 
-                # Choose nearest acceptor if multiple are within cutoff
-                if neighbors:
-                    dists = np.linalg.norm(acceptor_coords[neighbors] - p_coord, axis=1)
-                    nearest = neighbors[np.argmin(dists)]
-                    if is_molecule_mode:
-                        acceptor_id = atom_to_mol[nearest]
-                    else:
-                        acceptor_id = nearest
-                    bond_matrix[i, acceptor_id] = 1  # Proton i bonded to acceptor nearest
+        acceptors_per_compound = {}
+        for idx, comp in acceptor_selection:
+            labels = self.atom_selection(
+                role="acceptor",
+                compound=comp,
+                prompt_text=("Enter acceptor atom labels for {role} compound "
+                             "{compound_num} ({compound_name}) (comma-separated): ")
+            )
+            acceptors_per_compound[comp] = labels
 
-            for p_idx in range(n_protons):
-                bonded = np.where(bond_matrix[p_idx])[0]
-                if bonded.size == 0:
-                    continue
-                new_acceptor = bonded[0]
-                if last_acceptor[p_idx] == -1:
-                    last_acceptor[p_idx] = new_acceptor
-                    dwell_counters[p_idx] = 1
-                elif new_acceptor == last_acceptor[p_idx]:
-                    dwell_counters[p_idx] += 1
+        # === Mode: molecule vs atom ===
+        self.is_molecule_mode = prompt_yn(
+            "Track proton transfers by molecule [y] or atom [n]?",
+            True
+        )
+
+        # --- Build proton & acceptor global index lists ---
+        protons = []
+        acceptors = []
+
+        # protons: global indices
+        for comp, labels in protons_per_compound.items():
+            for mol in comp.members:
+                for label, gid in mol.label_to_global_id.items():
+                    if any(label_matches(lab, label) for lab in labels):
+                        protons.append(gid)
+
+        # acceptors: global indices
+        for comp, labels in acceptors_per_compound.items():
+            for mol in comp.members:
+                for label, gid in mol.label_to_global_id.items():
+                    if any(label_matches(lab, label) for lab in labels):
+                        acceptors.append(gid)
+
+        if not protons or not acceptors:
+            raise ValueError("No protons or acceptors found with the given labels.")
+
+        # Store indices
+        self.proton_indices = np.array(protons, dtype=int)
+        self.acceptor_indices = np.array(acceptors, dtype=int)
+        self.n_protons = len(self.proton_indices)
+
+        # --- Map acceptor atoms to acceptor molecules (for molecule mode) ---
+        self.atom_to_mol = {}       # maps index in acceptors-array -> acceptor-molecule ID
+        seen_molecules = {}
+        acceptor_molecules = []
+
+        for i, gid in enumerate(acceptors):  # acceptors are global atom indices
+            atom = self.traj.atoms[gid]
+            mol = atom.parent_molecule
+            if mol not in seen_molecules:
+                col_idx = len(acceptor_molecules)
+                acceptor_molecules.append(mol)
+                seen_molecules[mol] = col_idx
+            self.atom_to_mol[i] = seen_molecules[mol]
+
+        if self.is_molecule_mode:
+            self.n_acceptors = len(seen_molecules)  # number of acceptor molecules
+        else:
+            self.n_acceptors = len(self.acceptor_indices)  # number of acceptor atoms
+
+        # === Parameters ===
+        self.bond_cutoff = prompt_float(
+            "Enter maximum proton-acceptor bond distance (in Å): ",
+            1.2,
+            minval=0.1
+        )
+        self.dwell_threshold = prompt_int(
+            "Enter minimum dwell time on an acceptor (in frames): ",
+            2,
+            minval=0
+        )
+        max_chain_gaps = prompt(
+            "Enter one or more max chain gaps (in frames, comma-separated): ",
+            "100"
+        ).strip()
+        self.max_chain_gaps = [
+            int(x.strip())
+            for x in max_chain_gaps.split(',')
+            if x.strip().isdigit()
+        ]
+        if not self.max_chain_gaps:
+            self.max_chain_gaps = [100]
+
+        # === Transfer tracking state ===
+        self.transfer_events = []  # list of (frame_idx, proton_id, donor_acceptor, new_acceptor)
+        self.last_acceptor = np.full(self.n_protons, fill_value=-1, dtype=int)
+        self.dwell_counters = np.zeros(self.n_protons, dtype=int)
+
+        # Internal box reference for KDTree
+        self.box = np.asarray(self.traj.box_size, dtype=float)
+
+    def setup_frame_loop(self):
+        """
+        Override BaseAnalysis.setup_frame_loop to *disable* per-frame molecule updates.
+
+        We only ask for start_frame / nframes / frame_stride.
+        """
+        print("\nPer-frame molecule recognition is disabled for proton coupling analysis.")
+        print("Molecules & proton/acceptor definitions are taken from the initial\n"
+              "compound recognition and assumed to be static.\n")
+
+        self.update_compounds = False  # important: do NOT re-run guess_molecules()
+        self.start_frame = prompt_int(
+            "In which trajectory frame to start processing the trajectory?",
+            1,
+            minval=1
+        )
+        self.nframes = prompt_int(
+            "How many trajectory frames to read (from this position on)?",
+            -1,
+            "all"
+        )
+        self.frame_stride = prompt_int(
+            "Use every n-th read trajectory frame for the analysis:",
+            1,
+            minval=1
+        )
+
+    def post_compound_update(self):
+        """
+        Required abstract method, but never used because update_compounds is False.
+        """
+        return True
+
+    def process_frame(self):
+        """
+        For each frame:
+          - build KDTree over current acceptor positions,
+          - find nearest acceptor within cutoff for each proton,
+          - build a binary bond matrix,
+          - detect transfers based on dwell-time threshold.
+        """
+        coords = self.traj.coords
+
+        # Build KDTree over acceptor coordinates
+        acceptor_coords = coords[self.acceptor_indices]
+        tree = cKDTree(acceptor_coords, boxsize=self.traj.box_size)
+
+        # Binary matrix: n_protons x n_acceptors
+        bond_matrix = np.zeros((self.n_protons, self.n_acceptors), dtype=bool)
+
+        # Assign each proton to its nearest acceptor within cutoff
+        for i, p_idx in enumerate(self.proton_indices):
+            p_coord = coords[p_idx]
+            neighbors = tree.query_ball_point(p_coord, self.bond_cutoff)
+
+            if neighbors:
+                # pick nearest acceptor (by distance)
+                dists = np.linalg.norm(acceptor_coords[neighbors] - p_coord, axis=1)
+                nearest = neighbors[np.argmin(dists)]
+                if self.is_molecule_mode:
+                    acceptor_id = self.atom_to_mol[nearest]
                 else:
-                    if dwell_counters[p_idx] >= dwell_threshold:
-                        donor = last_acceptor[p_idx]
-                        transfer_events.append((frame_idx, donor, new_acceptor))
-                    last_acceptor[p_idx] = new_acceptor
-                    dwell_counters[p_idx] = 1
+                    acceptor_id = nearest
+                bond_matrix[i, acceptor_id] = True
+
+        # Dwell tracking and transfer event identification
+        for p_idx in range(self.n_protons):
+            bonded = np.where(bond_matrix[p_idx])[0]
+            if bonded.size == 0:
+                continue
+            new_acceptor = bonded[0]
+            if self.last_acceptor[p_idx] == -1:
+                self.last_acceptor[p_idx] = new_acceptor
+                self.dwell_counters[p_idx] = 1
+            elif new_acceptor == self.last_acceptor[p_idx]:
+                self.dwell_counters[p_idx] += 1
+            else:
+                # proton changed acceptor; check dwell threshold
+                if self.dwell_counters[p_idx] >= self.dwell_threshold:
+                    donor = self.last_acceptor[p_idx]
+                    self.transfer_events.append(
+                        (self.frame_idx, p_idx, donor, new_acceptor)
+                    )
+                self.last_acceptor[p_idx] = new_acceptor
+                self.dwell_counters[p_idx] = 1
+
+    def postprocess(self):
+        print("\nAnalyzing transfer events and building chains...")
+
+        if not self.transfer_events:
+            print("No transfer events detected. Nothing to analyze.")
+            return
+
+        # === Cancel rapid back-and-forth oscillations ===
+        oscillation_cutoff = 10  # frames
+        by_proton = defaultdict(list)
+
+        # Group events by proton
+        for f, pid, d, a in sorted(self.transfer_events):
+            by_proton[pid].append((f, d, a))
+
+        filtered_events = []
+        for pid, evs in by_proton.items():
+            filtered_events.extend(squash(evs, oscillation_cutoff))
+
+        filtered_events.sort()
+        self.transfer_events = filtered_events
+
+        # Analyze chains for each max_chain_gap
+        for gap in self.max_chain_gaps:
+            print(f"\nAnalyzing chains with max_chain_gap = {gap}...")
+
+            # Rebuild donor -> list of (frame, acceptor)
+            acceptor_transfer_map = defaultdict(list)
+            for frame, donor, acceptor in self.transfer_events:
+                acceptor_transfer_map[donor].append((frame, acceptor))
+
+            max_depth = 20
+            chain_counts = np.zeros(max_depth, dtype=int)
+
+            # Walk through chains
+            for frame, donor, acceptor in self.transfer_events:
+                visited = set()
+                current = acceptor
+                depth = 1
+                visited.add(donor)
+                current_frame = frame
+
+                while depth < max_depth:
+                    next_links = [
+                        (f, a) for (f, a) in acceptor_transfer_map.get(current, [])
+                        if a not in visited and 0 < f - current_frame <= gap
+                    ]
+                    if not next_links:
+                        break
+
+                    # choose earliest valid transfer
+                    next_frame, next_acc = min(next_links, key=lambda t: t[0])
+                    visited.add(current)
+                    current = next_acc
+                    current_frame = next_frame
+                    depth += 1
+
+                chain_counts[depth - 1] += 1
+
+            total_chains = np.sum(chain_counts)
+            if total_chains > 0:
+                Cn = chain_counts / total_chains
+            else:
+                Cn = chain_counts
+
+            fname = f"proton_chains_gap{gap}.dat"
+            with open(fname, "w") as f:
+                f.write(f"# Total number of chains: {total_chains}\n")
+                f.write("# n   C(n)\n")
+                for i, val in enumerate(Cn):
+                    if val > 0:
+                        f.write(f"{i+1} {val:.6f}\n")
+
+            print(f"Wrote C(n) to {fname}")
 
 
-            processed_frames += 1
+def squash(events, tau):
+    """
+    Remove back-and-forth hops within time window tau.
 
-#            if (processed_frames % 10 == 0):
-#                print(".", end="", flush=True)
-#                if (processed_frames % 1000 == 0):
-#                    print(f"\n{frame_idx+1}")
-
-#            print(f"\rProcessed {processed_frames} frames (current frame {frame_idx+1})", end="")
-
-            for _ in range(frame_stride):
-                frame_idx += 1
-                nframes -= 1
-                traj.read_frame()
-
-        except ValueError:
-            print("\nReached end of trajectory.")
-            break
-        except KeyboardInterrupt:
-            print("\nAnalysis interrupted by user.")
-            break
-
-    # === Post-processing: Track transfers and build chains ===
-    print("\nAnalyzing transfer events and building chains...")
-
-    acceptor_transfer_map = defaultdict(list)
-    for frame, donor, acceptor in transfer_events:
-        acceptor_transfer_map[donor].append((frame, acceptor))
-
-    # Walk through chains
-    chain_counts = np.zeros(20, dtype=int)  # Track up to 20-chain depth by default
-
-    # Walk through chains with frame gap restriction
-    for gap in max_chain_gaps:
-        print(f"\nAnalyzing chains with max_chain_gap = {gap}...")
-        acceptor_transfer_map = defaultdict(list)
-        for frame, donor, acceptor in transfer_events:
-            acceptor_transfer_map[donor].append((frame, acceptor))
-
-        chain_counts = np.zeros(20, dtype=int)
-
-        for frame, donor, acceptor in transfer_events:
-            visited = set()
-            current = acceptor
-            depth = 1
-            visited.add(donor)
-            current_frame = frame
-
-            while depth < len(chain_counts):
-                next_links = [
-                    (f, a) for (f, a) in acceptor_transfer_map.get(current, [])
-                    if a not in visited and 0 < f - current_frame <= gap
-                ]
-                if not next_links:
-                    break
-
-                # Choose earliest valid transfer
-                next_frame, next_acc = min(next_links, key=lambda t: t[0])
-                visited.add(current)
-                current = next_acc
-                current_frame = next_frame
-                depth += 1
-
-            chain_counts[depth - 1] += 1
-
-        # Normalize to get C(n)
-        total_chains = np.sum(chain_counts)
-        Cn = chain_counts / total_chains if total_chains > 0 else chain_counts
-
-        fname = f"proton_chains_gap{gap}.dat"
-        with open(fname, "w") as f:
-            f.write(f"# Total number of chains: {total_chains}\n")
-            f.write("# n   C(n)\n")
-            for i, val in enumerate(Cn):
-                if val > 0:
-                    f.write(f"{i+1} {val:.6f}\n")
-
-        print(f"Wrote C(n) to {fname}")
+    events: list of (frame, donor, acceptor) for a single proton.
+    """
+    stack = []
+    for f, d, a in events:
+        if stack and stack[-1][1] == a and stack[-1][2] == d and (f - stack[-1][0]) <= tau:
+            # cancel A→B followed by B→A within tau
+            stack.pop()
+        else:
+            stack.append((f, d, a))
+    return stack
 
