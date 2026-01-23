@@ -81,6 +81,16 @@ class ClusterAnalysis(BaseAnalysis):
         if self.compute_cacf:
             self.corr_depth = prompt_int("Maximum correlation depth (number of frames): ", 100, minval=1)
 
+        # Standard Deviations
+        self.compute_errors = prompt_yn(
+            "Compute per-frame standard deviations for cluster counts?", False
+        )
+        if self.compute_errors:
+            # (composition, graph_id) -> [count_in_frame0, count_in_frame1, ...]
+            self.frame_cluster_counts = {}
+        else:
+            self.frame_cluster_counts = None
+
         # ----- Accumulators -----
         self.cluster_histogram = Counter()
         self.graph_list = []
@@ -152,6 +162,8 @@ class ClusterAnalysis(BaseAnalysis):
         if not atom_groups:
             # Nothing to cluster this frame
             self._pad_absent_clusters(seen_this_frame=set())
+            if self.compute_errors:
+                self._update_frame_counts_for_empty_frame()
             return
 
         # 2) Identify clusters (graphs)
@@ -163,11 +175,15 @@ class ClusterAnalysis(BaseAnalysis):
         )
 
         seen_this_frame = set()  # (composition, graph_id, atom_ids)
+        frame_counts = Counter()
 
         # 3) Count clusters + optionally write xyz
         for composition, graph, cluster_atoms in clusters:
             graph_id = get_graph_id(graph) if self.should_hash else 0
-            self.cluster_histogram[(composition, graph_id)] += 1
+            key = (composition, graph_id)
+            self.cluster_histogram[key] += 1
+
+            frame_counts[key] += 1
 
             atom_ids = frozenset(atom.idx for atom in cluster_atoms)
             seen_this_frame.add((composition, graph_id, atom_ids))
@@ -185,6 +201,9 @@ class ClusterAnalysis(BaseAnalysis):
                     self.is_save_whole,
                     self.traj.box_size
                 )
+
+        if self.compute_errors:
+            self._update_frame_counts(frame_counts)
 
         # 4) Pad 0s for clusters not seen in this frame (for intermittent CACF)
         self._pad_absent_clusters(seen_this_frame)
@@ -220,6 +239,32 @@ class ClusterAnalysis(BaseAnalysis):
                 if (composition, graph_id, atom_ids) not in seen_this_frame:
                     self.cluster_beta[(composition, graph_id)][atom_ids].append(0)
 
+    def _update_frame_counts(self, frame_counts):
+        """
+        Maintain a per-frame time series of cluster counts for each
+        (composition, graph_id) key.
+
+        self.processed_frames is the number of *already* processed frames
+        when process_frame() is called, so it is the index of the current frame.
+        """
+        t = self.processed_frames  # 0-based index for "current" frame
+
+        # 1) For existing keys: append 0 or the current count
+        for key, series in self.frame_cluster_counts.items():
+            series.append(frame_counts.get(key, 0))
+
+        # 2) For new keys: create a series full of zeros for past frames, plus current count
+        for key, count in frame_counts.items():
+            if key not in self.frame_cluster_counts:
+                self.frame_cluster_counts[key] = [0] * t + [count]
+
+    def _update_frame_counts_for_empty_frame(self):
+        if not self.frame_cluster_counts:
+            return
+        for series in self.frame_cluster_counts.values():
+            series.append(0)
+
+
     def postprocess(self):
         # ----- Print histogram -----
         sorted_compositions = sorted(self.cluster_histogram.items(), key=lambda item: item[0])
@@ -229,7 +274,7 @@ class ClusterAnalysis(BaseAnalysis):
             print(f"Composition {composition}: {count} occurrences")
 
         # ----- Post-process clusters (populations, images, occurrences files) -----
-        post_process_clusters(self.cluster_histogram, self.graph_list, self.vis_format)
+        post_process_clusters(self.cluster_histogram, self.graph_list, self.vis_format, self.frame_cluster_counts)
 
         # ----- CACF -----
         if self.compute_cacf:
@@ -384,112 +429,128 @@ def get_graph_id(graph):
     return hashlib.md5(graph_string.encode()).hexdigest()
 
 
-def post_process_clusters(cluster_histogram, graph_list, vis_format):
-    graph_dict = {(composition, graph_id): graph for composition, graph_id, graph in graph_list}
-
-    sorted_clusters = sorted(
-        cluster_histogram.items(),
-        key=lambda item: (-item[1], item[0][0], item[0][1])
-    )
-
-    # Save images for visualization if requested
-    if vis_format:
-        for i, ((composition, graph_id), count) in enumerate(sorted_clusters):
-            if i > 200:
-                break
-            if (composition, graph_id) in graph_dict:
-                filename = f"graph{i}_{composition}.{vis_format}"
-                draw_graph(graph_dict[(composition, graph_id)], filename)
-
-    # Save cluster occurrences
-    with open("cluster_occurrences.dat", "w") as f_occ:
-        f_occ.write("Graph ID    Occurrences\n")
-        for (composition, graph_id), count in sorted_clusters:
-            f_occ.write(f"{composition:<30} {count:<10} {graph_id}\n")
-
-    # Extract unique atom types from compositions: entries look like "1-O-2"
-    atom_types = {
-        entry.split("-")[1]
-        for (composition, _), _ in cluster_histogram.items()
-        for entry in composition.split("_")
-        if len(entry.split("-")) >= 3
-    }
-
-    # Compute populations I(P) for each atom type
-    atom_populations = {atom: {} for atom in atom_types}
-    for atom in atom_types:
-        weighted_occurrences = {}
-        total_weighted = 0
-
-        for (composition, graph_id), occ in cluster_histogram.items():
-            atom_count = 0
-            for entry in composition.split("_"):
-                parts = entry.split("-")
-                if len(parts) < 3:
-                    continue
-                _, atom_label, count = parts[0], parts[1], parts[2]
-                if atom_label == atom:
-                    atom_count += int(count)
-
-            w_occ = occ * atom_count
-            weighted_occurrences[(composition, graph_id)] = w_occ
-            total_weighted += w_occ
-
-        for (composition, graph_id), w_occ in weighted_occurrences.items():
-            atom_populations[atom][(composition, graph_id)] = (w_occ / total_weighted) if total_weighted > 0 else 0.0
-
-    # Save cluster populations I(P)
-    with open("cluster_populations.dat", "w") as f_pop:
-        header = f"{'Cluster':<30}" + " ".join(f"{f'I({atom})':>15}" for atom in atom_types)
-        f_pop.write(f"{header}\n")
-
-        sorted_comps = sorted(
-            cluster_histogram.keys(),
-            key=lambda comp: sum(atom_populations[a].get((comp[0], comp[1]), 0.0) for a in atom_types),
-            reverse=True
-        )
-
-        for (composition, graph_id) in sorted_comps:
-            line = f"{composition:<30}" + " ".join(
-                f"{atom_populations[atom].get((composition, graph_id), 0.0):>15.10f}"
-                for atom in atom_types
-            )
-            f_pop.write(f"{line}\n")
-
-    # Summarized populations by cluster size (per atom type)
-    cluster_size_populations = {atom: {} for atom in atom_types}
-    for atom in atom_types:
-        size_pop = {}
-        for (composition, graph_id), _occ in cluster_histogram.items():
-            atom_count = 0
-            for entry in composition.split("_"):
-                parts = entry.split("-")
-                if len(parts) < 3:
-                    continue
-                _, atom_label, count = parts[0], parts[1], parts[2]
-                if atom_label == atom:
-                    atom_count += int(count)
-
-            if atom_count > 0:
-                size_pop[atom_count] = size_pop.get(atom_count, 0.0) + atom_populations[atom].get((composition, graph_id), 0.0)
-
-        cluster_size_populations[atom] = size_pop
-
-    with open("cluster_size.dat", "w") as f_size:
-        header = f"{'Cluster Size':<15}" + " ".join(f"{f'I({atom})':>15}" for atom in atom_types)
-        f_size.write(f"{header}\n")
-
-        max_size = max(
-            (max(sp.keys(), default=0) for sp in cluster_size_populations.values()),
-            default=0
-        )
-
-        for size in range(1, max_size + 1):
-            line = f"{size:<15}" + " ".join(
-                f"{cluster_size_populations[atom].get(size, 0.0):>15.10f}"
-                for atom in atom_types
-            )
-            f_size.write(f"{line}\n")
+#def post_process_clusters(cluster_histogram, graph_list, vis_format, frame_cluster_counts):
+#    graph_dict = {(composition, graph_id): graph for composition, graph_id, graph in graph_list}
+#
+#    sorted_clusters = sorted(
+#        cluster_histogram.items(),
+#        key=lambda item: (-item[1], item[0][0], item[0][1])
+#    )
+#
+#    # Save images for visualization if requested
+#    if vis_format:
+#        for i, ((composition, graph_id), count) in enumerate(sorted_clusters):
+#            if i > 200:
+#                break
+#            if (composition, graph_id) in graph_dict:
+#                filename = f"graph{i}_{composition}.{vis_format}"
+#                draw_graph(graph_dict[(composition, graph_id)], filename)
+#
+#    # Save cluster occurrences
+#    with open("cluster_occurrences.dat", "w") as f_occ:
+#        if frame_cluster_counts is not None:
+#            f_occ.write(f"{'Cluster':<30} {'Occurrences':>12} {'GraphID':<32} {'mean_per_frame':>16} {'std_per_frame':>16}\n")
+#
+#            for (composition, graph_id), count in sorted_clusters:
+#                series = frame_cluster_counts.get((composition, graph_id), [])
+#                if series:
+#                    arr = np.asarray(series, dtype=float)
+#                    mean = arr.mean()
+#                    std = arr.std(ddof=1) if len(arr) > 1 else 0.0
+#                else:
+#                    mean = std = 0.0
+#
+#                f_occ.write(f"{composition:<30} {count:>12d} {graph_id:<32} {mean:>16.6f} {std:>16.6f}\n")
+#
+#        else:
+#            f_occ.write(f"{'Cluster':<30} {'Occurrences':>12} {'GraphID':<32}\n")
+#            for (composition, graph_id), count in sorted_clusters:
+#                f_occ.write(f"{composition:<30} {count:>12d} {graph_id:<32}\n")
+#
+#
+#    # Extract unique atom types from compositions: entries look like "1-O-2"
+#    atom_types = {
+#        entry.split("-")[1]
+#        for (composition, _), _ in cluster_histogram.items()
+#        for entry in composition.split("_")
+#        if len(entry.split("-")) >= 3
+#    }
+#
+#    # Compute populations I(P) for each atom type
+#    atom_populations = {atom: {} for atom in atom_types}
+#    for atom in atom_types:
+#        weighted_occurrences = {}
+#        total_weighted = 0
+#
+#        for (composition, graph_id), occ in cluster_histogram.items():
+#            atom_count = 0
+#            for entry in composition.split("_"):
+#                parts = entry.split("-")
+#                if len(parts) < 3:
+#                    continue
+#                _, atom_label, count = parts[0], parts[1], parts[2]
+#                if atom_label == atom:
+#                    atom_count += int(count)
+#
+#            w_occ = occ * atom_count
+#            weighted_occurrences[(composition, graph_id)] = w_occ
+#            total_weighted += w_occ
+#
+#        for (composition, graph_id), w_occ in weighted_occurrences.items():
+#            atom_populations[atom][(composition, graph_id)] = (w_occ / total_weighted) if total_weighted > 0 else 0.0
+#
+#    # Save cluster populations I(P)
+#    with open("cluster_populations.dat", "w") as f_pop:
+#        header = f"{'Cluster':<30}" + " ".join(f"{f'I({atom})':>15}" for atom in atom_types)
+#        f_pop.write(f"{header}\n")
+#
+#        sorted_comps = sorted(
+#            cluster_histogram.keys(),
+#            key=lambda comp: sum(atom_populations[a].get((comp[0], comp[1]), 0.0) for a in atom_types),
+#            reverse=True
+#        )
+#
+#        for (composition, graph_id) in sorted_comps:
+#            line = f"{composition:<30}" + " ".join(
+#                f"{atom_populations[atom].get((composition, graph_id), 0.0):>15.10f}"
+#                for atom in atom_types
+#            )
+#            f_pop.write(f"{line}\n")
+#
+#    # Summarized populations by cluster size (per atom type)
+#    cluster_size_populations = {atom: {} for atom in atom_types}
+#    for atom in atom_types:
+#        size_pop = {}
+#        for (composition, graph_id), _occ in cluster_histogram.items():
+#            atom_count = 0
+#            for entry in composition.split("_"):
+#                parts = entry.split("-")
+#                if len(parts) < 3:
+#                    continue
+#                _, atom_label, count = parts[0], parts[1], parts[2]
+#                if atom_label == atom:
+#                    atom_count += int(count)
+#
+#            if atom_count > 0:
+#                size_pop[atom_count] = size_pop.get(atom_count, 0.0) + atom_populations[atom].get((composition, graph_id), 0.0)
+#
+#        cluster_size_populations[atom] = size_pop
+#
+#    with open("cluster_size.dat", "w") as f_size:
+#        header = f"{'Cluster Size':<15}" + " ".join(f"{f'I({atom})':>15}" for atom in atom_types)
+#        f_size.write(f"{header}\n")
+#
+#        max_size = max(
+#            (max(sp.keys(), default=0) for sp in cluster_size_populations.values()),
+#            default=0
+#        )
+#
+#        for size in range(1, max_size + 1):
+#            line = f"{size:<15}" + " ".join(
+#                f"{cluster_size_populations[atom].get(size, 0.0):>15.10f}"
+#                for atom in atom_types
+#            )
+#            f_size.write(f"{line}\n")
 
 
 def draw_graph(graph, filename="graph.png"):
@@ -516,4 +577,184 @@ def draw_graph(graph, filename="graph.png"):
     plt.savefig(filename, dpi=300)
     plt.close()
 
+
+
+def post_process_clusters(cluster_histogram, graph_list, vis_format, frame_cluster_counts):
+    graph_dict = {(composition, graph_id): graph for composition, graph_id, graph in graph_list}
+
+    sorted_clusters = sorted(
+        cluster_histogram.items(),
+        key=lambda item: (-item[1], item[0][0], item[0][1])
+    )
+
+    if vis_format:
+        for i, ((composition, graph_id), count) in enumerate(sorted_clusters):
+            if i > 200:
+                break
+            if (composition, graph_id) in graph_dict:
+                filename = f"graph{i}_{composition}.{vis_format}"
+                draw_graph(graph_dict[(composition, graph_id)], filename)
+
+    # -------------------- Build per-frame count series --------------------
+    # counts_per_frame[(composition, graph_id)] -> np.array shape (T,)
+    counts_per_frame = {}
+
+    if frame_cluster_counts:
+        # Use the recorded per-frame series
+        for key, series in frame_cluster_counts.items():
+            counts_per_frame[key] = np.asarray(series, dtype=float)
+
+        # Determine T and pad defensively
+        T = max(len(s) for s in counts_per_frame.values())
+
+        # Ensure all histogram keys are present
+        for key in cluster_histogram.keys():
+            if key not in counts_per_frame:
+                counts_per_frame[key] = np.zeros(T, dtype=float)
+
+        # Pad any shorter series
+        for key, s in counts_per_frame.items():
+            if len(s) < T:
+                counts_per_frame[key] = np.pad(s, (0, T - len(s)), constant_values=0.0)
+    else:
+        # No per-frame info: treat each cluster count as a single-frame series
+        # This recovers the old behaviour for I(P) etc, with std = 0
+        for key, occ in cluster_histogram.items():
+            counts_per_frame[key] = np.array([float(occ)], dtype=float)
+        T = 1
+
+    # -------------------- cluster_occurrences.dat (with mean/std) --------------------
+    with open("cluster_occurrences.dat", "w") as f_occ:
+        f_occ.write(f"{'Cluster':<30} {'Occurrences':>12} {'GraphID':<32} {'mean_per_frame':>16} {'std_per_frame':>16}\n")
+
+        for (composition, graph_id), total_occ in sorted_clusters:
+            series = counts_per_frame.get((composition, graph_id), np.zeros(T, dtype=float))
+            mean = series.mean()
+            std = series.std(ddof=1) if len(series) > 1 else 0.0
+
+            f_occ.write(f"{composition:<30} {total_occ:>12d} {graph_id:<32} {mean:>16.6f} {std:>16.6f}\n")
+
+    # -------------------- Atom types & atom counts per cluster --------------------
+    # entries look like "1-O-2"
+    atom_types = {
+        entry.split("-")[1]
+        for (composition, _), _ in cluster_histogram.items()
+        for entry in composition.split("_")
+        if len(entry.split("-")) >= 3
+    }
+
+    # atom_counts_per_cluster[atom][(composition,graph_id)] = N_atom(P)
+    atom_counts_per_cluster = {atom: {} for atom in atom_types}
+    for atom in atom_types:
+        for (composition, graph_id) in cluster_histogram.keys():
+            atom_count = 0
+            for entry in composition.split("_"):
+                parts = entry.split("-")
+                if len(parts) < 3:
+                    continue
+                _, atom_label, count = parts[0], parts[1], parts[2]
+                if atom_label == atom:
+                    atom_count += int(count)
+            if atom_count > 0:
+                atom_counts_per_cluster[atom][(composition, graph_id)] = atom_count
+
+    # -------------------- Per-atom cluster & size populations with mean/std --------------------
+    atom_populations_mean = {atom: {} for atom in atom_types}
+    atom_populations_std  = {atom: {} for atom in atom_types}
+    cluster_size_populations_mean = {atom: {} for atom in atom_types}
+    cluster_size_populations_std  = {atom: {} for atom in atom_types}
+
+    for atom in atom_types:
+        # Denominator per frame: sum_P n_t(P)*N_atom(P)
+        denom = np.zeros(T, dtype=float)
+
+        for key, series in counts_per_frame.items():
+            N_atom = atom_counts_per_cluster[atom].get(key, 0)
+            if N_atom == 0:
+                continue
+            denom += series * N_atom
+
+        valid_mask = denom > 0
+        if not np.any(valid_mask):
+            # No frames where this atom type is present
+            continue
+
+        # Temporary storage for size-resolved series
+        size_series = defaultdict(lambda: np.zeros(T, dtype=float))
+
+        # Per-cluster I_t and stats
+        for key in cluster_histogram.keys():
+            N_atom = atom_counts_per_cluster[atom].get(key, 0)
+            if N_atom == 0:
+                atom_populations_mean[atom][key] = 0.0
+                atom_populations_std[atom][key] = 0.0
+                continue
+
+            series = counts_per_frame.get(key, np.zeros(T, dtype=float))
+            w = series * N_atom
+
+            I_t = np.zeros(T, dtype=float)
+            I_t[valid_mask] = w[valid_mask] / denom[valid_mask]
+
+            vals = I_t[valid_mask]
+            mean = vals.mean()
+            std = vals.std(ddof=1) if len(vals) > 1 else 0.0
+
+            atom_populations_mean[atom][key] = mean
+            atom_populations_std[atom][key] = std
+
+            size = N_atom
+            size_series[size][valid_mask] += I_t[valid_mask]
+
+        # Size-resolved means/stds
+        for size, s_series in size_series.items():
+            vals = s_series[valid_mask]
+            mean = vals.mean()
+            std = vals.std(ddof=1) if len(vals) > 1 else 0.0
+            cluster_size_populations_mean[atom][size] = mean
+            cluster_size_populations_std[atom][size] = std
+
+    # -------------------- cluster_populations.dat (mean & std for I(P)) --------------------
+    with open("cluster_populations.dat", "w") as f_pop:
+        header = f"{'Cluster':<30}"
+        for atom in atom_types:
+            header += f"{f'I({atom})':>15}{f'std(I({atom}))':>15}"
+        f_pop.write(header + "\n")
+
+        sorted_comps = sorted(
+            cluster_histogram.keys(),
+            key=lambda comp: sum(
+                atom_populations_mean[a].get((comp[0], comp[1]), 0.0) for a in atom_types
+            ),
+            reverse=True
+        )
+
+        for (composition, graph_id) in sorted_comps:
+            key = (composition, graph_id)
+            line = f"{composition:<30}"
+            for atom in atom_types:
+                mean = atom_populations_mean[atom].get(key, 0.0)
+                std  = atom_populations_std[atom].get(key, 0.0)
+                line += f"{mean:>15.10f}{std:>15.10f}"
+            f_pop.write(line + "\n")
+
+    # -------------------- cluster_size.dat (mean & std by cluster size) --------------------
+    with open("cluster_size.dat", "w") as f_size:
+        header = f"{'Cluster Size':<15}"
+        for atom in atom_types:
+            header += f"{f'I({atom})':>15}{f'std(I({atom}))':>15}"
+        f_size.write(header + "\n")
+
+        max_size = 0
+        for atom in atom_types:
+            if cluster_size_populations_mean[atom]:
+                max_size = max(max_size, max(cluster_size_populations_mean[atom].keys()))
+
+        for size in range(1, max_size + 1):
+            line = f"{size:<15}"
+            for atom in atom_types:
+                mean = cluster_size_populations_mean[atom].get(size, 0.0)
+                std  = cluster_size_populations_std[atom].get(size, 0.0)
+                line += f"{mean:>15.10f}{std:>15.10f}"
+            f_size.write(line + "\n")
 
