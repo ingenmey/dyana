@@ -1,5 +1,3 @@
-# analyses/charge_msd_analysis.py
-
 import numpy as np
 from collections import defaultdict
 from scipy.spatial import cKDTree
@@ -39,6 +37,8 @@ class ChargeMSDAnalysis(BaseAnalysis):
         print("      cut off from acceptor molecules during the initial")
         print("      compound recognition and that the bonding topology is")
         print("      static. Per-frame molecule recognition is disabled.\n")
+
+        self.allow_compound_update = False
 
         # === Protons ===
         proton_selection = self.compound_selection(
@@ -86,7 +86,7 @@ class ChargeMSDAnalysis(BaseAnalysis):
 
         # === Parameters ===
         self.bond_cutoff = prompt_float(
-            "Enter maximum proton-acceptor bond distance (in Å): ",
+            "Enter default maximum proton-acceptor bond distance (in Å): ",
             1.2,
             minval=0.1,
         )
@@ -96,7 +96,27 @@ class ChargeMSDAnalysis(BaseAnalysis):
             minval=2,
         )
 
-        # Build proton and acceptor global index lists (static)
+        # Optional: per-acceptor-label cutoffs
+        use_individual = prompt(
+            "Use individual distance cutoffs for different acceptor labels? [y/N]: "
+        ).strip().lower()
+        per_label_cutoff = {}
+        if use_individual in ("y", "yes"):
+            print("\nEnter cutoffs per acceptor label pattern (press Enter to accept the default).")
+            for comp, labels in acceptors_per_compound.items():
+                for lab in labels:
+                    if lab in per_label_cutoff:
+                        # already asked (same pattern reused for another compound)
+                        continue
+                    cutoff = prompt_float(
+                        f"  Cutoff distance for acceptor label pattern '{lab}' (Å): ",
+                        self.bond_cutoff,
+                        minval=0.1,
+                    )
+                    per_label_cutoff[lab] = cutoff
+        self.per_label_acceptor_cutoff = per_label_cutoff
+
+        # === Build proton global index list (static) ===
         protons = [
             idx
             for comp, labels in protons_per_compound.items()
@@ -104,33 +124,36 @@ class ChargeMSDAnalysis(BaseAnalysis):
             for label, idx in mol.label_to_global_id.items()
             if any(label_matches(lab, label) for lab in labels)
         ]
-
-        acceptors = [
-            idx
-            for comp, labels in acceptors_per_compound.items()
-            for mol in comp.members
-            for label, idx in mol.label_to_global_id.items()
-            if any(label_matches(lab, label) for lab in labels)
-        ]
-
-        if not protons or not acceptors:
-            raise ValueError("No protons or acceptors found with the given labels.")
-
+        if not protons:
+            raise ValueError("No protons found with the given labels.")
         self.proton_indices = list(protons)
-        self.acceptor_indices = list(acceptors)
 
-        # Map acceptor atoms (global indices) -> Molecule
-        self.atom_to_mol = {idx: self.traj.atoms[idx].parent_molecule for idx in self.acceptor_indices}
+        # === Build acceptor global index list and per-atom cutoffs (static) ===
+        self.acceptor_indices = []
+        self.acceptor_cutoffs = {}           # acc_global_idx -> cutoff (Å)
+        self.atom_to_mol = {}                # acc_global_idx -> Molecule
+        self.mol_acceptor_atoms = defaultdict(list)  # Molecule -> list of acc_global_idx
 
-        # mol -> list of acceptor atom global indices (for position centers)
-        self.mol_acceptor_atoms = defaultdict(list)
         for comp, labels in acceptors_per_compound.items():
             for mol in comp.members:
-                for label in labels:
-                    # Here we use exact label equality for acceptor-center atoms
-                    if label in mol.label_to_global_id:
-                        gid = mol.label_to_global_id[label]
-                        self.mol_acceptor_atoms[mol].append(gid)
+                for atom_label, gid in mol.label_to_global_id.items():
+                    matched_label = None
+                    for user_label in labels:
+                        if label_matches(user_label, atom_label):
+                            matched_label = user_label
+                            break
+                    if matched_label is None:
+                        continue
+
+                    self.acceptor_indices.append(gid)
+                    self.atom_to_mol[gid] = mol
+                    self.mol_acceptor_atoms[mol].append(gid)
+
+                    cutoff = self.per_label_acceptor_cutoff.get(matched_label, self.bond_cutoff)
+                    self.acceptor_cutoffs[gid] = cutoff
+
+        if not self.acceptor_indices:
+            raise ValueError("No acceptor atoms found with the given labels.")
 
         # === Charge tracking state ===
         self.next_cid = 1  # next free charge ID
@@ -143,39 +166,13 @@ class ChargeMSDAnalysis(BaseAnalysis):
         self.charge_unwrapped = defaultdict(list)   # cid -> list of positions
         self.charge_prev_wrapped = {}               # cid -> last wrapped position
 
-        # Proton mapping from previous frame
+        # Proton mapping from previous frame (filled in on first frame)
         self.prev_proton_to_acceptor = {}  # p_idx -> acc_idx
 
         # Initialization flag: we lazily initialize charge states on the first processed frame
         self.initialized = False
 
         self.box = np.asarray(self.traj.box_size, dtype=float)
-
-    def setup_frame_loop(self):
-        """
-        Override BaseAnalysis.setup_frame_loop to disable per-frame molecule recognition.
-        We only ask for start_frame / nframes / frame_stride.
-        """
-        print("\nPer-frame molecule recognition is disabled for charge transfer analysis.")
-        print("Molecules & proton/acceptor definitions are taken from the initial\n"
-              "compound recognition and assumed to be static.\n")
-
-        self.update_compounds = False  # IMPORTANT: we rely on static topology
-        self.start_frame = prompt_int(
-            "In which trajectory frame to start processing the trajectory?",
-            1,
-            minval=1,
-        )
-        self.nframes = prompt_int(
-            "How many trajectory frames to read (from this position on)?",
-            -1,
-            "all",
-        )
-        self.frame_stride = prompt_int(
-            "Use every n-th read trajectory frame for the analysis:",
-            1,
-            minval=1,
-        )
 
     def post_compound_update(self):
         """
@@ -195,15 +192,22 @@ class ChargeMSDAnalysis(BaseAnalysis):
             self.traj.box_size,
             self.proton_indices,
             self.acceptor_indices,
-            self.bond_cutoff,
+            self.acceptor_cutoffs,
             self.atom_to_mol,
         )
+
+        # Build proton counts for *all* acceptor molecules (including those with zero bound protons)
+        all_mols = set(self.atom_to_mol.values())
+        full_proton_count = {
+            mol: proton_count.get(mol, 0)
+            for mol in all_mols
+        }
 
         (self.mol_charge_state,
          self.mol_charge_ids,
          self.charge_signs,
          self.next_cid) = initialize_charge_states(
-            proton_count,
+            full_proton_count,
             self.neutral_proton_counts,
             self.next_cid,
         )
@@ -219,7 +223,8 @@ class ChargeMSDAnalysis(BaseAnalysis):
                 self.charge_unwrapped[cid].append(center.copy())
                 self.charge_history[cid].append((self.frame_idx, mol.mol_id))
 
-        self.prev_proton_to_acceptor = proton_to_acceptor
+        # Save mapping for hop detection in the next frame
+        self.prev_proton_to_acceptor = dict(proton_to_acceptor)
         self.initialized = True
 
     def process_frame(self):
@@ -229,8 +234,8 @@ class ChargeMSDAnalysis(BaseAnalysis):
           - On subsequent frames:
               * update unwrapped positions for existing charges
               * compute proton-to-acceptor mapping & proton counts
-              * compute new charge states
-              * process proton hops and move/create/annihilate charges
+              * for each proton hop, update integer charge states and move/create/
+                annihilate charge IDs in a local, per-hop manner
               * record charge locations
         """
         coords = self.traj.coords
@@ -265,23 +270,14 @@ class ChargeMSDAnalysis(BaseAnalysis):
             self.traj.box_size,
             self.proton_indices,
             self.acceptor_indices,
-            self.bond_cutoff,
+            self.acceptor_cutoffs,
             self.atom_to_mol,
         )
 
-        # New charge state from current proton counts
-        new_charge_state = {
-            mol: proton_count[mol] - self.neutral_proton_counts[mol.comp_id]
-            for mol in proton_count
-        }
+        # Working copy of charge states that we update per hop
+        local_charge_state = dict(self.mol_charge_state)
 
-        # Ensure we have previous states for all molecules active in THIS frame
-        # (molecules that just appeared get previous state 0)
-        for mol in new_charge_state.keys():
-            if mol not in self.mol_charge_state:
-                self.mol_charge_state[mol] = 0
-
-        # --- Process proton hops and move/create/annihilate charges ---
+        # --- Process proton hops with generalized per-hop logic ---
         for p_idx, new_acc in proton_to_acceptor.items():
             old_acc = self.prev_proton_to_acceptor.get(p_idx)
             if old_acc is None or old_acc == new_acc:
@@ -289,65 +285,85 @@ class ChargeMSDAnalysis(BaseAnalysis):
 
             donor = self.atom_to_mol[old_acc]
             acceptor = self.atom_to_mol[new_acc]
+            if donor is acceptor:
+                continue  # shouldn't happen, but safe-guard
 
             donor_ids = self.mol_charge_ids[donor]
             acceptor_ids = self.mol_charge_ids[acceptor]
-            donor_state = self.mol_charge_state.get(donor, 0)
-            acceptor_state = self.mol_charge_state.get(acceptor, 0)
 
-            # Possible scenarios (same as original code)
-            if donor_state == -1 and acceptor_state == 0 and donor_ids:
-                # Move negative charge from donor to acceptor
-                acceptor_ids.append(donor_ids.pop(0))
+            qd = local_charge_state.get(donor, 0)
+            qa = local_charge_state.get(acceptor, 0)
 
-            elif donor_state == 0 and acceptor_state == -1 and acceptor_ids:
-                # Move negative charge from acceptor to donor
-                donor_ids.append(acceptor_ids.pop(0))
+            # Case A: move +1 charge donor -> acceptor
+            if qd > 0 and qa >= 0:
+                cid = next((c for c in donor_ids if self.charge_signs.get(c, 0) == +1), None)
+                if cid is None:
+                    raise RuntimeError(f"No +1 charge ID on positively charged donor {donor}")
+                donor_ids.remove(cid)
+                acceptor_ids.append(cid)
 
-            elif donor_state == 1 and acceptor_state == 0 and donor_ids:
-                # Move positive charge from donor to acceptor
-                acceptor_ids.append(donor_ids.pop(0))
+            # Case B: move -1 charge acceptor -> donor
+            elif qd <= 0 and qa < 0:
+                cid = next((c for c in acceptor_ids if self.charge_signs.get(c, 0) == -1), None)
+                if cid is None:
+                    raise RuntimeError(f"No -1 charge ID on negatively charged acceptor {acceptor}")
+                acceptor_ids.remove(cid)
+                donor_ids.append(cid)
 
-            elif donor_state == 0 and acceptor_state == 1 and acceptor_ids:
-                # Move positive charge from acceptor to donor
-                donor_ids.append(acceptor_ids.pop(0))
+            # Case C: annihilate one (+1, -1) pair
+            elif qd >= 1 and qa <= -1:
+                pos_id = next((c for c in donor_ids if self.charge_signs.get(c, 0) == +1), None)
+                neg_id = next((c for c in acceptor_ids if self.charge_signs.get(c, 0) == -1), None)
+                if pos_id is None or neg_id is None:
+                    raise RuntimeError(
+                        f"Missing charge IDs for annihilation on donor {donor}, acceptor {acceptor}"
+                    )
+                donor_ids.remove(pos_id)
+                acceptor_ids.remove(neg_id)
 
-            elif donor_state == 0 and acceptor_state == 0:
-                # Create +1 on donor and -1 on acceptor
-                self.charge_signs[self.next_cid] = -1
-                acceptor_ids.append(self.next_cid)
+            # Case D: create a (-1, +1) pair
+            elif qd <= 0 and qa >= 0:
+                # new -1 on donor
+                cid_neg = self.next_cid
                 self.next_cid += 1
+                self.charge_signs[cid_neg] = -1
+                donor_ids.append(cid_neg)
 
-                self.charge_signs[self.next_cid] = +1
-                donor_ids.append(self.next_cid)
+                # new +1 on acceptor
+                cid_pos = self.next_cid
                 self.next_cid += 1
+                self.charge_signs[cid_pos] = +1
+                acceptor_ids.append(cid_pos)
 
-            elif abs(donor_state) == 1 and acceptor_state == -donor_state:
-                # Annihilate one +1 and one -1 charge if both are present
-                if donor_state == 1:
-                    pos_ids = [cid for cid in donor_ids if self.charge_signs.get(cid, 0) == +1]
-                    neg_ids = [cid for cid in acceptor_ids if self.charge_signs.get(cid, 0) == -1]
-                    if pos_ids and neg_ids:
-                        donor_ids.remove(pos_ids[0])
-                        acceptor_ids.remove(neg_ids[0])
-                else:
-                    pos_ids = [cid for cid in acceptor_ids if self.charge_signs.get(cid, 0) == +1]
-                    neg_ids = [cid for cid in donor_ids if self.charge_signs.get(cid, 0) == -1]
-                    if pos_ids and neg_ids:
-                        donor_ids.remove(neg_ids[0])
-                        acceptor_ids.remove(pos_ids[0])
+            else:
+                # In principle unreachable because the four cases cover all (qd, qa)
+                raise RuntimeError(
+                    f"Unclassified charge hop state: donor={qd}, acceptor={qa}"
+                )
 
-        # --- Record current charge locations (after moves) ---
+            # Update integer charge states
+            local_charge_state[donor] = qd - 1
+            local_charge_state[acceptor] = qa + 1
+
+        # Optional sanity check: compare to what we'd get from proton_count
+        # (can be commented out if too slow)
+        # all_mols = set(self.atom_to_mol.values())
+        # for mol in all_mols:
+        #     expected = proton_count.get(mol, 0) - self.neutral_proton_counts[mol.comp_id]
+        #     if local_charge_state.get(mol, 0) != expected:
+        #         raise RuntimeError(
+        #             f"Charge mismatch on {mol}: "
+        #             f"state={local_charge_state.get(mol, 0)}, expected={expected}"
+        #         )
+
+        # --- Record current charge locations (after updates) ---
         for mol, cids in self.mol_charge_ids.items():
             for cid in cids:
                 self.charge_history[cid].append((self.frame_idx, mol.mol_id))
 
         # Prepare for next frame
-        self.prev_proton_to_acceptor = proton_to_acceptor
-        self.mol_charge_state = new_charge_state
-
-        if self.processed_frames % 100 == 0 and self.processed_frames > 0:
-            print(f"Processed {self.processed_frames} frames (current frame {self.frame_idx+1})")
+        self.mol_charge_state = local_charge_state
+        self.prev_proton_to_acceptor = dict(proton_to_acceptor)
 
     def postprocess(self):
         # === Output trajectories ===
@@ -373,27 +389,69 @@ class ChargeMSDAnalysis(BaseAnalysis):
         )
 
 
-def get_proton_count(coords, boxsize, protons, acceptors, bond_cutoff, atom_to_mol):
+def get_proton_count(coords, boxsize, protons, acceptors, acceptor_cutoffs, atom_to_mol):
     """
-    Map protons to their nearest acceptor atom (within cutoff), then count
-    the number of protons bound to each acceptor molecule.
+    Map each proton to a bound acceptor atom and count protons per acceptor molecule.
+
+    Behaviour:
+      - Every proton is *always* assigned to some acceptor (no free protons).
+      - If per-acceptor cutoffs are given, the "closest" acceptor is chosen
+        by first restricting to acceptors within their individual cutoff
+        distances; if none satisfy this, we fall back to the globally
+        closest acceptor (ignoring cutoffs).
     """
-    tree = cKDTree(coords[acceptors], boxsize=boxsize)
+    if not acceptors:
+        return {}, defaultdict(int)
+
+    acc_coords = coords[acceptors]
+    tree = cKDTree(acc_coords, boxsize=boxsize)
+
+    # Per-acceptor cutoff array aligned with `acceptors`
+    acc_cut_array = np.array(
+        [acceptor_cutoffs.get(idx, np.inf) for idx in acceptors],
+        dtype=float,
+    )
+    finite_mask = np.isfinite(acc_cut_array)
+    if np.any(finite_mask):
+        max_cut = float(np.max(acc_cut_array[finite_mask]))
+    else:
+        max_cut = np.inf
+
     proton_to_acceptor = {}
+    proton_count = defaultdict(int)
 
     for p_idx in protons:
         p_coord = coords[p_idx]
-        neighbors = tree.query_ball_point(p_coord, bond_cutoff)
-        if neighbors:
-            nearest = min(
-                neighbors,
-                key=lambda j: np.linalg.norm(p_coord - coords[acceptors[j]]),
-            )
-            proton_to_acceptor[p_idx] = acceptors[nearest]
 
-    proton_count = defaultdict(int)
-    for acc in proton_to_acceptor.values():
-        proton_count[atom_to_mol[acc]] += 1
+        # Candidate neighbours within the largest cutoff
+        if np.isfinite(max_cut):
+            neighbor_ids = tree.query_ball_point(p_coord, max_cut)
+        else:
+            # No finite cutoffs defined: consider all acceptors
+            neighbor_ids = list(range(len(acceptors)))
+
+        best_acc = None
+        best_dist2 = None
+
+        # First try to respect individual cutoffs
+        for j in neighbor_ids:
+            acc_idx = acceptors[j]
+            cutoff = acc_cut_array[j]
+            if not np.isfinite(cutoff):
+                continue
+            diff = p_coord - coords[acc_idx]
+            d2 = np.dot(diff, diff)
+            if d2 <= cutoff * cutoff and (best_dist2 is None or d2 < best_dist2):
+                best_dist2 = d2
+                best_acc = acc_idx
+
+        if best_acc is None:
+            # No acceptor within its own cutoff: fall back to globally closest acceptor
+            _, j = tree.query(p_coord, k=1)
+            best_acc = acceptors[j]
+
+        proton_to_acceptor[p_idx] = best_acc
+        proton_count[atom_to_mol[best_acc]] += 1
 
     return proton_to_acceptor, proton_count
 
@@ -405,6 +463,8 @@ def initialize_charge_states(proton_count, neutral_proton_counts, next_cid):
       - mol_charge_state:  mol -> integer charge
       - mol_charge_ids:    mol -> list of charge IDs
       - charge_signs:      cid -> +1 / -1
+
+    This works for arbitrary integer charge states (not just -1, 0, +1).
     """
     mol_charge_state = {}
     mol_charge_ids = defaultdict(list)

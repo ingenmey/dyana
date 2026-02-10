@@ -9,6 +9,7 @@ class BaseAnalysis(ABC):
         self.frame_idx = 0
         self.processed_frames = 0
         self.update_compounds = False
+        self.allow_compound_update = True
 
     def skip_to_start(self):
         self.frame_idx = 0
@@ -126,7 +127,11 @@ class BaseAnalysis(ABC):
         return [s.strip() for s in answer.split(',') if s.strip()]
 
     def setup_frame_loop(self):
-        self.update_compounds = prompt_yn("Perform molecule recognition and update compound list in each frame?", False)
+        if self.allow_compound_update:
+            self.update_compounds = prompt_yn("Perform molecule recognition and update compound list in each frame?", False)
+        else:
+            self.update_compounds = False
+            print("\nPer-frame molecule recognition is disabled for this analysis.")
         self.start_frame = prompt_int("In which trajectory frame to start processing the trajectory?", 1, minval=1)
         self.nframes = prompt_int("How many trajectory frames to read (from this position on)?", -1, "all")
         self.frame_stride = prompt_int("Use every n-th read trajectory frame for the analysis:", 1, minval=1)

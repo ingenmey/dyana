@@ -12,7 +12,7 @@ def set_input_file(file_path):
 
 def set_log_file(file_path):
     global log_file
-    log_file = open(file_path, 'w')
+    log_file = open(file_path, 'w', buffering=1)
 
 def close_log_file():
     global log_file
@@ -54,6 +54,7 @@ def prompt(question, default=None, display_default=None):
             print(question, answer)
             if log_file:
                 log_file.write(f"# {question.strip()}\n{answer}\n")
+                log_file.flush()
             if answer:
                 return answer
             elif default is not None:
@@ -69,11 +70,13 @@ def prompt(question, default=None, display_default=None):
         if answer:
             if log_file:
                 log_file.write(f"# {question.strip()}\n{answer}\n")
+                log_file.flush()
             return answer
 
         elif default is not None:
             if log_file:
                 log_file.write(f"# {question.strip()}\n\n")
+                log_file.flush()
             return default
         else:
             print("Invalid input. Try again.")

@@ -35,6 +35,7 @@ class PCCFAnalysis(BaseAnalysis):
         print("      compound recognition. Molecules are treated as static;")
         print("      per-frame molecule recognition is disabled.\n")
 
+        self.allow_compound_update = False
 
         # === Protons ===
         proton_selection = self.compound_selection(
@@ -153,36 +154,9 @@ class PCCFAnalysis(BaseAnalysis):
         # Internal box reference for KDTree
         self.box = np.asarray(self.traj.box_size, dtype=float)
 
-    def setup_frame_loop(self):
-        """
-        Override BaseAnalysis.setup_frame_loop to *disable* per-frame molecule updates.
-
-        We only ask for start_frame / nframes / frame_stride.
-        """
-        print("\nPer-frame molecule recognition is disabled for proton coupling analysis.")
-        print("Molecules & proton/acceptor definitions are taken from the initial\n"
-              "compound recognition and assumed to be static.\n")
-
-        self.update_compounds = False  # important: do NOT re-run guess_molecules()
-        self.start_frame = prompt_int(
-            "In which trajectory frame to start processing the trajectory?",
-            1,
-            minval=1
-        )
-        self.nframes = prompt_int(
-            "How many trajectory frames to read (from this position on)?",
-            -1,
-            "all"
-        )
-        self.frame_stride = prompt_int(
-            "Use every n-th read trajectory frame for the analysis:",
-            1,
-            minval=1
-        )
-
     def post_compound_update(self):
         """
-        Required abstract method, but never used because update_compounds is False.
+        Required abstract method, but never used because allow_compound_update is False.
         """
         return True
 

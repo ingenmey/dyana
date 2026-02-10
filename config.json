@@ -1,3 +1,5 @@
 {
-    "EXCLUDED_ELEMENTS": ["Li", "Na", "Mg", "K", "Ca", "Rb", "Sr", "Cs", "Ba", "Cu", "Ag", "Au", "Pt", "Zn", "Fe", "Co"]
+    "EXCLUDED_ELEMENTS": ["Li", "Na", "Mg", "K", "Ca", "Rb", "Sr", "Cs", "Ba", "Cu", "Ag", "Au", "Pt", "Zn", "Fe", "Co"],
+    "NEIGHBOR_SEARCH_SCALE": 1.164,
+    "BOND_DISTANCE_SCALE": 1.4
 }
