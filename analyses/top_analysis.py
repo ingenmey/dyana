@@ -9,7 +9,7 @@ from utils import prompt, prompt_int, prompt_yn, prompt_float, label_matches
 class TetrahedralOrderAnalysis(BaseAnalysis):
     def setup(self):
         self.ref_idx, self.ref_comp = self.compound_selection("reference")
-        self.ref_labels = self.atom_selection("reference")
+        self.ref_labels = self.atom_selection("reference", compound=self.ref_comp)
         self.ref_key = list(self.traj.compounds.keys())[self.ref_idx]
 
         # Multi-compound observed selection
@@ -21,7 +21,7 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
         # Prompt for atom labels per observed compound
         self.obs_labels_per_compound = {}
         for key, comp in zip(self.obs_keys, self.obs_comps):
-            self.obs_labels_per_compound[key] = self.atom_selection("observed", comp)
+            self.obs_labels_per_compound[key] = self.atom_selection("observed", compound=comp)
 
         # Cutoff and histogram setup as before...
         self.use_cutoff = prompt_yn("Use a maximum distance cutoff for neighbor search?", False)
@@ -123,7 +123,7 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
         # Normalize and write q
         total_q = self.hist_q.counts.sum()
         if total_q > 0:
-            self.hist_q.normalize("total", total=100)
+            self.hist_q.normalize(field="count", method="total", total=100)
             self.hist_q.save_txt("tetrahedral_q.dat", ["q", "P(q)"])
             print("\nTetrahedral orientational order distribution saved to tetrahedral_q.dat")
         else:
@@ -132,7 +132,7 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
         # Normalize and write S
         total_s = self.hist_s.counts.sum()
         if total_s > 0:
-            self.hist_s.normalize("total", total=100)
+            self.hist_s.normalize(field="count", method="total", total=100)
             self.hist_s.save_txt("tetrahedral_s.dat", ["S", "P(S)"])
             print("Tetrahedral translational order distribution saved to tetrahedral_s.dat")
         else:
