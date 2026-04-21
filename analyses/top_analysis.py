@@ -79,7 +79,9 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
                 if len(neighbor_idxs) < 4:
                     continue
                 neighbors = obs_coords[neighbor_idxs]
-                distances = np.linalg.norm(neighbors - r_coord, axis=1)
+                deltas = neighbors - r_coord
+                deltas -= box * np.round(deltas / box)
+                distances = np.linalg.norm(deltas, axis=1)
                 nearest = np.argsort(distances)[:4]
                 four_nearest = neighbors[nearest]
                 four_dists = distances[nearest]
@@ -137,4 +139,3 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
             print("Tetrahedral translational order distribution saved to tetrahedral_s.dat")
         else:
             print("No valid S values were accumulated.")
-

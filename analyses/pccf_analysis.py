@@ -184,7 +184,9 @@ class PCCFAnalysis(BaseAnalysis):
 
             if neighbors:
                 # pick nearest acceptor (by distance)
-                dists = np.linalg.norm(acceptor_coords[neighbors] - p_coord, axis=1)
+                deltas = acceptor_coords[neighbors] - p_coord
+                deltas -= self.traj.box_size * np.round(deltas / self.traj.box_size)
+                dists = np.linalg.norm(deltas, axis=1)
                 nearest = neighbors[np.argmin(dists)]
                 if self.is_molecule_mode:
                     acceptor_id = self.atom_to_mol[nearest]
@@ -303,4 +305,3 @@ def squash(events, tau):
         else:
             stack.append((f, d, a))
     return stack
-

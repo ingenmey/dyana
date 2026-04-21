@@ -217,7 +217,7 @@ class ChargeMSDAnalysis(BaseAnalysis):
             atom_indices = self.mol_acceptor_atoms.get(mol, [])
             if not atom_indices:
                 continue
-            center = np.mean(coords[atom_indices], axis=0)
+            center = periodic_center(coords[atom_indices], self.traj.box_size)
             for cid in cids:
                 self.charge_prev_wrapped[cid] = center.copy()
                 self.charge_unwrapped[cid].append(center.copy())
@@ -250,7 +250,7 @@ class ChargeMSDAnalysis(BaseAnalysis):
             atom_indices = self.mol_acceptor_atoms.get(mol, [])
             if not atom_indices:
                 continue
-            center = np.mean(coords[atom_indices], axis=0)
+            center = periodic_center(coords[atom_indices], self.traj.box_size)
             for cid in cids:
                 if cid in self.charge_prev_wrapped:
                     delta = center - self.charge_prev_wrapped[cid]
@@ -440,6 +440,7 @@ def get_proton_count(coords, boxsize, protons, acceptors, acceptor_cutoffs, atom
             if not np.isfinite(cutoff):
                 continue
             diff = p_coord - coords[acc_idx]
+            diff -= boxsize * np.round(diff / boxsize)
             d2 = np.dot(diff, diff)
             if d2 <= cutoff * cutoff and (best_dist2 is None or d2 < best_dist2):
                 best_dist2 = d2
@@ -454,6 +455,23 @@ def get_proton_count(coords, boxsize, protons, acceptors, acceptor_cutoffs, atom
         proton_count[atom_to_mol[best_acc]] += 1
 
     return proton_to_acceptor, proton_count
+
+
+def periodic_center(points, boxsize):
+    """
+    Average wrapped coordinates after unwrapping all points around the first one.
+    """
+    points = np.asarray(points, dtype=float)
+    boxsize = np.asarray(boxsize, dtype=float)
+
+    if len(points) == 0:
+        return np.zeros(3, dtype=float)
+
+    reference = points[0]
+    deltas = points - reference
+    deltas -= boxsize * np.round(deltas / boxsize)
+    center = np.mean(reference + deltas, axis=0)
+    return np.mod(center, boxsize)
 
 
 def initialize_charge_states(proton_count, neutral_proton_counts, next_cid):
@@ -531,4 +549,3 @@ def compute_charge_msd(charge_unwrapped, charge_signs, max_lag=1000, output_file
             f.write(f"{t:<4} {msd_p:.6f} {msd_m:.6f}\n")
 
     print(f"MSD written to {output_file}")
-
