@@ -4,7 +4,9 @@ import numpy as np
 from scipy.spatial import cKDTree
 from analyses.base_analysis import BaseAnalysis
 from analyses.histogram import HistogramND
-from utils import prompt, prompt_int, prompt_yn, prompt_float, label_matches
+from analyses.selection import collect_atom_indices
+from geometry import minimum_image
+from utils import prompt, prompt_int, prompt_yn, prompt_float
 
 class TetrahedralOrderAnalysis(BaseAnalysis):
     def setup(self):
@@ -45,11 +47,7 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
             self.obs_indices.extend(self._get_indices(comp, labels))
 
     def _get_indices(self, compound, labels):
-        return [
-            idx for mol in compound.members
-            for label, idx in mol.label_to_global_id.items()
-            if any(label_matches(lab, label) for lab in labels)
-        ]
+        return collect_atom_indices(compound, labels)
 
     def post_compound_update(self):
         try:
@@ -79,8 +77,7 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
                 if len(neighbor_idxs) < 4:
                     continue
                 neighbors = obs_coords[neighbor_idxs]
-                deltas = neighbors - r_coord
-                deltas -= box * np.round(deltas / box)
+                deltas = minimum_image(neighbors - r_coord, box)
                 distances = np.linalg.norm(deltas, axis=1)
                 nearest = np.argsort(distances)[:4]
                 four_nearest = neighbors[nearest]
@@ -98,10 +95,8 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
             cosines = []
             for j in range(3):
                 for k in range(j + 1, 4):
-                    vj = four_nearest[j] - r_coord
-                    vk = four_nearest[k] - r_coord
-                    vj -= box * np.round(vj / box)
-                    vk -= box * np.round(vk / box)
+                    vj = minimum_image(four_nearest[j] - r_coord, box)
+                    vk = minimum_image(four_nearest[k] - r_coord, box)
                     vj /= np.linalg.norm(vj)
                     vk /= np.linalg.norm(vk)
                     cos_angle = np.dot(vj, vk)

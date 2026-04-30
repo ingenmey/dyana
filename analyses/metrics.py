@@ -3,6 +3,7 @@
 import numpy as np
 from dataclasses import dataclass
 from scipy.spatial import cKDTree
+from geometry import minimum_image
 
 
 @dataclass
@@ -42,15 +43,13 @@ class DistanceMetric:
             for i, neighbor_ids in enumerate(pairs):
                 if not neighbor_ids:
                     continue
-                deltas = coords_b[neighbor_ids] - coords_a[i]
-                deltas -= self.box * np.round(deltas / self.box)
+                deltas = minimum_image(coords_b[neighbor_ids] - coords_a[i], self.box)
                 dists = np.linalg.norm(deltas, axis=1)
                 result.extend(dists[dists > 0])  # Exclude self-match
             return np.array(result)
         else:
             # full distance matrix
-            deltas = coords_a[:, np.newaxis, :] - coords_b[np.newaxis, :, :]
-            deltas -= self.box * np.round(deltas / self.box)
+            deltas = minimum_image(coords_a[:, np.newaxis, :] - coords_b[np.newaxis, :, :], self.box)
             dists = np.linalg.norm(deltas, axis=2)
             return dists[dists > 0].flatten()
 
@@ -90,12 +89,8 @@ class AngleMetric:
             self.obs_tip.indices = ot[mask]
 
     def __call__(self, coords: np.ndarray) -> np.ndarray:
-        v1 = self.ref_tip.coords(coords) - self.ref_base.coords(coords)
-        v2 = self.obs_tip.coords(coords) - self.obs_base.coords(coords)
-
-        # Minimum image convention
-        v1 -= self.box * np.round(v1 / self.box)
-        v2 -= self.box * np.round(v2 / self.box)
+        v1 = minimum_image(self.ref_tip.coords(coords) - self.ref_base.coords(coords), self.box)
+        v2 = minimum_image(self.obs_tip.coords(coords) - self.obs_base.coords(coords), self.box)
 
         # v1 , v2 :   shape (N, 3)      (already wrapped by MIC)
         # v1_cutoff_sq , v2_cutoff_sq :  either a float (cut-off²) or None
@@ -183,4 +178,3 @@ class AngleMetric:
 #        cos_theta = np.clip(cos_theta, -1.0, 1.0)
 #        angles = np.arccos(cos_theta) * (180 / np.pi)
 #        return angles
-

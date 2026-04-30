@@ -202,7 +202,8 @@ def main(traj_file):
         analysis = analysis_func(traj)
         analysis.run()
 
-if __name__ == '__main__':
+
+def cli():
     parser = argparse.ArgumentParser(description="Molecular dynamics trajectory analyzer.")
     parser.add_argument('traj_file', type=str, help="Path to the trajectory file in XYZ format")
     parser.add_argument('-i', '--input', type=str, help="Path to the input file")
@@ -219,3 +220,7 @@ if __name__ == '__main__':
         main(args.traj_file)
     finally:
         close_log_file()
+
+
+if __name__ == '__main__':
+    cli()

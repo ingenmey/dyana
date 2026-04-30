@@ -3,7 +3,8 @@ from collections import Counter
 from scipy.spatial import cKDTree
 
 from analyses.base_analysis import BaseAnalysis
-from utils import label_matches, prompt_yn
+from analyses.selection import build_atom_to_molecule, collect_atom_indices
+from utils import prompt_yn
 
 
 class NeighborCountAnalysis(BaseAnalysis):
@@ -69,22 +70,14 @@ class NeighborCountAnalysis(BaseAnalysis):
         Collect global atom indices for a given compound and list of label patterns.
         Uses label_matches(...) for wildcard support.
         """
-        return [
-            idx for mol in comp.members
-            for lab, idx in mol.label_to_global_id.items()
-            if any(label_matches(user_lab, lab) for user_lab in labels)
-        ]
+        return collect_atom_indices(comp, labels)
 
     def _build_atom_to_mol_map(self, comp):
         """
         Return dict mapping global atom index -> parent molecule object
         for all atoms in the given compound.
         """
-        atom_to_mol = {}
-        for mol in comp.members:
-            for idx in mol.label_to_global_id.values():
-                atom_to_mol[idx] = mol
-        return atom_to_mol
+        return build_atom_to_molecule(comp)
 
     def _update_indices(self):
         """
@@ -196,4 +189,3 @@ class NeighborCountAnalysis(BaseAnalysis):
                 f.write(f"{n:3d}  {probs.get(n, 0.0):.6f}\n")
 
         print(f"Neighbour-count distribution written to {fname}")
-

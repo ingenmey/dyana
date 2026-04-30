@@ -1,0 +1,32 @@
+# Enter cell vector length in X dimension (in Å):
+15.67
+# Enter cell vector length in Y dimension (in Å):
+15.67
+# Enter cell vector length in Z dimension (in Å):
+15.67
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+
+# Choose an analysis:
+rdf
+# Choose the reference compound (number):  [1]
+
+# Choose the observed compound (number):  [1]
+
+# Which atom(s) in reference compound? (comma-separated)
+O
+# Which atom(s) in observed compound? (comma-separated)
+H
+# Enter the maximum distance for RDF calculation (in Å):  [10.0]
+
+# Enter the number of bins for RDF calculation:  [500]
+1000
+# Perform molecule recognition and update compound list in each frame? [No]
+
+# In which trajectory frame to start processing the trajectory? [1]
+
+# How many trajectory frames to read (from this position on)? [all]
+
+# Use every n-th read trajectory frame for the analysis: [1]
+

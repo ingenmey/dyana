@@ -1,0 +1,36 @@
+{
+  "analysis": "rdf",
+  "dependencies": {
+    "matplotlib": "3.8.3",
+    "networkx": "3.3",
+    "numpy": "1.26.4",
+    "scipy": "1.12.0"
+  },
+  "git_commit": "da2d90e0782b8cfdd7a92c66ae6cd2aa82182d95",
+  "output_file": "rdf_O_H.dat",
+  "parameters": {
+    "analysis": "rdf",
+    "average_n_obs": 256.0,
+    "average_n_ref": 128.0,
+    "bin_count": 1000,
+    "box_volume": 3847.751263,
+    "frame_loop": {
+      "frame_stride": 1,
+      "nframes": null,
+      "start_frame": 1,
+      "update_compounds": false
+    },
+    "max_distance": 10.0,
+    "obs_compound_index": 0,
+    "obs_labels": [
+      "H"
+    ],
+    "processed_frames": 1000,
+    "ref_compound_index": 0,
+    "ref_labels": [
+      "O"
+    ]
+  },
+  "platform": "Linux-4.4.0-19041-Microsoft-x86_64-with-glibc2.35",
+  "python_version": "3.10.12"
+}

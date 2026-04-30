@@ -5,6 +5,7 @@ from collections import defaultdict
 from scipy.spatial import cKDTree
 
 from analyses.base_analysis import BaseAnalysis
+from geometry import minimum_image
 from utils import (
     prompt,
     prompt_int,
@@ -184,8 +185,7 @@ class PCCFAnalysis(BaseAnalysis):
 
             if neighbors:
                 # pick nearest acceptor (by distance)
-                deltas = acceptor_coords[neighbors] - p_coord
-                deltas -= self.traj.box_size * np.round(deltas / self.traj.box_size)
+                deltas = minimum_image(acceptor_coords[neighbors] - p_coord, self.traj.box_size)
                 dists = np.linalg.norm(deltas, axis=1)
                 nearest = neighbors[np.argmin(dists)]
                 if self.is_molecule_mode:

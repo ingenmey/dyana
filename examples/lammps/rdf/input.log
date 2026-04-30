@@ -1,0 +1,26 @@
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+
+# Choose an analysis:
+rdf
+# Choose the reference compound (number):  [1]
+3
+# Choose the observed compound (number):  [1]
+2
+# Which atom(s) in reference compound 3 (Na)? (comma-separated)
+Na
+# Which atom(s) in observed compound 2 (H2O)? (comma-separated)
+O
+# Enter the maximum distance for RDF calculation (in Angstrom):  [10.0]
+
+# Enter the number of bins for RDF calculation:  [1000]
+1000
+# Perform molecule recognition and update compound list in each frame? [No]
+
+# In which trajectory frame to start processing the trajectory? [1]
+
+# How many trajectory frames to read (from this position on)? [all]
+
+# Use every n-th read trajectory frame for the analysis: [1]
+

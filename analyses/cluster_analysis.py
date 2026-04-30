@@ -12,6 +12,7 @@ import hashlib
 import matplotlib.pyplot as plt
 
 from analyses.base_analysis import BaseAnalysis
+from geometry import minimum_image
 from utils import (
     label_matches, prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 )
@@ -318,8 +319,7 @@ def write_xyz(filename, atoms, is_save_whole, box_size):
         """Unwrap coordinates to avoid broken bonds due to PBC."""
         unwrapped = np.copy(coords)
         for i in range(1, len(unwrapped)):
-            delta = unwrapped[i] - unwrapped[i - 1]
-            delta -= box_size * np.round(delta / box_size)
+            delta = minimum_image(unwrapped[i] - unwrapped[i - 1], box_size)
             unwrapped[i] = unwrapped[i - 1] + delta
         return unwrapped
 
@@ -757,4 +757,3 @@ def post_process_clusters(cluster_histogram, graph_list, vis_format, frame_clust
                 std  = cluster_size_populations_std[atom].get(size, 0.0)
                 line += f"{mean:>15.10f}{std:>15.10f}"
             f_size.write(line + "\n")
-

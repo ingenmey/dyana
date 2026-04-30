@@ -3,6 +3,7 @@
 import numpy as np
 from scipy.spatial import cKDTree
 from analyses.base_analysis import BaseAnalysis
+from geometry import minimum_image
 from utils import prompt, prompt_int, prompt_float, prompt_yn, label_matches
 from analyses.histogram import HistogramND
 
@@ -115,8 +116,7 @@ class ADFThreeBody(BaseAnalysis):
             neighbor1_candidates = kdtree_n1.query_ball_point(center, cutoffs[0,1])
             neighbor1_indices = []
             for idx in neighbor1_candidates:
-                disp = neighbor1_coords[idx] - center
-                disp -= np.round(disp / box_size) * box_size
+                disp = minimum_image(neighbor1_coords[idx] - center, box_size)
                 dist = np.linalg.norm(disp)
                 if dist >= cutoffs[0,0]:
                     neighbor1_indices.append(idx)
@@ -125,8 +125,7 @@ class ADFThreeBody(BaseAnalysis):
             neighbor2_candidates = kdtree_n2.query_ball_point(center, cutoffs[1,1])
             neighbor2_indices = []
             for idx in neighbor2_candidates:
-                disp = neighbor2_coords[idx] - center
-                disp -= np.round(disp / box_size) * box_size
+                disp = minimum_image(neighbor2_coords[idx] - center, box_size)
                 dist = np.linalg.norm(disp)
                 if dist >= cutoffs[1,0]:
                     neighbor2_indices.append(idx)
@@ -148,11 +147,8 @@ class ADFThreeBody(BaseAnalysis):
                     neighbor1 = neighbor1_coords[n1_idx]
                     neighbor2 = neighbor2_coords[n2_idx]
 
-                    vec1 = neighbor1 - center
-                    vec1 -= np.round(vec1 / box_size) * box_size
-
-                    vec2 = neighbor2 - center
-                    vec2 -= np.round(vec2 / box_size) * box_size
+                    vec1 = minimum_image(neighbor1 - center, box_size)
+                    vec2 = minimum_image(neighbor2 - center, box_size)
 
                     vectors1.append(vec1)
                     vectors2.append(vec2)
@@ -172,5 +168,4 @@ class ADFThreeBody(BaseAnalysis):
         cos_angles = np.clip(cos_angles, -1.0, 1.0)
         angles = np.arccos(cos_angles) * (180.0 / np.pi)
         return angles
-
 

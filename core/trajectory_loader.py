@@ -17,6 +17,7 @@ from atomic_properties import (
     elem_number,
     elem_color,
 )
+from geometry import distance_squared, periodic_center, wrap
 from utils import label_matches
 
 # ---------------------------------------------------------------------------
@@ -123,7 +124,7 @@ class Molecule:
         self.coords = all_coords[self.atom_ids]
 
         if box_size is not None:
-            np.mod(self.coords, box_size, out=self.coords)
+            self.coords = wrap(self.coords, box_size)
 
         # Update canonical Atom.coord for each Atom in this molecule
         for atom, position in zip(self.atoms, self.coords):
@@ -137,20 +138,7 @@ class Molecule:
             self.com[:] = 0.0
             return
 
-        reference_coord = self.coords[0]
-        adjusted_coords = self.coords.copy()
-
-        for i in range(1, len(adjusted_coords)):
-            for dim in range(3):
-                delta = adjusted_coords[i][dim] - reference_coord[dim]
-                half_box = 0.5 * box_size[dim]
-                if delta > half_box:
-                    adjusted_coords[i][dim] -= box_size[dim]
-                elif delta < -half_box:
-                    adjusted_coords[i][dim] += box_size[dim]
-
-        self.com = np.average(adjusted_coords, axis=0, weights=self.atomic_masses)
-        self.com = np.mod(self.com, box_size)
+        self.com = periodic_center(self.coords, box_size, weights=self.atomic_masses)
 
     # ------------------------------------------------------------------
     # Extended connectivity & labelling (pure per-molecule logic)
@@ -522,9 +510,7 @@ class BaseTrajectory(ABC):
             Squared distance between the atoms if they are within the
             bonding threshold, otherwise False.
         """
-        delta = np.abs(coord_i - coord_j)
-        delta = np.where(delta > self.half_box_size, np.abs(delta - self.box_size), delta)
-        distance_sq = np.sum(delta ** 2)
+        distance_sq = distance_squared(coord_i, coord_j, self.box_size)
 
         threshold_sq = ((cov_radius_i + cov_radius_j) * BOND_DISTANCE_SCALE) ** 2
         return distance_sq if distance_sq < threshold_sq else False
@@ -925,6 +911,8 @@ class LAMMPSTrajectory(BaseTrajectory):
             )
 
         atom_rows = [self.fin.readline().strip().split() for _ in range(self.natoms)]
+        if "id" in column_indices:
+            atom_rows.sort(key=lambda row: int(row[column_indices["id"]]))
 
         symbols: list[str] = []
         coords_list: list[list[float]] = []
@@ -985,4 +973,3 @@ def load_trajectory(fin, traj_format: str, box_size: np.ndarray) -> BaseTrajecto
         return LAMMPSTrajectory(fin, box_size)
     else:
         raise ValueError(f"Unsupported trajectory format: {traj_format}")
-

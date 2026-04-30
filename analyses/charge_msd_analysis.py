@@ -3,6 +3,7 @@ from collections import defaultdict
 from scipy.spatial import cKDTree
 
 from analyses.base_analysis import BaseAnalysis
+from geometry import minimum_image, periodic_center
 from utils import (
     prompt,
     prompt_int,
@@ -253,9 +254,7 @@ class ChargeMSDAnalysis(BaseAnalysis):
             center = periodic_center(coords[atom_indices], self.traj.box_size)
             for cid in cids:
                 if cid in self.charge_prev_wrapped:
-                    delta = center - self.charge_prev_wrapped[cid]
-                    # minimum image convention
-                    delta -= self.traj.box_size * np.round(delta / self.traj.box_size)
+                    delta = minimum_image(center - self.charge_prev_wrapped[cid], self.traj.box_size)
                     unwrapped = self.charge_unwrapped[cid][-1] + delta
                 else:
                     # Should normally only happen at creation; start at center
@@ -439,8 +438,7 @@ def get_proton_count(coords, boxsize, protons, acceptors, acceptor_cutoffs, atom
             cutoff = acc_cut_array[j]
             if not np.isfinite(cutoff):
                 continue
-            diff = p_coord - coords[acc_idx]
-            diff -= boxsize * np.round(diff / boxsize)
+            diff = minimum_image(p_coord - coords[acc_idx], boxsize)
             d2 = np.dot(diff, diff)
             if d2 <= cutoff * cutoff and (best_dist2 is None or d2 < best_dist2):
                 best_dist2 = d2
@@ -455,23 +453,6 @@ def get_proton_count(coords, boxsize, protons, acceptors, acceptor_cutoffs, atom
         proton_count[atom_to_mol[best_acc]] += 1
 
     return proton_to_acceptor, proton_count
-
-
-def periodic_center(points, boxsize):
-    """
-    Average wrapped coordinates after unwrapping all points around the first one.
-    """
-    points = np.asarray(points, dtype=float)
-    boxsize = np.asarray(boxsize, dtype=float)
-
-    if len(points) == 0:
-        return np.zeros(3, dtype=float)
-
-    reference = points[0]
-    deltas = points - reference
-    deltas -= boxsize * np.round(deltas / boxsize)
-    center = np.mean(reference + deltas, axis=0)
-    return np.mod(center, boxsize)
 
 
 def initialize_charge_states(proton_count, neutral_proton_counts, next_cid):

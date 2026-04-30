@@ -5,12 +5,12 @@ from collections import defaultdict
 from scipy.spatial import cKDTree
 
 from analyses.base_analysis import BaseAnalysis
+from analyses.selection import collect_atom_indices
 from utils import (
     prompt,
     prompt_int,
     prompt_float,
     prompt_yn,
-    label_matches,
 )
 
 
@@ -76,16 +76,8 @@ class DACFAnalysis(BaseAnalysis):
 
     def _update_indices(self):
         """Rebuild global index lists for the selected labels in current ref/obs compounds."""
-        self.ref_indices = [
-            idx for mol in self.ref_comp.members
-            for label, idx in mol.label_to_global_id.items()
-            if any(label_matches(lab, label) for lab in self.ref_labels)
-        ]
-        self.obs_indices = [
-            idx for mol in self.obs_comp.members
-            for label, idx in mol.label_to_global_id.items()
-            if any(label_matches(lab, label) for lab in self.obs_labels)
-        ]
+        self.ref_indices = collect_atom_indices(self.ref_comp, self.ref_labels)
+        self.obs_indices = collect_atom_indices(self.obs_comp, self.obs_labels)
 
     # ---------- BaseAnalysis interface ----------
 
@@ -277,4 +269,3 @@ class DACFAnalysis(BaseAnalysis):
 # Backwards-compatible alias for main.py
 # (AVAILABLE_ANALYSES expects a class callable as analysis_func(traj))
 dacf = DACFAnalysis
-
