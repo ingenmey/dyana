@@ -7,16 +7,16 @@ from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundPar
 
 @dataclass
 class PromptContext:
-    analysis: object
+    owner: object
     input_provider: object
     values: dict[str, object] = field(default_factory=dict)
 
 
-def prompt_config_from_schema(analysis, schema, config_class, provider=None):
+def prompt_config_from_schema(owner, schema, config_class, provider=None):
     values = {}
     context = PromptContext(
-        analysis=analysis,
-        input_provider=provider or analysis.input_provider,
+        owner=owner,
+        input_provider=provider or owner.input_provider,
         values=values,
     )
 
@@ -59,7 +59,7 @@ def prompt_param(param, context):
 
 
 def _prompt_compound(param, context):
-    selection = context.analysis.compound_selection(
+    selection = context.owner.compound_selection(
         role=param.role,
         multi=param.multi,
         prompt_text=param.prompt,
@@ -75,9 +75,9 @@ def _prompt_atom_labels(param, context):
     compound = None
     if param.compound is not None:
         compound_idx = context.values[param.compound]
-        compound = context.analysis.compound_by_index(compound_idx)
+        compound = context.owner.compound_by_index(compound_idx)
 
-    return context.analysis.atom_selection(
+    return context.owner.atom_selection(
         role=param.role,
         compound=compound,
         prompt_text=param.prompt,

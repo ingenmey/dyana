@@ -58,7 +58,7 @@ Status markers:
 
 ## 4. Prompt Dispatcher
 
-- [x] Add `prompt_config_from_schema(analysis, schema, config_class, provider=None)`.
+- [x] Add `prompt_config_from_schema(owner, schema, config_class, provider=None)`.
 - [x] Add a lightweight `PromptContext`.
 - [x] Dispatch shared prompt types through modular handlers:
   - compound selection
@@ -69,6 +69,7 @@ Status markers:
   - choice
 - [x] Support dependencies between parameters through context.
 - [x] Keep prompt builders easy to extend without editing each analysis.
+- [x] Reuse the same provider and schema engine for workflow/session prompts outside analyses.
 
 ## 5. Compound Selection Representation
 
@@ -184,4 +185,5 @@ Notes:
 4. Finish RDF as the canonical simple-analysis example.
 5. Allow non-RDF analyses to lag or break temporarily while RDF and the shared framework are clarified.
 6. Decide how top-level pre-analysis prompts should be separated from analysis config prompts.
-7. Only then resume wider productionization tasks.
+7. Build out the workflow/session layer on top of the shared provider and schema prompt engine.
+8. Only then resume wider productionization tasks.
