@@ -9,6 +9,7 @@ from input_providers import InteractiveInputProvider
 class BaseAnalysis(ABC):
     CONFIG_CLASS = None
     CONFIG_SCHEMA = None
+    CONFIG_BUILDER = None
 
     def __init__(self, traj, input_provider=None):
         self.traj = traj
@@ -96,7 +97,13 @@ class BaseAnalysis(ABC):
                 f"{type(self).__name__} must override prompt_config() or define CONFIG_CLASS and CONFIG_SCHEMA."
             )
 
-        return prompt_config_from_schema(self, self.CONFIG_SCHEMA, self.CONFIG_CLASS, provider=provider)
+        return prompt_config_from_schema(
+            self,
+            self.CONFIG_SCHEMA,
+            self.CONFIG_CLASS,
+            provider=provider,
+            builder=self.CONFIG_BUILDER,
+        )
 
     def configure_frame_loop(self, frame_loop):
         self.update_compounds = bool(frame_loop.update_compounds) if self.allow_compound_update else False

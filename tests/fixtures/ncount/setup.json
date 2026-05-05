@@ -1,0 +1,156 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "trajectory_format": "lammps",
+    "cell_vectors": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "excluded_elements": [
+      "Ag",
+      "Au",
+      "Ba",
+      "Ca",
+      "Co",
+      "Cs",
+      "Cu",
+      "Fe",
+      "K",
+      "Li",
+      "Mg",
+      "Na",
+      "Pt",
+      "Rb",
+      "Sr",
+      "Zn"
+    ],
+    "neighbor_search_scale": 1.164,
+    "bond_distance_scale": 1.4,
+    "forbidden_bonds": []
+  },
+  "compound_types": [
+    {
+      "rep": "BF4",
+      "formula": "BF4",
+      "bond_types": [
+        [
+          "B",
+          "F"
+        ],
+        [
+          "B",
+          "F"
+        ],
+        [
+          "B",
+          "F"
+        ],
+        [
+          "B",
+          "F"
+        ]
+      ],
+      "graph_hash": "d9981e98e27e6bc05916add06369cdaa",
+      "labels": [
+        "B1",
+        "F1",
+        "F2",
+        "F3",
+        "F4"
+      ]
+    },
+    {
+      "rep": "C4H8O",
+      "formula": "C4H8O",
+      "bond_types": [
+        [
+          "C",
+          "C"
+        ],
+        [
+          "C",
+          "C"
+        ],
+        [
+          "C",
+          "C"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "H"
+        ],
+        [
+          "C",
+          "O"
+        ],
+        [
+          "C",
+          "O"
+        ]
+      ],
+      "graph_hash": "80308d2c95b2814a59a763c56ce08576",
+      "labels": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H5",
+        "H6",
+        "H7",
+        "H8",
+        "O1"
+      ]
+    },
+    {
+      "rep": "Ca",
+      "formula": "Ca",
+      "bond_types": [],
+      "graph_hash": "9bee2327c963be5592e4b587b999796e",
+      "labels": [
+        "Ca1"
+      ]
+    }
+  ],
+  "metadata": {
+    "source_file": "../ca(bf4)2_thf.lmp",
+    "observed_counts": {
+      "BF4": 1,
+      "C4H8O": 1,
+      "Ca": 1
+    },
+    "saved_at": "2026-05-05T14:17:42.632558+00:00"
+  }
+}

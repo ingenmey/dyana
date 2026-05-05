@@ -1,7 +1,7 @@
 import unittest
 from dataclasses import dataclass
 
-from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, IntParam
+from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, ForEach, IntParam, When
 from config_builder import prompt_config_from_schema
 from input_providers import FileInputProvider, NullInputProvider
 
@@ -14,6 +14,14 @@ class DummyConfig:
     n_bins: int
     enabled: bool
     axis: str
+
+
+@dataclass(frozen=True)
+class DynamicConfig:
+    obs_compound_indices: list[int]
+    obs_labels_per_compound: dict[int, list[str]]
+    enabled: bool
+    note: str | None = None
 
 
 class DummyCompound:
@@ -29,6 +37,11 @@ class DummyAnalysis:
 
     def compound_selection(self, role="reference", multi=False, prompt_text=None, provider=None):
         input_provider = provider or self.input_provider
+        if multi:
+            prompt = prompt_text or f"Choose the {role} compounds (comma-separated numbers): "
+            choices = input_provider.ask_str(prompt).strip()
+            idxs = [int(x.strip()) - 1 for x in choices.split(",") if x.strip()]
+            return [(idx, self.compounds[idx]) for idx in idxs]
         prompt = prompt_text or f"Choose the {role} compound (number): "
         idx = input_provider.ask_int(prompt, 1, minval=1) - 1
         return idx, self.compounds[idx]
@@ -70,6 +83,46 @@ class ConfigBuilderTests(unittest.TestCase):
                 n_bins=12,
                 enabled=True,
                 axis="z",
+            ),
+        )
+
+    def test_prompt_config_from_schema_supports_for_each_and_when(self):
+        provider = FileInputProvider(
+            lines=["1,2", "O,H", "Na1", "y", "hello"],
+            fallback=NullInputProvider(),
+        )
+        analysis = DummyAnalysis(provider=provider)
+        schema = [
+            CompoundParam(name="obs_compound_indices", role="observed", multi=True),
+            ForEach(
+                source="obs_compound_indices",
+                item_name="obs_compound_index",
+                steps=[
+                    AtomLabelsParam(name="obs_labels", role="observed", compound="obs_compound_index"),
+                ],
+                collect_as="obs_labels_per_compound",
+                collect_mode="dict",
+            ),
+            BoolParam(name="enabled", prompt="Enable option?", default=False),
+            When(
+                source="enabled",
+                op="==",
+                value=True,
+                steps=[
+                    ChoiceParam(name="note", prompt="Note?", choices=["hello", "bye"], default="hello"),
+                ],
+            ),
+        ]
+
+        config = prompt_config_from_schema(analysis, schema, DynamicConfig, provider=provider)
+
+        self.assertEqual(
+            config,
+            DynamicConfig(
+                obs_compound_indices=[0, 1],
+                obs_labels_per_compound={0: ["O", "H"], 1: ["Na1"]},
+                enabled=True,
+                note="hello",
             ),
         )
 

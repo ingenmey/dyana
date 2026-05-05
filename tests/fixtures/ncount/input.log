@@ -1,0 +1,26 @@
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+
+# Choose an analysis:
+ncount
+# Choose the reference compound (number):  [1]
+2
+# Which atom(s) in reference compound 2 (C4H8O)? (comma-separated)
+O
+# Choose the observed compounds (comma-separated numbers):
+2
+# Which atom(s) in observed compound 2 (C4H8O)? (comma-separated)
+O
+# Exclude observed atoms that belong to the same molecule as the reference atom? [Yes]
+
+# Neighbour cutoff distance Angstrom:  [3.5]
+4.0
+# Perform molecule recognition and update compound list in each frame? [No]
+
+# In which trajectory frame to start processing the trajectory? [1]
+
+# How many trajectory frames to read (from this position on)? [all]
+
+# Use every n-th read trajectory frame for the analysis: [1]
+

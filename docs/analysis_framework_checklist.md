@@ -47,6 +47,9 @@ Status markers:
   - `FloatParam`
   - `BoolParam`
   - `ChoiceParam`
+- [x] Extend the schema language with repeated and conditional steps:
+  - `ForEach`
+  - `When`
 - [x] Keep parameter specs focused on gathering/validating config, not science.
 - [ ] Add room for later param types without overdesign:
   - `StringParam`
@@ -67,7 +70,11 @@ Status markers:
   - float
   - bool
   - choice
+- [x] Dispatch repeated prompt groups through `ForEach`.
+- [x] Dispatch conditional prompt groups through `When`.
 - [x] Support dependencies between parameters through context.
+- [x] Support loop-local scoped values inside schema-driven prompts.
+- [x] Allow an optional config-builder hook when intermediate prompt values need assembly.
 - [x] Keep prompt builders easy to extend without editing each analysis.
 - [x] Reuse the same `InputProvider` abstraction across workflow and analysis code.
 - [x] Keep the schema engine focused on migrated analyses rather than forcing it into the workflow layer.
@@ -107,19 +114,19 @@ Status markers:
 - [x] Treat RDF as the first simple-analysis migration target.
 - [x] Treat RDF as the canonical reference implementation for the framework.
 - [x] Migrate density after RDF.
-- [ ] Migrate neighbor count after density.
+- [x] Migrate neighbor count after density.
 - [ ] Migrate tetrahedral order after neighbor count.
 
 ### Medium-Complex Analyses
 
-- [ ] Migrate ADF with schema plus dependent parameters.
+- [x] Migrate ADF with schema plus dependent parameters.
 - [ ] Migrate ADF3B.
 - [ ] Migrate DACF.
 - [ ] Migrate percolation.
 
 ### Complex Analyses
 
-- [x] Allow custom `prompt_config()` when schema would be awkward.
+- [ ] Avoid falling back to custom `prompt_config()` by strengthening the schema language first.
 - [ ] Leave cluster on custom builder until last.
 - [ ] Leave PCCF on custom builder until last.
 - [ ] Leave CMSD on custom builder until last.
@@ -127,7 +134,7 @@ Status markers:
 Rule:
 
 - [x] Use declarative schema when clean.
-- [x] Use custom `prompt_config()` when the interaction is genuinely dynamic.
+- [x] Extend declarative schema to cover dynamic prompting patterns such as loops and conditionals.
 - [x] Still end at `configure(config)`.
 
 ## 9. Programmatic Access
@@ -162,8 +169,8 @@ Rule:
   - `RDF.configure(config)` exists.
   - RDF uses schema-driven prompting through shared framework code.
 - [x] Step 4: Add tests for schema-driven config building.
-- [ ] Step 5: Migrate density.
-- [ ] Step 6: Migrate simple analyses.
+- [x] Step 5: Migrate density.
+- [~] Step 6: Migrate simple analyses.
 - [ ] Step 7: Leave complex analyses custom until last.
 
 Notes:
@@ -187,15 +194,16 @@ Notes:
 
 - [ ] Reassess `config_schema.py` scaffolding that is not part of the current working path.
 - [ ] Reassess whether `PromptContext` in `config_builder.py` is more machinery than the current size needs.
+- [ ] Reassess whether `CONFIG_BUILDER` is actually needed once more schema-migrated analyses exist; remove it if direct dataclass construction remains sufficient.
 - [ ] Split responsibilities inside `workflow_prompts.py` if the current single class becomes harder to read.
 - [ ] Revisit the non-XYZ `prompt_cell_vectors(...)` behavior so the method name and return semantics line up more cleanly.
 - [ ] Tighten validation and error handling in `BaseAnalysis.compound_selection(..., multi=True)`.
 
 ## Current Focus
 
-1. Keep RDF and density as the clean reference analyses and preserve the working Python programmatic RDF path.
+1. Keep RDF, density, neighbor count, and ADF as the clean migrated analyses and preserve the working Python programmatic RDF path.
 2. Keep the workflow/session layer imperative and provider-driven.
 3. Use prepared setups as the practical bridge from interactive topology review to Python-driven analysis runs.
-4. Migrate the next simple analysis to validate the framework again on a different selection pattern.
+4. Use the strengthened schema system, not ad hoc prompt flows, as the default path for further migrated analyses.
 5. Revisit compound-selection stability once multiple migrated analyses put real pressure on index-based configs.
 6. Only then resume wider productionization tasks in depth.

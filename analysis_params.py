@@ -35,6 +35,7 @@ class IntParam(Param):
 class FloatParam(Param):
     minval: float | None = None
     maxval: float | None = None
+    allow_none: bool = False
 
 
 @dataclass(frozen=True)
@@ -45,3 +46,21 @@ class BoolParam(Param):
 @dataclass(frozen=True)
 class ChoiceParam(Param):
     choices: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ForEach:
+    source: str
+    item_name: str
+    steps: list[object]
+    collect_as: str
+    collect_mode: str = "dict"
+
+
+@dataclass(frozen=True)
+class When:
+    source: str
+    op: str = "=="
+    value: object = True
+    value_source: str | None = None
+    steps: list[object] = field(default_factory=list)

@@ -1,58 +1,132 @@
-# analyses/adf_analysis.py
+from __future__ import annotations
+
+from dataclasses import dataclass
 
 import numpy as np
+
+from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, IntParam, When
 from analyses.base_analysis import BaseAnalysis
-from utils import (
-    prompt, prompt_int, prompt_float, prompt_yn, prompt_choice, label_matches
-)
-from analyses.metrics import Selector, AngleMetric
 from analyses.histogram import HistogramND
+from analyses.metrics import AngleMetric, Selector
+from utils import label_matches
+
+
+@dataclass(frozen=True)
+class ADFConfig:
+    ref_compound_index: int
+    obs_compound_index: int
+    ref_base_source: str
+    ref_tip_source: str
+    ref_base_labels: list[str]
+    ref_tip_labels: list[str]
+    obs_base_source: str
+    obs_tip_source: str
+    obs_base_labels: list[str]
+    obs_tip_labels: list[str]
+    enforce_shared_atom: bool = False
+    bin_count: int = 180
+    v1_cutoff: float | None = None
+    v2_cutoff: float | None = None
+
+    def __post_init__(self):
+        if self.ref_compound_index < 0:
+            raise ValueError("ref_compound_index must be >= 0.")
+        if self.obs_compound_index < 0:
+            raise ValueError("obs_compound_index must be >= 0.")
+        for field_name in ("ref_base_source", "ref_tip_source", "obs_base_source", "obs_tip_source"):
+            if getattr(self, field_name) not in {"r", "o"}:
+                raise ValueError(f"{field_name} must be 'r' or 'o'.")
+        for field_name in ("ref_base_labels", "ref_tip_labels", "obs_base_labels", "obs_tip_labels"):
+            if not getattr(self, field_name):
+                raise ValueError(f"{field_name} must not be empty.")
+        if self.bin_count < 1:
+            raise ValueError("bin_count must be >= 1.")
+        if self.v1_cutoff is not None and self.v1_cutoff < 0:
+            raise ValueError("v1_cutoff must be >= 0 or None.")
+        if self.v2_cutoff is not None and self.v2_cutoff < 0:
+            raise ValueError("v2_cutoff must be >= 0 or None.")
 
 
 class ADF(BaseAnalysis):
-    def setup(self):
-        # --- User Setup ---
-        self.ref_idx, self.ref_comp = self.compound_selection("reference")
-        self.obs_idx, self.obs_comp = self.compound_selection("observed")
+    CONFIG_CLASS = ADFConfig
+    CONFIG_SCHEMA = [
+        CompoundParam(name="ref_compound_index", role="reference"),
+        CompoundParam(name="obs_compound_index", role="observed"),
+        ChoiceParam(name="ref_base_source", prompt="Base atom of first vector?", choices=["r", "o"], default="r"),
+        ChoiceParam(name="ref_tip_source", prompt="Tip atom of first vector?", choices=["r", "o"], default="r"),
+        AtomLabelsParam(name="ref_base_labels", prompt="Which atom(s) are at the base of the first vector? "),
+        AtomLabelsParam(name="ref_tip_labels", prompt="Which atom(s) are at the tip of the first vector? "),
+        ChoiceParam(name="obs_base_source", prompt="Base atom of second vector?", choices=["r", "o"], default="o"),
+        ChoiceParam(name="obs_tip_source", prompt="Tip atom of second vector?", choices=["r", "o"], default="o"),
+        AtomLabelsParam(name="obs_base_labels", prompt="Which atom(s) are at the base of the second vector? "),
+        AtomLabelsParam(name="obs_tip_labels", prompt="Which atom(s) are at the tip of the second vector? "),
+        When(
+            source="ref_tip_labels",
+            op="unordered==",
+            value_source="obs_base_labels",
+            steps=[
+                BoolParam(
+                    name="enforce_shared_atom",
+                    prompt="Should the tip atom of the reference vector and the base atom of the observed vector be the same atom?",
+                    default=True,
+                ),
+            ],
+        ),
+        IntParam(name="bin_count", prompt="Enter the number of bins for ADF calculation: ", default=180, minval=1),
+        FloatParam(name="v1_cutoff", prompt="Enter maximum length for the first vector: ", default=None, display_default="None", minval=0.0, allow_none=True),
+        FloatParam(name="v2_cutoff", prompt="Enter maximum length for the second vector: ", default=None, display_default="None", minval=0.0, allow_none=True),
+    ]
 
-        self.ref_base_source = prompt_choice("Base atom of first vector?", ["r", "o"], "r")
-        self.ref_tip_source = prompt_choice("Tip atom of first vector?", ["r", "o"], "r")
-        self.ref_base_label = prompt("Which atom is at the base of the first vector? ")
-        self.ref_tip_label = prompt("Which atom is at the tip of the first vector? ")
+    def configure(self, config: ADFConfig):
+        self.config = config
+        compounds = self.get_compounds()
+        keys = list(self.traj.compounds.keys())
 
-        self.obs_base_source = prompt_choice("Base atom of second vector?", ["r", "o"], "o")
-        self.obs_tip_source = prompt_choice("Tip atom of second vector?", ["r", "o"], "o")
-        self.obs_base_label = prompt("Which atom is at the base of the second vector? ")
-        self.obs_tip_label = prompt("Which atom is at the tip of the second vector? ")
+        try:
+            self.ref_comp = compounds[config.ref_compound_index]
+            self.obs_comp = compounds[config.obs_compound_index]
+            self.ref_key = keys[config.ref_compound_index]
+            self.obs_key = keys[config.obs_compound_index]
+        except IndexError as exc:
+            raise ValueError("ADF compound index is out of range.") from exc
 
-        self.enforce_shared_atom = (
-            self.ref_tip_label == self.obs_base_label
-            and prompt_yn("Should the tip atom of the reference vector and the base atom of the observed vector be the same atom?", True)
-        )
-
-        self.bin_count = prompt_int("Enter the number of bins for ADF calculation: ", 180, minval=1)
-        self.v1_cutoff = prompt_float("Enter maximum length for the first vector: ", None, "None", minval=0.0)
-        self.v2_cutoff = prompt_float("Enter maximum length for the second vector: ", None, "None", minval=0.0)
-
-        self.ref_key = list(self.traj.compounds.keys())[self.ref_idx]
-        self.obs_key = list(self.traj.compounds.keys())[self.obs_idx]
+        self.ref_base_source = config.ref_base_source
+        self.ref_tip_source = config.ref_tip_source
+        self.ref_base_labels = list(config.ref_base_labels)
+        self.ref_tip_labels = list(config.ref_tip_labels)
+        self.obs_base_source = config.obs_base_source
+        self.obs_tip_source = config.obs_tip_source
+        self.obs_base_labels = list(config.obs_base_labels)
+        self.obs_tip_labels = list(config.obs_tip_labels)
+        self.enforce_shared_atom = config.enforce_shared_atom
+        self.bin_count = config.bin_count
+        self.v1_cutoff = config.v1_cutoff
+        self.v2_cutoff = config.v2_cutoff
 
         self._update_vectors()
+        if not all([self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids]):
+            raise ValueError("No angle vectors matched the given labels in the initial frame.")
         self._create_metric()
 
         self.n_ref = len(self.ref_comp.members)
         self.n_obs = len(self.obs_comp.members)
         self.angle_edges = np.linspace(0, 180, self.bin_count + 1)
         self.hist = HistogramND([self.angle_edges])
+        self.mark_configured()
 
     def _update_vectors(self):
         self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids = build_vector_lists(
-            self.ref_comp, self.obs_comp,
-            self.ref_base_source, self.ref_tip_source,
-            self.obs_base_source, self.obs_tip_source,
-            self.ref_base_label, self.ref_tip_label,
-            self.obs_base_label, self.obs_tip_label,
-            self.enforce_shared_atom
+            self.ref_comp,
+            self.obs_comp,
+            self.ref_base_source,
+            self.ref_tip_source,
+            self.obs_base_source,
+            self.obs_tip_source,
+            self.ref_base_labels,
+            self.ref_tip_labels,
+            self.obs_base_labels,
+            self.obs_tip_labels,
+            self.enforce_shared_atom,
         )
 
     def _create_metric(self):
@@ -79,8 +153,8 @@ class ADF(BaseAnalysis):
             return False
 
         self._create_metric()
-        self.n_ref = (self.n_ref * self.processed_frames + len(self.ref_comp.members))/(self.processed_frames + 1)
-        self.n_obs = (self.n_obs * self.processed_frames + len(self.obs_comp.members))/(self.processed_frames + 1)
+        self.n_ref = (self.n_ref * self.processed_frames + len(self.ref_comp.members)) / (self.processed_frames + 1)
+        self.n_obs = (self.n_obs * self.processed_frames + len(self.obs_comp.members)) / (self.processed_frames + 1)
         return True
 
     def process_frame(self):
@@ -100,21 +174,31 @@ class ADF(BaseAnalysis):
 
         self.hist.normalize(method="total", total=self.bin_count * 100)
         self.hist.save_txt("adf.dat")
-
         print("ADF results saved to adf.dat")
 
 
-def find_matching_labels(mol, user_label):
+def find_matching_labels(mol, user_labels):
+    if isinstance(user_labels, str):
+        user_labels = [user_labels]
     return [
         idx for label, idx in mol.label_to_global_id.items()
-        if label_matches(user_label, label)
+        if any(label_matches(user_label, label) for user_label in user_labels)
     ]
 
 
-def build_vector_lists(ref_comp, obs_comp, ref_base_source, ref_tip_source,
-                       obs_base_source, obs_tip_source, ref_base_label, ref_tip_label,
-                       obs_base_label, obs_tip_label, enforce_shared_atom):
-
+def build_vector_lists(
+    ref_comp,
+    obs_comp,
+    ref_base_source,
+    ref_tip_source,
+    obs_base_source,
+    obs_tip_source,
+    ref_base_labels,
+    ref_tip_labels,
+    obs_base_labels,
+    obs_tip_labels,
+    enforce_shared_atom,
+):
     ref_base_ids, ref_tip_ids = [], []
     obs_base_ids, obs_tip_ids = [], []
 
@@ -128,10 +212,10 @@ def build_vector_lists(ref_comp, obs_comp, ref_base_source, ref_tip_source,
             ob_mol = obs_mol if obs_base_source == "o" else ref_mol
             ot_mol = obs_mol if obs_tip_source == "o" else ref_mol
 
-            rb_ids = find_matching_labels(rb_mol, ref_base_label)
-            rt_ids = find_matching_labels(rt_mol, ref_tip_label)
-            ob_ids = find_matching_labels(ob_mol, obs_base_label)
-            ot_ids = find_matching_labels(ot_mol, obs_tip_label)
+            rb_ids = find_matching_labels(rb_mol, ref_base_labels)
+            rt_ids = find_matching_labels(rt_mol, ref_tip_labels)
+            ob_ids = find_matching_labels(ob_mol, obs_base_labels)
+            ot_ids = find_matching_labels(ot_mol, obs_tip_labels)
 
             for rb in rb_ids:
                 for rt in rt_ids:
@@ -145,4 +229,3 @@ def build_vector_lists(ref_comp, obs_comp, ref_base_source, ref_tip_source,
                             obs_tip_ids.append(ot)
 
     return ref_base_ids, ref_tip_ids, obs_base_ids, obs_tip_ids
-

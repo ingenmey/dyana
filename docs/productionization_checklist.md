@@ -158,7 +158,7 @@ avoid carrying competing framework guidance.
 ## 11. Normalize Analysis APIs
 
 - [~] RDF now validates the new `BaseAnalysis` design; the remaining analyses still need migration.
-- [~] RDF and density now validate the new `BaseAnalysis` design; the remaining analyses still need migration.
+- [~] RDF, density, neighbor count, and ADF now validate the new `BaseAnalysis` design; the remaining analyses still need migration.
 - [x] Keep `BaseAnalysis` as the near-term canonical shared frame-loop/lifecycle base.
 - [x] Introduce config-driven setup independent of prompts, following the framework checklist.
 - [ ] Add `from_config` constructors only where they reduce boilerplate.
@@ -315,7 +315,7 @@ avoid carrying competing framework guidance.
 ## Immediate Next-Step Candidates
 
 1. Keep the productionization checklist aligned with [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md) while the framework remains RDF-first.
-2. Migrate the next simple analysis after density to validate that the shared framework is not tied to one analysis family.
+2. Migrate the next simple analysis after neighbor count to validate that the shared framework is not tied to one analysis family.
 3. After that, resume version/metadata/output-directory work here.
 4. Add opt-in slow smoke tests for the documented RDF examples.
 5. Then continue the larger package-layout and trajectory/core module split.
