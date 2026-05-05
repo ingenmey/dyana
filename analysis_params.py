@@ -10,7 +10,6 @@ class Param:
     prompt: str | None = None
     default: Any = None
     display_default: Any = None
-    required: bool = True
 
 
 @dataclass(frozen=True)

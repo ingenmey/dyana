@@ -1,0 +1,61 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "trajectory_format": "xyz",
+    "cell_vectors": [
+      15.67,
+      15.67,
+      15.67
+    ],
+    "excluded_elements": [
+      "Ag",
+      "Au",
+      "Ba",
+      "Ca",
+      "Co",
+      "Cs",
+      "Cu",
+      "Fe",
+      "K",
+      "Li",
+      "Mg",
+      "Na",
+      "Pt",
+      "Rb",
+      "Sr",
+      "Zn"
+    ],
+    "neighbor_search_scale": 1.164,
+    "bond_distance_scale": 1.4,
+    "forbidden_bonds": []
+  },
+  "compound_types": [
+    {
+      "rep": "H2O",
+      "formula": "H2O",
+      "bond_types": [
+        [
+          "H",
+          "O"
+        ],
+        [
+          "H",
+          "O"
+        ]
+      ],
+      "graph_hash": "2c96eb4288d63b2a9437ddd4172e67f3",
+      "labels": [
+        "H1",
+        "H2",
+        "O1"
+      ]
+    }
+  ],
+  "metadata": {
+    "source_file": "../water128.xyz",
+    "observed_counts": {
+      "H2O": 1
+    },
+    "saved_at": "2026-04-30T17:39:51.989811+00:00"
+  }
+}

@@ -89,7 +89,6 @@ class BaseAnalysis(ABC):
         if self.CONFIG_CLASS is None:
             raise NotImplementedError(f"{type(self).__name__} must override setup() or define CONFIG_CLASS.")
         self.configure(self.prompt_config())
-        self._analysis_configured = True
 
     def prompt_config(self, provider=None):
         if self.CONFIG_CLASS is None or self.CONFIG_SCHEMA is None:

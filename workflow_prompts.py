@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from input_providers import InteractiveInputProvider
 from core.trajectory_loader import load_trajectory
+from input_providers import InteractiveInputProvider
+from prepared_setup import (
+    apply_prepared_setup_recipe,
+    build_prepared_setup,
+    load_prepared_setup,
+    save_prepared_setup,
+    validate_prepared_setup,
+)
 
 
 class WorkflowPrompts:
@@ -23,19 +30,36 @@ class WorkflowPrompts:
         dimz = input_provider.ask_float("Enter cell vector length in Z dimension (in Angstrom): ", minval=0.0)
         return np.array([dimx, dimy, dimz], dtype=float)
 
-    def prepare_trajectory(self, traj_file, traj_format, provider=None):
+    def prepare_trajectory(self, traj_file, traj_format, provider=None, save_prepared_setup_path=None):
         input_provider = self.get_input_provider(provider)
         cell_vectors = self.prompt_cell_vectors(traj_format, provider=input_provider)
 
-        with open(traj_file, "r") as fin:
-            traj = load_trajectory(fin, traj_format, cell_vectors)
-            traj.read_frame()
+        fin = open(traj_file, "r")
+        traj = load_trajectory(fin, traj_format, cell_vectors)
+        traj.read_frame()
 
-            box_size = traj.box_size
-            print(f"\n\nCell vectors: a = {box_size[0]}, b = {box_size[1]}, c = {box_size[2]}\n")
+        box_size = traj.box_size
+        print(f"\n\nCell vectors: a = {box_size[0]}, b = {box_size[1]}, c = {box_size[2]}\n")
 
-            self.process_compounds(traj, provider=input_provider)
-            return traj
+        self.process_compounds(traj, provider=input_provider)
+        if save_prepared_setup_path is not None:
+            prepared_setup = build_prepared_setup(traj, traj_file, traj_format, cell_vectors)
+            save_prepared_setup(save_prepared_setup_path, prepared_setup)
+        return traj
+
+    def prepare_trajectory_from_setup(self, traj_file, prepared_setup_path):
+        prepared_setup = load_prepared_setup(prepared_setup_path)
+        recipe = prepared_setup.recipe
+        traj_format = recipe["trajectory_format"]
+        cell_vectors = np.array(recipe["cell_vectors"], dtype=float)
+
+        fin = open(traj_file, "r")
+        traj = load_trajectory(fin, traj_format, cell_vectors)
+        traj.read_frame()
+        apply_prepared_setup_recipe(traj, prepared_setup)
+        traj.guess_molecules()
+        validate_prepared_setup(traj, prepared_setup)
+        return traj
 
     def process_compounds(self, traj, provider=None):
         input_provider = self.get_input_provider(provider)

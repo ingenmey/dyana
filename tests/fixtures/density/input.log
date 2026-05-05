@@ -1,0 +1,20 @@
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+
+# Choose an analysis:
+dens
+# Choose the axis for density analysis (x/y/z) [z]
+
+# Enter the step size for density calculation (in Angstrom):  [0.1]
+
+# Normalize each compound using only the frames in which it appeared? [No]
+
+# Perform molecule recognition and update compound list in each frame? [No]
+
+# In which trajectory frame to start processing the trajectory? [1]
+
+# How many trajectory frames to read (from this position on)? [all]
+
+# Use every n-th read trajectory frame for the analysis: [1]
+

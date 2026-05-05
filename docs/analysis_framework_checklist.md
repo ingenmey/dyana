@@ -69,7 +69,8 @@ Status markers:
   - choice
 - [x] Support dependencies between parameters through context.
 - [x] Keep prompt builders easy to extend without editing each analysis.
-- [x] Reuse the same provider and schema engine for workflow/session prompts outside analyses.
+- [x] Reuse the same `InputProvider` abstraction across workflow and analysis code.
+- [x] Keep the schema engine focused on migrated analyses rather than forcing it into the workflow layer.
 
 ## 5. Compound Selection Representation
 
@@ -103,9 +104,9 @@ Status markers:
 
 ### Simple Analyses
 
-- [~] Treat RDF as the first simple-analysis migration target.
+- [x] Treat RDF as the first simple-analysis migration target.
 - [x] Treat RDF as the canonical reference implementation for the framework.
-- [ ] Migrate density after RDF.
+- [x] Migrate density after RDF.
 - [ ] Migrate neighbor count after density.
 - [ ] Migrate tetrahedral order after neighbor count.
 
@@ -134,6 +135,8 @@ Rule:
 - [x] Programmatic mode should call `configure(config)`.
 - [x] Add a consistent programmatic frame-loop setup path.
 - [x] Unify execution under `run()` rather than keeping a separate `run_configured()` method.
+- [x] Provide a practical programmatic entry path by loading a saved prepared setup before analysis configuration.
+- [x] Treat prepared setups as the near-term bridge between interactive topology review and Python-driven analyses.
 - [ ] Delay general result-return APIs until output design is agreed.
 
 ## 10. Output Handling In Framework Work
@@ -168,6 +171,9 @@ Notes:
 - [x] During framework work, RDF is the only analysis that must remain fully functional.
 - [x] Other analyses may break temporarily and be reintroduced after the framework is clean.
 - [x] Do not preserve legacy code paths solely for compatibility if they make the framework harder to read.
+- [x] Treat the workflow layer and the analysis layer as separate design problems.
+- [x] Keep the workflow layer imperative and provider-driven.
+- [x] Keep schema-driven prompting as an analysis-layer tool, not a universal rule.
 
 ## 13. Checklist Guidance
 
@@ -177,13 +183,19 @@ Notes:
 - [x] Keep the productionization checklist aligned with this framework checklist.
 - [x] Treat this checklist as the current focus before wider productionization resumes.
 
+## Later Cleanup Notes
+
+- [ ] Reassess `config_schema.py` scaffolding that is not part of the current working path.
+- [ ] Reassess whether `PromptContext` in `config_builder.py` is more machinery than the current size needs.
+- [ ] Split responsibilities inside `workflow_prompts.py` if the current single class becomes harder to read.
+- [ ] Revisit the non-XYZ `prompt_cell_vectors(...)` behavior so the method name and return semantics line up more cleanly.
+- [ ] Tighten validation and error handling in `BaseAnalysis.compound_selection(..., multi=True)`.
+
 ## Current Focus
 
-1. Add config-schema parameter primitives.
-2. Add the shared prompt dispatcher.
-3. Teach `BaseAnalysis` to use `CONFIG_CLASS` and `CONFIG_SCHEMA`.
-4. Finish RDF as the canonical simple-analysis example.
-5. Allow non-RDF analyses to lag or break temporarily while RDF and the shared framework are clarified.
-6. Decide how top-level pre-analysis prompts should be separated from analysis config prompts.
-7. Build out the workflow/session layer on top of the shared provider and schema prompt engine.
-8. Only then resume wider productionization tasks.
+1. Keep RDF and density as the clean reference analyses and preserve the working Python programmatic RDF path.
+2. Keep the workflow/session layer imperative and provider-driven.
+3. Use prepared setups as the practical bridge from interactive topology review to Python-driven analysis runs.
+4. Migrate the next simple analysis to validate the framework again on a different selection pattern.
+5. Revisit compound-selection stability once multiple migrated analyses put real pressure on index-based configs.
+6. Only then resume wider productionization tasks in depth.

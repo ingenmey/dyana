@@ -1,9 +1,4 @@
-"""Input providers for interactive and scripted CLI prompts.
-
-This module starts replacing the old global prompt state in `utils.py`.
-The public `utils.prompt*` functions remain as compatibility wrappers while
-new code can depend on provider objects directly.
-"""
+"""Input providers for interactive, scripted, and non-interactive prompt flows."""
 
 from __future__ import annotations
 

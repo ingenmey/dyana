@@ -53,6 +53,8 @@ avoid carrying competing framework guidance.
 - [x] Add per-analysis config objects, starting with RDF.
 - [~] Convert analyses so prompting only builds config objects, using the framework checklist plan.
 - [x] Make analyses runnable directly from config, starting with RDF.
+- [x] Add a reusable prepared-setup artifact so interactive topology setup can be saved and later reused for compatible systems.
+- [x] Make a real Python-driven end-to-end RDF run possible by combining prepared setup loading with analysis configuration.
 - [ ] Return result objects from analyses only after a shared result/output pattern is agreed.
 - [ ] Rebuild interactive wrappers on top of the new framework where they still make sense.
 - [ ] Add JSON/YAML non-interactive run mode.
@@ -67,8 +69,8 @@ avoid carrying competing framework guidance.
   - `utils.py` now delegates to provider objects.
   - A module-level default provider remains as compatibility state for existing prompt wrappers.
 - [~] Pass input/log providers through CLI/config-building code only.
-  - Provider classes exist and `utils.py` is a compatibility wrapper.
-  - Existing analyses still import prompt wrappers directly.
+  - Provider classes exist and drive the rebuilt RDF/workflow path directly.
+  - Legacy analyses still need migration away from prompt-wrapper imports.
 
 ## 5. Formalize Configuration
 
@@ -150,12 +152,13 @@ avoid carrying competing framework guidance.
 - [ ] Add consistent naming conventions for output files.
 - [ ] Put analysis outputs into timestamped or user-selected run directories.
 - [~] Include units, frame range, stride, and normalization in headers/metadata.
-  - Config-driven RDF writer uses ASCII units and can write metadata.
+  - RDF output headers and metadata coverage are in decent shape.
   - Other outputs still need metadata/header cleanup.
 
 ## 11. Normalize Analysis APIs
 
-- [~] Current analyses share `BaseAnalysis` interactive frame loop.
+- [~] RDF now validates the new `BaseAnalysis` design; the remaining analyses still need migration.
+- [~] RDF and density now validate the new `BaseAnalysis` design; the remaining analyses still need migration.
 - [x] Keep `BaseAnalysis` as the near-term canonical shared frame-loop/lifecycle base.
 - [x] Introduce config-driven setup independent of prompts, following the framework checklist.
 - [ ] Add `from_config` constructors only where they reduce boilerplate.
@@ -178,13 +181,15 @@ avoid carrying competing framework guidance.
 - [x] Add RDF counting tests on synthetic frames.
   - RDF config/result normalization tests exist.
   - `RDF.configure()` plus `process_frame()`/`postprocess()` is tested on a one-frame synthetic trajectory.
-- [ ] Add CLI smoke tests with scripted input.
+- [x] Add CLI/end-to-end RDF test with scripted input.
 - [~] Add integration smoke tests using `examples/xyz/water128.xyz`.
   - Example trajectory, RDF input log, and reference RDF output are documented.
-  - Automated opt-in slow test is still missing.
+  - A true end-to-end RDF regression test exists in `tests/fixtures/rdf`.
+  - Example-level opt-in slow coverage is still missing.
 - [~] Add integration smoke tests using `examples/lammps/naclo4_h2o.lmp`.
   - Example trajectory, RDF input log, and reference RDF output are documented.
   - Automated opt-in slow test is still missing.
+- [x] Add a true Python-driven end-to-end RDF regression test using prepared setup loading plus `RDF.configure(...)`.
 
 ## 13. Add CI And Tooling
 
@@ -301,13 +306,16 @@ avoid carrying competing framework guidance.
 - [~] Add output metadata with version/dependency/config information.
   - Metadata writer includes Python, dependency, git, and analysis parameter information.
   - Dyana version and full resolved config are still missing.
+- [~] Add reusable prepared-setup metadata and validation.
+  - Prepared setup JSON now stores recipe, compound-type signatures, and informational metadata.
+  - Version tagging and broader docs are still missing.
 - [ ] Add reproducibility guidance for citing analysis settings.
 - [ ] Preserve behavior with tests before changing scientific definitions.
 
 ## Immediate Next-Step Candidates
 
-1. Continue the current focus in [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md): settle the programmatic entry path and replace the `nframes=-1` sentinel in the framework path.
-2. Use RDF as the only analysis that must stay functional during framework work; legacy analyses can be repaired later.
-3. Keep the productionization checklist aligned with the framework checklist while framework work is in progress.
-4. After the framework shape is stable, resume version/metadata/output-directory work here.
-5. Then add opt-in slow smoke tests for the documented RDF examples.
+1. Keep the productionization checklist aligned with [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md) while the framework remains RDF-first.
+2. Migrate the next simple analysis after density to validate that the shared framework is not tied to one analysis family.
+3. After that, resume version/metadata/output-directory work here.
+4. Add opt-in slow smoke tests for the documented RDF examples.
+5. Then continue the larger package-layout and trajectory/core module split.

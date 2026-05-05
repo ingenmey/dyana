@@ -44,8 +44,7 @@ def determine_traj_format(traj_file):
     raise ValueError(f"Unsupported file extension: {ext}")
 
 
-def choose_analysis(workflow_prompts):
-    input_provider = workflow_prompts.input_provider
+def choose_analysis(input_provider):
     print("\nAvailable analyses:")
     for key, (description, _) in AVAILABLE_ANALYSES.items():
         print(f"{key}: {description}")
@@ -58,15 +57,30 @@ def choose_analysis(workflow_prompts):
         print("Invalid choice. Please choose an analysis from the above list.")
 
 
-def main(traj_file, input_provider=None):
+def main(traj_file, input_provider=None, prepared_setup=None, save_prepared_setup_path=None):
     workflow_prompts = WorkflowPrompts(input_provider=input_provider)
     input_provider = workflow_prompts.input_provider
+    traj = None
 
-    traj_format = determine_traj_format(traj_file)
-    traj = workflow_prompts.prepare_trajectory(traj_file, traj_format, provider=input_provider)
-    analysis_func = choose_analysis(workflow_prompts)
-    analysis = analysis_func(traj, input_provider=input_provider)
-    analysis.run()
+    try:
+        if prepared_setup is not None:
+            traj = workflow_prompts.prepare_trajectory_from_setup(traj_file, prepared_setup)
+        else:
+            traj_format = determine_traj_format(traj_file)
+            traj = workflow_prompts.prepare_trajectory(
+                traj_file,
+                traj_format,
+                provider=input_provider,
+                save_prepared_setup_path=save_prepared_setup_path,
+            )
+
+        analysis_func = choose_analysis(input_provider)
+        analysis = analysis_func(traj, input_provider=input_provider)
+        analysis.run()
+    finally:
+        fin = getattr(traj, "fin", None)
+        if fin is not None and not fin.closed:
+            fin.close()
 
 
 def cli():
@@ -74,9 +88,11 @@ def cli():
     parser.add_argument("traj_file", type=str, help="Path to the trajectory file in XYZ format")
     parser.add_argument("-i", "--input", type=str, help="Path to the input file")
     parser.add_argument("-l", "--log", type=str, default="input.log", help="Path to the log file")
+    parser.add_argument("--prepared-setup", type=str, help="Path to a prepared setup JSON file")
+    parser.add_argument("--save-prepared-setup", type=str, help="Write the accepted prepared setup to this JSON file")
     args = parser.parse_args()
 
-    if args.input is not None or args.log is not None:
+    if args.input is not None:
         input_provider = FileInputProvider(
             file_path=args.input,
             fallback=InteractiveInputProvider(),
@@ -86,7 +102,12 @@ def cli():
         input_provider = InteractiveInputProvider()
 
     try:
-        main(args.traj_file, input_provider=input_provider)
+        main(
+            args.traj_file,
+            input_provider=input_provider,
+            prepared_setup=args.prepared_setup,
+            save_prepared_setup_path=args.save_prepared_setup,
+        )
     finally:
         close = getattr(input_provider, "close", None)
         if close:
