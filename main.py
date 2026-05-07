@@ -1,36 +1,25 @@
 #!/usr/bin/env python3
 
 import argparse
+import importlib
 import os
 
 import constants
-
-from analyses.adf3b_analysis import ADFThreeBody as adf3b
-from analyses.adf_analysis import ADF as adf
-from analyses.charge_msd_analysis import ChargeMSDAnalysis as cmsd
-from analyses.cluster_analysis import ClusterAnalysis as cluster
-from analyses.dacf_analysis import DACFAnalysis as dacf
-from analyses.density_analysis import DensityAnalysis as density
-from analyses.neighbor_count_analysis import NeighborCountAnalysis as ncount
-from analyses.pccf_analysis import PCCFAnalysis as pccf
-from analyses.percolation_analysis import PercolationAnalysis as percolation
-from analyses.rdf_analysis import RDF as rdf
-from analyses.top_analysis import TetrahedralOrderAnalysis as top
 from input_providers import FileInputProvider, InteractiveInputProvider
 from workflow_prompts import WorkflowPrompts
 
 AVAILABLE_ANALYSES = {
-    "rdf": ("Radial distribution function analysis", rdf),
-    "adf": ("Angular distribution function analysis", adf),
-    "adf3b": ("Threebody Angular distribution function analysis", adf3b),
-    "dens": ("Particle density analysis", density),
-    "percolation": ("Hydrogen bond percolation analysis", percolation),
-    "cluster": ("Cluster composition histogram", cluster),
-    "dacf": ("Dimer existence auto-correlation function", dacf),
-    "top": ("Tetrahedral order parameter", top),
-    "pccf": ("Proton coupling correlation function", pccf),
-    "cmsd": ("Charge mean square displacement", cmsd),
-    "ncount": ("Neighbour-count probability", ncount),
+    "rdf": ("Radial distribution function analysis", "analyses.rdf_analysis", "RDF"),
+    "adf": ("Angular distribution function analysis", "analyses.adf_analysis", "ADF"),
+    "dens": ("Particle density analysis", "analyses.density_analysis", "DensityAnalysis"),
+    "ncount": ("Neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
+    # "adf3b": ("Threebody Angular distribution function analysis", "analyses.adf3b_analysis", "ADFThreeBody"),
+    # "percolation": ("Hydrogen bond percolation analysis", "analyses.percolation_analysis", "PercolationAnalysis"),
+    # "cluster": ("Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
+    # "dacf": ("Dimer existence auto-correlation function", "analyses.dacf_analysis", "DACFAnalysis"),
+    # "top": ("Tetrahedral order parameter", "analyses.top_analysis", "TetrahedralOrderAnalysis"),
+    # "pccf": ("Proton coupling correlation function", "analyses.pccf_analysis", "PCCFAnalysis"),
+    # "cmsd": ("Charge mean square displacement", "analyses.charge_msd_analysis", "ChargeMSDAnalysis"),
 }
 
 
@@ -46,14 +35,15 @@ def determine_traj_format(traj_file):
 
 def choose_analysis(input_provider):
     print("\nAvailable analyses:")
-    for key, (description, _) in AVAILABLE_ANALYSES.items():
+    for key, (description, _, _) in AVAILABLE_ANALYSES.items():
         print(f"{key}: {description}")
 
     while True:
         analysis_choice = input_provider.ask_str("\nChoose an analysis: ").strip()
         if analysis_choice in AVAILABLE_ANALYSES:
-            _, analysis_func = AVAILABLE_ANALYSES[analysis_choice]
-            return analysis_func
+            _, module_name, class_name = AVAILABLE_ANALYSES[analysis_choice]
+            module = importlib.import_module(module_name)
+            return getattr(module, class_name)
         print("Invalid choice. Please choose an analysis from the above list.")
 
 

@@ -147,13 +147,14 @@ avoid carrying competing framework guidance.
 - [ ] Prevent accidental overwrite unless `--force`.
 - [x] Add run metadata writer.
 - [ ] Add resolved-config writer.
-- [ ] Centralize plain-text table writing.
-  - Deferred; analyses continue using existing writers such as `HistogramND.save_txt`.
+- [~] Centralize plain-text table writing.
+  - A shared output writer now exists for the migrated analyses.
+  - The current implementation still needs simplification toward one harmonized text format.
 - [ ] Add consistent naming conventions for output files.
 - [ ] Put analysis outputs into timestamped or user-selected run directories.
 - [~] Include units, frame range, stride, and normalization in headers/metadata.
-  - RDF output headers and metadata coverage are in decent shape.
-  - Other outputs still need metadata/header cleanup.
+  - Migrated analyses now share a common output direction.
+  - Headers and formatting still need cleanup to become truly consistent.
 
 ## 11. Normalize Analysis APIs
 
@@ -163,7 +164,9 @@ avoid carrying competing framework guidance.
 - [x] Introduce config-driven setup independent of prompts, following the framework checklist.
 - [ ] Add `from_config` constructors only where they reduce boilerplate.
 - [ ] Add result dataclasses after a shared result/output pattern is agreed.
-- [ ] Move file writing out of calculation classes only after a central output layer exists.
+- [~] Move file writing out of calculation classes once a central output layer exists.
+  - RDF, density, neighbor count, and ADF now write through a shared output module.
+  - Remaining analyses are intentionally left untouched for now.
 - [x] Treat RDF as the reference analysis while the shared framework is rebuilt.
 - [x] Allow temporary breakage of legacy analyses during framework migration.
 
@@ -315,7 +318,7 @@ avoid carrying competing framework guidance.
 ## Immediate Next-Step Candidates
 
 1. Keep the productionization checklist aligned with [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md) while the framework remains RDF-first.
-2. Migrate the next simple analysis after neighbor count to validate that the shared framework is not tied to one analysis family.
+2. Simplify and standardize the shared output writer for the currently migrated analyses instead of preserving legacy formatting quirks.
 3. After that, resume version/metadata/output-directory work here.
-4. Add opt-in slow smoke tests for the documented RDF examples.
+4. Add opt-in slow smoke tests for the documented example trajectories.
 5. Then continue the larger package-layout and trajectory/core module split.

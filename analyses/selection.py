@@ -5,6 +5,18 @@ from __future__ import annotations
 from utils import label_matches
 
 
+def find_matching_labels(molecule, labels):
+    """Collect matching global atom indices in one molecule for one or more label patterns."""
+    if isinstance(labels, str):
+        labels = [labels]
+
+    return [
+        idx
+        for label, idx in molecule.label_to_global_id.items()
+        if any(label_matches(user_label, label) for user_label in labels)
+    ]
+
+
 def collect_atom_indices(compound, labels):
     """Collect global atom indices in a compound matching one or more label patterns."""
     if isinstance(labels, str):
@@ -13,8 +25,7 @@ def collect_atom_indices(compound, labels):
     return [
         idx
         for mol in compound.members
-        for label, idx in mol.label_to_global_id.items()
-        if any(label_matches(user_label, label) for user_label in labels)
+        for idx in find_matching_labels(mol, labels)
     ]
 
 
@@ -33,4 +44,3 @@ def collect_indices_for_compounds(compounds, labels_by_key, keys):
     for key, compound in zip(keys, compounds):
         indices.extend(collect_atom_indices(compound, labels_by_key[key]))
     return indices
-

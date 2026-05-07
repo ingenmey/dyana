@@ -179,13 +179,13 @@ class ADFConfigTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 analysis.run()
-                output = Path("adf.dat")
+                output = Path("adf_O-H2O_H-H2O_O-OH_H-OH.dat")
                 self.assertTrue(output.exists())
                 text = output.read_text(encoding="utf-8")
             finally:
                 os.chdir(cwd)
 
-        self.assertIn("bin_0", text)
+        self.assertIn("count", text)
 
 
 if __name__ == "__main__":

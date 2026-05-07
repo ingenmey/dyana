@@ -32,7 +32,24 @@ class BaseAnalysis(ABC):
 
     def compound_by_index(self, index):
         compounds = self.get_compounds()
-        return compounds[index]
+        try:
+            return compounds[index]
+        except IndexError as exc:
+            raise ValueError(f"{type(self).__name__} compound index is out of range.") from exc
+
+    def resolve_compounds(self, indices):
+        compounds = self.get_compounds()
+        keys = list(self.traj.compounds.keys())
+        resolved = []
+        for index in indices:
+            try:
+                resolved.append((compounds[index], keys[index]))
+            except IndexError as exc:
+                raise ValueError(f"{type(self).__name__} compound index is out of range.") from exc
+        return resolved
+
+    def reattach_compounds(self, keys):
+        return [self.traj.compounds[key] for key in keys]
 
     def skip_to_start(self):
         self.frame_idx = 0

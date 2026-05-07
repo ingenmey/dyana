@@ -9,19 +9,35 @@
 # Accept these molecules (y) or change something (n) [Yes]
 
 # Choose an analysis:
-rdf
+adf
 # Choose the reference compound (number):  [1]
-
+1
 # Choose the observed compound (number):  [1]
-
-# Which atom(s) in reference compound 1 (H2O)? (comma-separated)
+1
+# Base atom of first vector? (r/o) [r]
+r
+# Tip atom of first vector? (r/o) [r]
+r
+# Which atom(s) are at the base of the first vector?
 O
-# Which atom(s) in observed compound 1 (H2O)? (comma-separated)
+# Which atom(s) are at the tip of the first vector?
 H
-# Enter the maximum distance for RDF calculation (in Angstrom):  [10.0]
+# Base atom of second vector? (r/o) [o]
+r
+# Tip atom of second vector? (r/o) [o]
+o
+# Which atom(s) are at the base of the second vector?
+H
+# Which atom(s) are at the tip of the second vector?
+O
+# Should the tip atom of the reference vector and the base atom of the observed vector be the same atom? [Yes]
 
-# Enter the number of bins for RDF calculation:  [1000]
-1000
+# Enter the number of bins for ADF calculation:  [180]
+
+# Enter maximum length for the first vector:  [None]
+1.5
+# Enter maximum length for the second vector:  [None]
+2.5
 # Perform molecule recognition and update compound list in each frame? [No]
 
 # In which trajectory frame to start processing the trajectory? [1]

@@ -30,7 +30,7 @@ class RDFEndToEndTests(unittest.TestCase):
         generated = self._run_rdf(
             input_log=RDF_FIXTURES / "input.log",
         )
-        reference = (RDF_FIXTURES / "rdf_O_H.dat").read_text(encoding="utf-8")
+        reference = (RDF_FIXTURES / "rdf_O-H2O_H-H2O.dat").read_text(encoding="utf-8")
         self.assertEqual(generated, reference)
 
     def test_programmatic_prepared_setup_path_reproduces_reference_rdf(self):
@@ -66,7 +66,7 @@ class RDFEndToEndTests(unittest.TestCase):
                     )
                 )
                 analysis.run()
-                output = Path("rdf_O_H.dat")
+                output = Path("rdf_O-H2O_H-H2O.dat")
                 self.assertTrue(output.exists())
                 generated = output.read_text(encoding="utf-8")
             finally:
@@ -74,7 +74,7 @@ class RDFEndToEndTests(unittest.TestCase):
                     traj.fin.close()
                 os.chdir(cwd)
 
-        reference = (RDF_FIXTURES / "rdf_O_H.dat").read_text(encoding="utf-8")
+        reference = (RDF_FIXTURES / "rdf_O-H2O_H-H2O.dat").read_text(encoding="utf-8")
         self.assertEqual(generated, reference)
 
         self.assertEqual(len(setup["compound_types"]), 1)
@@ -91,7 +91,7 @@ class RDFEndToEndTests(unittest.TestCase):
                     str(WATER_FIXTURE),
                     input_provider=provider,
                 )
-                output = Path("rdf_O_H.dat")
+                output = Path("rdf_O-H2O_H-H2O.dat")
                 self.assertTrue(output.exists())
                 return output.read_text(encoding="utf-8")
             finally:

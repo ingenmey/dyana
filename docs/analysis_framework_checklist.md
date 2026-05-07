@@ -148,10 +148,11 @@ Rule:
 
 ## 10. Output Handling In Framework Work
 
-- [x] Keep current output behavior short-term.
-- [x] Keep using `HistogramND.save_txt` where already used.
-- [x] Avoid per-analysis custom writers unless a shared output layer exists.
-- [ ] Revisit shared output helpers after multiple analyses are migrated.
+- [x] Add a shared output-writing layer for migrated analyses.
+- [x] Keep `HistogramND` as a data/binning container rather than a text-output API.
+- [x] Avoid per-analysis formatting code when a shared writer can handle it.
+- [ ] Standardize one clear text-table format across migrated analyses instead of reproducing legacy spacing per analysis.
+- [ ] Apply the shared output layer only to the currently migrated analyses until more migrations are requested.
 
 ## 11. Proposed Minimal Framework API
 
@@ -205,5 +206,6 @@ Notes:
 2. Keep the workflow/session layer imperative and provider-driven.
 3. Use prepared setups as the practical bridge from interactive topology review to Python-driven analysis runs.
 4. Use the strengthened schema system, not ad hoc prompt flows, as the default path for further migrated analyses.
-5. Revisit compound-selection stability once multiple migrated analyses put real pressure on index-based configs.
-6. Only then resume wider productionization tasks in depth.
+5. Simplify the shared output writer toward one readable, harmonized format instead of preserving legacy per-analysis spacing.
+6. Revisit compound-selection stability once multiple migrated analyses put real pressure on index-based configs.
+7. Only then resume wider productionization tasks in depth.

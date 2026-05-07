@@ -40,19 +40,13 @@ class HistogramND:
         If values is None, initializes the field to zeros.
     normalize(field="count", method="total", box_volume=None, total=1)
         Normalize the specified data field by total counts, bin volume, or no normalization.
-    save_txt(filename, headers=None, fields=None)
-        Save the histogram (one or more fields) as a plain-text file, with customizable headers.
-    save_npy(filename)
-        Save the default ("count") field to a .npy file.
-    save_all(basename)
-        Save both .npy and .dat versions (default field only).
 
     Example
     -------
     >>> hist = HistogramND([np.linspace(0, 1, 11)], mode="linear")
     >>> hist.add(np.random.rand(1000))
     >>> hist.normalize()
-    >>> hist.save_txt("myhist.dat")
+    >>> hist.counts
     """
 
     def __init__(self, bin_edges: list[np.ndarray], mode="simple"):
@@ -163,43 +157,4 @@ class HistogramND:
             count_sum = self.data[field].sum()
             if count_sum > 0:
                 self.data[field] = self.data[field] / count_sum * total
-
-    def save_txt(self, filename: str, headers=None, fields=None):
-        """
-        Save histogram bin centers and specified fields to a text file.
-
-        Parameters
-        ----------
-        filename : str
-            Output file path.
-        headers : list of str, optional
-            Column headers (one per dimension plus one per field). If None, defaults
-            to ['bin_0', ..., 'bin_N', ...fields].
-        fields : list of str, optional
-            List of field names to write. If None, all fields in self.data are saved.
-
-        Notes
-        -----
-        The first column is left-aligned; all others are decimal-aligned for easier reading.
-        """
-        dims = len(self.bin_edges)
-        bin_centers = [0.5 * (edges[1:] + edges[:-1]) for edges in self.bin_edges]
-        mesh = np.meshgrid(*bin_centers, indexing="ij")
-        flat_centers = [m.flatten() for m in mesh]
-
-        # Choose which fields to write (defaults to all in self.data, in insertion order)
-        if fields is None:
-            fields = list(self.data.keys())
-        flat_data = [self.data[field].flatten() for field in fields]
-
-        if headers is None:
-            headers = [f"bin_{i}" for i in range(dims)] + list(fields)
-        elif len(headers) != dims + len(fields):
-            raise ValueError(f"headers must have {dims+len(fields)} entries, got {len(headers)}.")
-
-        with open(filename, "w") as f:
-            f.write("# " + f"{headers[0]:<12}" + " ".join(f"{h:>12}" for h in headers[1:]) + "\n")
-            for row in zip(*flat_centers, *flat_data):
-                center_str = f"{row[0]:<12.6f}" + "".join(f" {v:>12.6f}" for v in row[1:])
-                f.write(center_str + "\n")
 

@@ -8,7 +8,8 @@ from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundPar
 from analyses.base_analysis import BaseAnalysis
 from analyses.histogram import HistogramND
 from analyses.metrics import AngleMetric, Selector
-from utils import label_matches
+from analyses.selection import find_matching_labels
+from output_writer import build_output_filename, format_selection, write_histogram_1d
 
 
 @dataclass(frozen=True)
@@ -79,16 +80,8 @@ class ADF(BaseAnalysis):
 
     def configure(self, config: ADFConfig):
         self.config = config
-        compounds = self.get_compounds()
-        keys = list(self.traj.compounds.keys())
-
-        try:
-            self.ref_comp = compounds[config.ref_compound_index]
-            self.obs_comp = compounds[config.obs_compound_index]
-            self.ref_key = keys[config.ref_compound_index]
-            self.obs_key = keys[config.obs_compound_index]
-        except IndexError as exc:
-            raise ValueError("ADF compound index is out of range.") from exc
+        (self.ref_comp, self.ref_key), = self.resolve_compounds([config.ref_compound_index])
+        (self.obs_comp, self.obs_key), = self.resolve_compounds([config.obs_compound_index])
 
         self.ref_base_source = config.ref_base_source
         self.ref_tip_source = config.ref_tip_source
@@ -103,10 +96,9 @@ class ADF(BaseAnalysis):
         self.v1_cutoff = config.v1_cutoff
         self.v2_cutoff = config.v2_cutoff
 
-        self._update_vectors()
+        self.rebuild_runtime_state()
         if not all([self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids]):
             raise ValueError("No angle vectors matched the given labels in the initial frame.")
-        self._create_metric()
 
         self.n_ref = len(self.ref_comp.members)
         self.n_obs = len(self.obs_comp.members)
@@ -114,7 +106,7 @@ class ADF(BaseAnalysis):
         self.hist = HistogramND([self.angle_edges])
         self.mark_configured()
 
-    def _update_vectors(self):
+    def rebuild_runtime_state(self):
         self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids = build_vector_lists(
             self.ref_comp,
             self.obs_comp,
@@ -129,7 +121,6 @@ class ADF(BaseAnalysis):
             self.enforce_shared_atom,
         )
 
-    def _create_metric(self):
         self.metric = AngleMetric(
             selector_ref_base=Selector(np.array(self.ref_base_ids)),
             selector_ref_tip=Selector(np.array(self.ref_tip_ids)),
@@ -143,16 +134,14 @@ class ADF(BaseAnalysis):
 
     def post_compound_update(self):
         try:
-            self.ref_comp = self.traj.compounds[self.ref_key]
-            self.obs_comp = self.traj.compounds[self.obs_key]
+            self.ref_comp, self.obs_comp = self.reattach_compounds([self.ref_key, self.obs_key])
         except KeyError:
             return False
 
-        self._update_vectors()
+        self.rebuild_runtime_state()
         if not all([self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids]):
             return False
 
-        self._create_metric()
         self.n_ref = (self.n_ref * self.processed_frames + len(self.ref_comp.members)) / (self.processed_frames + 1)
         self.n_obs = (self.n_obs * self.processed_frames + len(self.obs_comp.members)) / (self.processed_frames + 1)
         return True
@@ -173,18 +162,17 @@ class ADF(BaseAnalysis):
             self.hist.counts /= (self.processed_frames * self.n_ref * self.n_obs)
 
         self.hist.normalize(method="total", total=self.bin_count * 100)
-        self.hist.save_txt("adf.dat")
-        print("ADF results saved to adf.dat")
-
-
-def find_matching_labels(mol, user_labels):
-    if isinstance(user_labels, str):
-        user_labels = [user_labels]
-    return [
-        idx for label, idx in mol.label_to_global_id.items()
-        if any(label_matches(user_label, label) for user_label in user_labels)
-    ]
-
+        fname = build_output_filename(
+            "adf",
+            [
+                format_selection(self.ref_base_labels, self.ref_comp.rep),
+                format_selection(self.ref_tip_labels, self.ref_comp.rep),
+                format_selection(self.obs_base_labels, self.obs_comp.rep),
+                format_selection(self.obs_tip_labels, self.obs_comp.rep),
+            ],
+        )
+        write_histogram_1d(fname, self.hist)
+        print(f"Saved ADF results to {fname}")
 
 def build_vector_lists(
     ref_comp,

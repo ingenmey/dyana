@@ -7,6 +7,7 @@ from analyses.histogram import HistogramND
 from analyses.selection import collect_atom_indices
 from geometry import minimum_image
 from utils import prompt, prompt_int, prompt_yn, prompt_float
+from output_writer import write_histogram_1d
 
 class TetrahedralOrderAnalysis(BaseAnalysis):
     def setup(self):
@@ -121,7 +122,7 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
         total_q = self.hist_q.counts.sum()
         if total_q > 0:
             self.hist_q.normalize(field="count", method="total", total=100)
-            self.hist_q.save_txt("tetrahedral_q.dat", ["q", "P(q)"])
+            write_histogram_1d("tetrahedral_q.dat", self.hist_q, headers=["q", "P(q)"])
             print("\nTetrahedral orientational order distribution saved to tetrahedral_q.dat")
         else:
             print("No valid q values were accumulated.")
@@ -130,7 +131,7 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
         total_s = self.hist_s.counts.sum()
         if total_s > 0:
             self.hist_s.normalize(field="count", method="total", total=100)
-            self.hist_s.save_txt("tetrahedral_s.dat", ["S", "P(S)"])
+            write_histogram_1d("tetrahedral_s.dat", self.hist_s, headers=["S", "P(S)"])
             print("Tetrahedral translational order distribution saved to tetrahedral_s.dat")
         else:
             print("No valid S values were accumulated.")

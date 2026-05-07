@@ -7,6 +7,7 @@ import numpy as np
 from analysis_params import BoolParam, ChoiceParam, FloatParam
 from analyses.base_analysis import BaseAnalysis
 from analyses.histogram import HistogramND
+from output_writer import build_output_filename, write_histogram_1d
 
 
 @dataclass(frozen=True)
@@ -95,5 +96,6 @@ class DensityAnalysis(BaseAnalysis):
 
         sorted_reps = [self.all_compounds[k] for k in sorted(self.all_compounds)]
         headers = ["r/Angstrom"] + sorted_reps
-        self.hist.save_txt("density.dat", headers=headers, fields=sorted_reps)
-        print("\nDensity data saved to 'density.dat'.")
+        fname = build_output_filename("density")
+        write_histogram_1d(fname, self.hist, headers=headers, fields=sorted_reps)
+        print(f"Saved density results to {fname}")

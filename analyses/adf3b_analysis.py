@@ -6,6 +6,7 @@ from analyses.base_analysis import BaseAnalysis
 from geometry import minimum_image
 from utils import prompt, prompt_int, prompt_float, prompt_yn, label_matches
 from analyses.histogram import HistogramND
+from output_writer import write_histogram_1d
 
 class ADFThreeBody(BaseAnalysis):
     def setup(self):
@@ -94,7 +95,7 @@ class ADFThreeBody(BaseAnalysis):
             self.hist.counts /= (self.processed_frames * self.n_center * self.n_neigh1 * self.n_neigh2)
 
         self.hist.normalize(method="total", total=self.bin_count * 100)
-        self.hist.save_txt("adf_threebody.dat", ["Angle (deg)", "ADF"])
+        write_histogram_1d("adf_threebody.dat", self.hist, headers=["Angle (deg)", "ADF"])
 
         print("Three-body ADF results saved to adf_threebody.dat / adf_threebody.npy")
 
@@ -168,4 +169,3 @@ class ADFThreeBody(BaseAnalysis):
         cos_angles = np.clip(cos_angles, -1.0, 1.0)
         angles = np.arccos(cos_angles) * (180.0 / np.pi)
         return angles
-

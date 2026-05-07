@@ -28,7 +28,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
 
     def test_scripted_input_log_reproduces_reference_ncount(self):
         generated = self._run_ncount(input_log=NCOUNT_FIXTURES / "input.log")
-        reference = (NCOUNT_FIXTURES / "ncount.dat").read_text(encoding="utf-8")
+        reference = (NCOUNT_FIXTURES / "ncount_O-C4H8O_O-C4H8O.dat").read_text(encoding="utf-8")
         self.assertEqual(generated, reference)
 
     def test_programmatic_prepared_setup_path_reproduces_reference_ncount(self):
@@ -64,7 +64,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
                     )
                 )
                 analysis.run()
-                output = Path("ncount.dat")
+                output = Path("ncount_O-C4H8O_O-C4H8O.dat")
                 self.assertTrue(output.exists())
                 generated = output.read_text(encoding="utf-8")
             finally:
@@ -72,7 +72,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
                     traj.fin.close()
                 os.chdir(cwd)
 
-        reference = (NCOUNT_FIXTURES / "ncount.dat").read_text(encoding="utf-8")
+        reference = (NCOUNT_FIXTURES / "ncount_O-C4H8O_O-C4H8O.dat").read_text(encoding="utf-8")
         self.assertEqual(generated, reference)
         self.assertEqual(len(setup["compound_types"]), 3)
 
@@ -88,7 +88,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
                     str(LAMMPS_FIXTURE),
                     input_provider=provider,
                 )
-                output = Path("ncount.dat")
+                output = Path("ncount_O-C4H8O_O-C4H8O.dat")
                 self.assertTrue(output.exists())
                 return output.read_text(encoding="utf-8")
             finally:

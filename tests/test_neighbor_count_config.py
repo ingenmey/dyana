@@ -159,7 +159,7 @@ class NeighborCountConfigTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 analysis.run()
-                output = Path("ncount.dat")
+                output = Path("ncount_O-H2O_H-H2O+Na-Na.dat")
                 self.assertTrue(output.exists())
                 text = output.read_text(encoding="utf-8")
             finally:

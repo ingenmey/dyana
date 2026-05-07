@@ -151,7 +151,7 @@ class RDFConfigTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 rdf.postprocess()
-                output = Path("rdf_O_H.dat")
+                output = Path("rdf_O-OH_H-OH.dat")
                 self.assertTrue(output.exists())
                 text = output.read_text(encoding="utf-8")
             finally:
@@ -179,7 +179,7 @@ class RDFConfigTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 rdf.run()
-                self.assertTrue(Path("rdf_O_H.dat").exists())
+                self.assertTrue(Path("rdf_O-OH_H-OH.dat").exists())
             finally:
                 os.chdir(cwd)
 

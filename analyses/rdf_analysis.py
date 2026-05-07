@@ -11,6 +11,7 @@ from analyses.base_analysis import BaseAnalysis
 from analyses.histogram import HistogramND
 from analyses.metrics import DistanceMetric, Selector
 from analyses.selection import collect_atom_indices
+from output_writer import build_output_filename, format_selection, write_histogram_1d
 
 
 @dataclass(frozen=True)
@@ -62,23 +63,15 @@ class RDF(BaseAnalysis):
 
     def configure(self, config: RDFConfig):
         self.config = config
-        compounds = self.get_compounds()
-        keys = list(self.traj.compounds.keys())
-
-        try:
-            self.ref_comp = compounds[config.ref_compound_index]
-            self.obs_comp = compounds[config.obs_compound_index]
-            self.ref_key = keys[config.ref_compound_index]
-            self.obs_key = keys[config.obs_compound_index]
-        except IndexError as exc:
-            raise ValueError("RDF compound index is out of range.") from exc
+        (self.ref_comp, self.ref_key), = self.resolve_compounds([config.ref_compound_index])
+        (self.obs_comp, self.obs_key), = self.resolve_compounds([config.obs_compound_index])
 
         self.ref_labels = list(config.ref_labels)
         self.obs_labels = list(config.obs_labels)
         self.max_distance = config.max_distance
         self.bin_count = config.bin_count
 
-        self.update_selectors()
+        self.rebuild_runtime_state()
         self.n_ref = len(self.ref_indices)
         self.n_obs = len(self.obs_indices)
         edges = np.linspace(0.0, self.max_distance, self.bin_count + 1)
@@ -86,7 +79,7 @@ class RDF(BaseAnalysis):
         self.box_volume = np.prod(self.traj.box_size)
         self.mark_configured()
 
-    def update_selectors(self):
+    def rebuild_runtime_state(self):
         self.ref_indices = collect_atom_indices(self.ref_comp, self.ref_labels)
         self.obs_indices = collect_atom_indices(self.obs_comp, self.obs_labels)
 
@@ -102,12 +95,11 @@ class RDF(BaseAnalysis):
 
     def post_compound_update(self):
         try:
-            self.ref_comp = self.traj.compounds[self.ref_key]
-            self.obs_comp = self.traj.compounds[self.obs_key]
+            self.ref_comp, self.obs_comp = self.reattach_compounds([self.ref_key, self.obs_key])
         except KeyError:
             return False
 
-        self.update_selectors()
+        self.rebuild_runtime_state()
         self.n_ref = (
             (self.n_ref * self.processed_frames + len(self.ref_indices))
             / (self.processed_frames + 1)
@@ -136,11 +128,13 @@ class RDF(BaseAnalysis):
         number_integral = obs_density * np.cumsum(self.hist.counts * shell_volumes)
         self.hist.data["number_integral"] = number_integral
 
-        fname = f"rdf_{_label_str(self.ref_labels)}_{_label_str(self.obs_labels)}.dat"
-        self.hist.save_txt(fname, ["r/Angstrom", "g(r)", "N(r)"])
+        fname = build_output_filename(
+            "rdf",
+            [
+                format_selection(self.ref_labels, self.ref_comp.rep),
+                format_selection(self.obs_labels, self.obs_comp.rep),
+            ],
+        )
+        write_histogram_1d(fname, self.hist, headers=["r/Angstrom", "g(r)", "N(r)"], fields=["count", "number_integral"])
 
-        print(f"RDF and number-integral saved to {fname}")
-
-
-def _label_str(labels):
-    return "_".join(label.replace(" ", "") for label in labels)
+        print(f"Saved RDF results to {fname}")

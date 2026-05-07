@@ -8,6 +8,7 @@ from scipy.spatial import cKDTree
 from analysis_params import AtomLabelsParam, BoolParam, CompoundParam, FloatParam, ForEach
 from analyses.base_analysis import BaseAnalysis
 from analyses.selection import build_atom_to_molecule, collect_indices_for_compounds, collect_atom_indices
+from output_writer import build_output_filename, format_selection, format_selection_group, write_table
 
 
 @dataclass(frozen=True)
@@ -91,26 +92,20 @@ class NeighborCountAnalysis(BaseAnalysis):
 
     def configure(self, config: NeighborCountConfig):
         self.config = config
-        compounds = self.get_compounds()
-        keys = list(self.traj.compounds.keys())
-
-        try:
-            self.ref_comp = compounds[config.ref_compound_index]
-            self.ref_key = keys[config.ref_compound_index]
-            self.obs_comps = [compounds[idx] for idx in config.obs_compound_indices]
-            self.obs_keys = [keys[idx] for idx in config.obs_compound_indices]
-        except IndexError as exc:
-            raise ValueError("Neighbor-count compound index is out of range.") from exc
+        (self.ref_comp, self.ref_key), = self.resolve_compounds([config.ref_compound_index])
+        resolved_obs = self.resolve_compounds(config.obs_compound_indices)
+        self.obs_comps = [comp for comp, _ in resolved_obs]
+        self.obs_keys = [key for _, key in resolved_obs]
 
         self.ref_labels = list(config.ref_labels)
         self.obs_labels_per_compound = {
-            keys[idx]: list(config.obs_labels_per_compound[idx])
-            for idx in config.obs_compound_indices
+            key: list(config.obs_labels_per_compound[idx])
+            for idx, key in zip(config.obs_compound_indices, self.obs_keys)
         }
         self.exclude_same_molecule = config.exclude_same_molecule
         self.r_cut = config.r_cut
 
-        self._update_indices()
+        self.rebuild_runtime_state()
         if not self.ref_indices or not self.obs_indices:
             raise ValueError("No atoms matched the given labels in the initial frame.")
 
@@ -118,7 +113,7 @@ class NeighborCountAnalysis(BaseAnalysis):
         self.total_ref_atoms = 0
         self.mark_configured()
 
-    def _update_indices(self):
+    def rebuild_runtime_state(self):
         self.ref_indices = collect_atom_indices(self.ref_comp, self.ref_labels)
         self.obs_indices = collect_indices_for_compounds(self.obs_comps, self.obs_labels_per_compound, self.obs_keys)
         self.ref_atom_to_mol = build_atom_to_molecule(self.ref_comp)
@@ -128,12 +123,12 @@ class NeighborCountAnalysis(BaseAnalysis):
 
     def post_compound_update(self):
         try:
-            self.ref_comp = self.traj.compounds[self.ref_key]
-            self.obs_comps = [self.traj.compounds[k] for k in self.obs_keys]
+            self.ref_comp = self.reattach_compounds([self.ref_key])[0]
+            self.obs_comps = self.reattach_compounds(self.obs_keys)
         except KeyError:
             return False
 
-        self._update_indices()
+        self.rebuild_runtime_state()
         if not self.ref_indices or not self.obs_indices:
             return False
         return True
@@ -167,8 +162,6 @@ class NeighborCountAnalysis(BaseAnalysis):
             self.n_hist[count] += 1
 
     def postprocess(self):
-        print()
-
         if self.total_ref_atoms == 0:
             print("No reference atoms found - nothing to write.")
             return
@@ -176,11 +169,22 @@ class NeighborCountAnalysis(BaseAnalysis):
         max_n = max(self.n_hist) if self.n_hist else 0
         probs = {n: self.n_hist[n] / self.total_ref_atoms for n in range(max_n + 1)}
 
-        fname = "ncount.dat"
-        with open(fname, "w", encoding="utf-8") as f:
-            f.write(f"# P(n)   cutoff = {self.r_cut:.2f} Angstrom\n")
-            f.write("#  n   P(n)\n")
-            for n in range(max_n + 1):
-                f.write(f"{n:3d}  {probs.get(n, 0.0):.6f}\n")
+        observed_pairs = [
+            (self.obs_labels_per_compound[key], comp.rep)
+            for key, comp in zip(self.obs_keys, self.obs_comps)
+        ]
+        fname = build_output_filename(
+            "ncount",
+            [
+                format_selection(self.ref_labels, self.ref_comp.rep),
+                format_selection_group(observed_pairs),
+            ],
+        )
+        write_table(
+            fname,
+            headers=["n", "P(n)"],
+            data=[[n, probs.get(n, 0.0)] for n in range(max_n + 1)],
+            comment_lines=[f"P(n)   cutoff = {self.r_cut:.2f} Angstrom"],
+        )
 
-        print(f"Neighbour-count distribution written to {fname}")
+        print(f"Saved neighbour-count results to {fname}")
