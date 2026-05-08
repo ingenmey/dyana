@@ -10,7 +10,6 @@ from analysis_params import AtomLabelsParam, CompoundParam, FloatParam, IntParam
 from analyses.base_analysis import BaseAnalysis
 from analyses.histogram import HistogramND
 from analyses.metrics import DistanceMetric, Selector
-from analyses.selection import collect_atom_indices
 from output_writer import build_output_filename, format_selection, write_histogram_1d
 
 
@@ -63,28 +62,38 @@ class RDF(BaseAnalysis):
 
     def configure(self, config: RDFConfig):
         self.config = config
-        (self.ref_comp, self.ref_key), = self.resolve_compounds([config.ref_compound_index])
-        (self.obs_comp, self.obs_key), = self.resolve_compounds([config.obs_compound_index])
+        (self.ref_type, self.ref_key), = self.resolve_compound_types([config.ref_compound_index])
+        (self.obs_type, self.obs_key), = self.resolve_compound_types([config.obs_compound_index])
+        topology_frame = self.traj.topology_frame
 
         self.ref_labels = list(config.ref_labels)
         self.obs_labels = list(config.obs_labels)
         self.max_distance = config.max_distance
         self.bin_count = config.bin_count
+        self.ref_selection = topology_frame.resolve_selection(self.ref_type, self.ref_labels)
+        self.obs_selection = topology_frame.resolve_selection(self.obs_type, self.obs_labels)
 
         self.rebuild_runtime_state()
-        self.n_ref = len(self.ref_indices)
-        self.n_obs = len(self.obs_indices)
+        self.n_ref = int(self.ref_indices.size)
+        self.n_obs = int(self.obs_indices.size)
         edges = np.linspace(0.0, self.max_distance, self.bin_count + 1)
         self.hist = HistogramND([edges], "linear")
         self.box_volume = np.prod(self.traj.box_size)
         self.mark_configured()
 
     def rebuild_runtime_state(self):
-        self.ref_indices = collect_atom_indices(self.ref_comp, self.ref_labels)
-        self.obs_indices = collect_atom_indices(self.obs_comp, self.obs_labels)
+        topology_frame = self.traj.topology_frame
+        self.ref_indices = topology_frame.get_atom_indices_for_local_indices(
+            self.ref_type,
+            self.ref_selection.local_indices,
+        )
+        self.obs_indices = topology_frame.get_atom_indices_for_local_indices(
+            self.obs_type,
+            self.obs_selection.local_indices,
+        )
 
-        self.ref_sel = Selector(np.array(self.ref_indices))
-        self.obs_sel = Selector(np.array(self.obs_indices))
+        self.ref_sel = Selector(self.ref_indices)
+        self.obs_sel = Selector(self.obs_indices)
 
         self.metric = DistanceMetric(
             self.ref_sel,
@@ -94,18 +103,18 @@ class RDF(BaseAnalysis):
         )
 
     def post_compound_update(self):
-        try:
-            self.ref_comp, self.obs_comp = self.reattach_compounds([self.ref_key, self.obs_key])
-        except KeyError:
+        topology_frame = self.traj.topology_frame
+        if not topology_frame.has_compound_type_key(self.ref_key) or not topology_frame.has_compound_type_key(self.obs_key):
             return False
+        self.ref_type, self.obs_type = self.reattach_compound_types([self.ref_key, self.obs_key])
 
         self.rebuild_runtime_state()
         self.n_ref = (
-            (self.n_ref * self.processed_frames + len(self.ref_indices))
+            (self.n_ref * self.processed_frames + int(self.ref_indices.size))
             / (self.processed_frames + 1)
         )
         self.n_obs = (
-            (self.n_obs * self.processed_frames + len(self.obs_indices))
+            (self.n_obs * self.processed_frames + int(self.obs_indices.size))
             / (self.processed_frames + 1)
         )
         return True
@@ -131,8 +140,8 @@ class RDF(BaseAnalysis):
         fname = build_output_filename(
             "rdf",
             [
-                format_selection(self.ref_labels, self.ref_comp.rep),
-                format_selection(self.obs_labels, self.obs_comp.rep),
+                format_selection(self.ref_labels, self.ref_type.rep),
+                format_selection(self.obs_labels, self.obs_type.rep),
             ],
         )
         write_histogram_1d(fname, self.hist, headers=["r/Angstrom", "g(r)", "N(r)"], fields=["count", "number_integral"])

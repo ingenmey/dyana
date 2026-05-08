@@ -67,20 +67,25 @@ class WorkflowPrompts:
         traj.guess_molecules()
 
         while True:
-            for i, compound in enumerate(traj.compounds.values()):
-                count = len(compound.members)
-                print(f"Compound {i + 1}: {compound.rep}, Number: {count}")
+            compound_types = list(traj.topology_frame.get_compound_types())
+            for i, compound_type in enumerate(compound_types):
+                count = traj.topology_frame.get_member_count(compound_type)
+                print(f"Compound {i + 1}: {compound_type.rep}, Number: {count}")
 
-            for i, compound in enumerate(traj.compounds.values()):
-                compound.average_bond_lengths()
+            for i, compound_type in enumerate(compound_types):
+                bond_lengths = traj.topology_frame.get_average_bond_lengths(
+                    compound_type,
+                    traj.coords,
+                    traj.box_size,
+                )
                 print(f"\nCompound {i + 1} Bond Length Matrix:")
 
-                labels = list(compound.members[0].label_to_id.keys())
+                labels = list(compound_type.canonical_labels)
                 size = len(labels)
                 matrix = [["-  " for _ in range(size)] for _ in range(size)]
                 label_to_index = {label: idx for idx, label in enumerate(labels)}
 
-                for bond, length in compound.bond_lengths.items():
+                for bond, length in bond_lengths.items():
                     label1, label2 = bond.split()
                     idx1, idx2 = label_to_index[label1], label_to_index[label2]
                     matrix[idx1][idx2] = f"{length:.4f}"
@@ -94,8 +99,8 @@ class WorkflowPrompts:
 
             should_draw_compounds = input_provider.ask_bool("Draw compounds to PDF?", False)
             if should_draw_compounds:
-                for compound in traj.compounds.values():
-                    compound.members[0].draw_graph(compound.comp_id + 1)
+                for compound_type in compound_types:
+                    compound_type.draw_graph(compound_type.type_id + 1)
 
             is_keep_compounds = input_provider.ask_bool("Accept these molecules (y) or change something (n)", True)
             if is_keep_compounds:
@@ -118,15 +123,16 @@ class WorkflowPrompts:
         input_provider = self.get_input_provider(provider)
         while True:
             print("\nCurrent Compounds:")
-            for i, compound in enumerate(traj.compounds.values(), start=1):
-                print(f"{i}: {compound.rep}")
+            compound_types = list(traj.topology_frame.get_compound_types())
+            for i, compound_type in enumerate(compound_types, start=1):
+                print(f"{i}: {compound_type.rep}")
 
             comp_id = input_provider.ask_int("Which compound to modify?", -1, "[done]") - 1
             if comp_id < 0:
                 break
 
             try:
-                compound = list(traj.compounds.values())[comp_id]
+                compound_type = compound_types[comp_id]
             except (ValueError, IndexError):
                 print("Invalid compound number.")
                 continue
@@ -134,16 +140,16 @@ class WorkflowPrompts:
             atom1 = input_provider.ask_str("First atom label to break bond (e.g., O1): ").strip()
             atom2 = input_provider.ask_str("Second atom label to break bond (e.g., H2): ").strip()
 
-            try:
-                compound.members[0].label_to_global_id[atom1]
-                compound.members[0].label_to_global_id[atom2]
-            except KeyError:
+            if atom1 not in compound_type.label_to_local_index or atom2 not in compound_type.label_to_local_index:
                 print("Invalid atom label(s). Try again.")
                 continue
 
-            for molecule in compound.members:
-                global_idx1 = molecule.label_to_global_id[atom1]
-                global_idx2 = molecule.label_to_global_id[atom2]
+            local_idx1 = compound_type.label_to_local_index[atom1]
+            local_idx2 = compound_type.label_to_local_index[atom2]
+            member_atom_ids = traj.topology_frame.get_member_atom_ids(compound_type)
+            for atom_ids in member_atom_ids:
+                global_idx1 = int(atom_ids[local_idx1])
+                global_idx2 = int(atom_ids[local_idx2])
                 traj.forbidden_bonds.add((min(global_idx1, global_idx2), max(global_idx1, global_idx2)))
 
             print(f"Added forbidden bond between {atom1} and {atom2}.")

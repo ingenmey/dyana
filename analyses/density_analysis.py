@@ -61,35 +61,44 @@ class DensityAnalysis(BaseAnalysis):
         if self.per_compound_normalization:
             self.compound_frame_counts = {}
 
-        for comp_key, comp in self.traj.compounds.items():
-            self.hist.add_data_field(field=comp.rep)
-            self.all_compounds[comp_key] = comp.rep
+        for compound_type in self.get_compound_types():
+            self.hist.add_data_field(field=compound_type.rep)
+            self.all_compounds[compound_type.key] = compound_type.rep
             if self.per_compound_normalization:
-                self.compound_frame_counts[comp_key] = 0
+                self.compound_frame_counts[compound_type.key] = 0
 
         self.mark_configured()
 
     def post_compound_update(self):
-        for comp_key, comp in self.traj.compounds.items():
-            if comp.rep not in self.hist.data:
-                self.hist.add_data_field(field=comp.rep)
-                self.all_compounds[comp_key] = comp.rep
+        for compound_type in self.get_compound_types():
+            if compound_type.rep not in self.hist.data:
+                self.hist.add_data_field(field=compound_type.rep)
+                self.all_compounds[compound_type.key] = compound_type.rep
             if self.per_compound_normalization:
-                if comp_key not in self.compound_frame_counts:
-                    self.compound_frame_counts[comp_key] = 0
-                self.compound_frame_counts[comp_key] += 1
+                if compound_type.key not in self.compound_frame_counts:
+                    self.compound_frame_counts[compound_type.key] = 0
         return True
 
     def process_frame(self):
-        for compound in self.traj.compounds.values():
-            coms = np.array([mol.com[self.axis_index] for mol in compound.members])
+        topology_frame = self.traj.topology_frame
+        for compound_type in self.get_compound_types():
+            coms = topology_frame.get_member_coms(
+                compound_type,
+                coords=self.traj.coords,
+                box_size=self.traj.box_size,
+            )[:, self.axis_index]
             if len(coms) > 0:
-                self.hist.add(coms, field=compound.rep)
+                self.hist.add(coms, field=compound_type.rep)
+
+            if self.per_compound_normalization:
+                self.compound_frame_counts[compound_type.key] = self.compound_frame_counts.get(compound_type.key, 0) + 1
 
     def postprocess(self):
         for comp_key, rep in self.all_compounds.items():
             if self.per_compound_normalization:
-                frames = self.compound_frame_counts.get(comp_key, 1)
+                frames = self.compound_frame_counts.get(comp_key, 0)
+                if frames == 0:
+                    continue
                 self.hist.data[rep] /= frames
             else:
                 self.hist.data[rep] /= self.processed_frames

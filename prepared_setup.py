@@ -31,6 +31,10 @@ class PreparedSetup:
 
 
 def build_prepared_setup(traj, traj_file: str, traj_format: str, cell_vectors) -> PreparedSetup:
+    observed_counts = Counter()
+    for compound_type in traj.topology_registry:
+        observed_counts[compound_type.rep] += traj.topology_frame.get_member_count(compound_type)
+
     payload = {
         "format_version": 1,
         "recipe": {
@@ -44,7 +48,7 @@ def build_prepared_setup(traj, traj_file: str, traj_format: str, cell_vectors) -
         "compound_types": _compound_type_entries(traj),
         "metadata": {
             "source_file": str(traj_file),
-            "observed_counts": dict(sorted(Counter(comp.rep for comp in traj.compounds.values()).items())),
+            "observed_counts": dict(sorted(observed_counts.items())),
             "saved_at": datetime.now(timezone.utc).isoformat(),
         },
     }
@@ -118,16 +122,15 @@ def _validate_recipe_compatibility(recipe):
 
 def _compound_type_entries(traj):
     entries = []
-    for compound in traj.compounds.values():
-        formula_str, bond_types, graph_hash = compound.key
-        labels = sorted(compound.members[0].label_to_id.keys()) if compound.members else []
+    for compound_type in traj.topology_registry:
+        formula_str, bond_types, graph_hash = compound_type.key
         entries.append(
             {
-                "rep": compound.rep,
+                "rep": compound_type.rep,
                 "formula": formula_str,
                 "bond_types": [list(pair) for pair in bond_types],
                 "graph_hash": graph_hash,
-                "labels": labels,
+                "labels": list(compound_type.canonical_labels),
             }
         )
     entries.sort(key=_compound_signature)

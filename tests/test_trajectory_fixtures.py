@@ -36,19 +36,30 @@ class TrajectoryFixtureTests(unittest.TestCase):
         np.testing.assert_allclose(traj.box_size, [30.5247410713473] * 3)
         self.assertEqual(traj.symbols[:2], ["Ca", "Ca"])
 
-    def test_water_fixture_recognizes_one_h2o_compound(self):
+    def test_water_fixture_builds_topology_registry_and_frame(self):
         with open(FIXTURES / "water128.xyz", "r") as fin:
             traj = load_trajectory(fin, "xyz", np.array([15.67, 15.67, 15.67]))
             traj.read_frame()
             traj.guess_molecules()
 
-        compounds = list(traj.compounds.values())
-        self.assertEqual(len(compounds), 1)
-        self.assertEqual(compounds[0].rep, "H2O")
-        self.assertEqual(len(compounds[0].members), 128)
+        self.assertIsNotNone(traj.topology_registry)
+        self.assertIsNotNone(traj.topology_frame)
 
-        labels = set(compounds[0].members[0].label_to_id)
-        self.assertEqual(labels, {"H1", "H2", "O1"})
+        compound_types = traj.topology_frame.get_compound_types()
+        self.assertEqual(len(compound_types), 1)
+        water_type = compound_types[0]
+        self.assertEqual(water_type.rep, "H2O")
+        self.assertEqual(set(water_type.canonical_labels), {"H1", "H2", "O1"})
+
+        member_atom_ids = traj.topology_frame.get_member_atom_ids(water_type)
+        self.assertEqual(member_atom_ids.shape, (128, 3))
+        self.assertEqual(len(traj.topology_frame.get_atom_indices(water_type, ["O"])), 128)
+        self.assertEqual(len(traj.topology_frame.get_atom_indices(water_type, ["H"])), 256)
+
+        atom_type_id, member_index, local_index = traj.topology_frame.get_atom_location(int(member_atom_ids[0, 0]))
+        self.assertEqual(atom_type_id, water_type.type_id)
+        self.assertEqual(member_index, 0)
+        self.assertEqual(local_index, 0)
 
 
 if __name__ == "__main__":

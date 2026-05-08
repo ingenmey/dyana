@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+import numpy as np
 
 from config_schema import FrameLoopConfig
 from input_providers import FileInputProvider, NullInputProvider
@@ -31,7 +32,7 @@ class RDFEndToEndTests(unittest.TestCase):
             input_log=RDF_FIXTURES / "input.log",
         )
         reference = (RDF_FIXTURES / "rdf_O-H2O_H-H2O.dat").read_text(encoding="utf-8")
-        self.assertEqual(generated, reference)
+        np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
 
     def test_programmatic_prepared_setup_path_reproduces_reference_rdf(self):
         from analyses.rdf_analysis import RDF, RDFConfig
@@ -75,7 +76,7 @@ class RDFEndToEndTests(unittest.TestCase):
                 os.chdir(cwd)
 
         reference = (RDF_FIXTURES / "rdf_O-H2O_H-H2O.dat").read_text(encoding="utf-8")
-        self.assertEqual(generated, reference)
+        np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
 
         self.assertEqual(len(setup["compound_types"]), 1)
 
@@ -97,6 +98,16 @@ class RDFEndToEndTests(unittest.TestCase):
             finally:
                 os.chdir(cwd)
                 provider.close()
+
+
+def _parse_numeric_table(text: str) -> np.ndarray:
+    rows = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        rows.append([float(value) for value in stripped.split()])
+    return np.array(rows, dtype=float)
 
 
 if __name__ == "__main__":

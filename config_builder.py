@@ -135,7 +135,7 @@ def _prompt_atom_labels(param, context):
     compound = None
     if param.compound is not None:
         compound_idx = _resolve_name(param.compound, context)
-        compound = context.owner.compound_by_index(compound_idx)
+        compound = context.owner.compound_type_by_index(compound_idx)
 
     return context.owner.atom_selection(
         role=param.role,

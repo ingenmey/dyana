@@ -8,7 +8,6 @@ from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundPar
 from analyses.base_analysis import BaseAnalysis
 from analyses.histogram import HistogramND
 from analyses.metrics import AngleMetric, Selector
-from analyses.selection import find_matching_labels
 from output_writer import build_output_filename, format_selection, write_histogram_1d
 
 
@@ -80,8 +79,9 @@ class ADF(BaseAnalysis):
 
     def configure(self, config: ADFConfig):
         self.config = config
-        (self.ref_comp, self.ref_key), = self.resolve_compounds([config.ref_compound_index])
-        (self.obs_comp, self.obs_key), = self.resolve_compounds([config.obs_compound_index])
+        (self.ref_type, self.ref_key), = self.resolve_compound_types([config.ref_compound_index])
+        (self.obs_type, self.obs_key), = self.resolve_compound_types([config.obs_compound_index])
+        topology_frame = self.traj.topology_frame
 
         self.ref_base_source = config.ref_base_source
         self.ref_tip_source = config.ref_tip_source
@@ -95,37 +95,56 @@ class ADF(BaseAnalysis):
         self.bin_count = config.bin_count
         self.v1_cutoff = config.v1_cutoff
         self.v2_cutoff = config.v2_cutoff
+        self.ref_base_selection = topology_frame.resolve_selection(
+            self.ref_type if self.ref_base_source == "r" else self.obs_type,
+            self.ref_base_labels,
+        )
+        self.ref_tip_selection = topology_frame.resolve_selection(
+            self.ref_type if self.ref_tip_source == "r" else self.obs_type,
+            self.ref_tip_labels,
+        )
+        self.obs_base_selection = topology_frame.resolve_selection(
+            self.obs_type if self.obs_base_source == "o" else self.ref_type,
+            self.obs_base_labels,
+        )
+        self.obs_tip_selection = topology_frame.resolve_selection(
+            self.obs_type if self.obs_tip_source == "o" else self.ref_type,
+            self.obs_tip_labels,
+        )
 
         self.rebuild_runtime_state()
-        if not all([self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids]):
+        if any(arr.size == 0 for arr in (self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids)):
             raise ValueError("No angle vectors matched the given labels in the initial frame.")
 
-        self.n_ref = len(self.ref_comp.members)
-        self.n_obs = len(self.obs_comp.members)
+        topology_frame = self.traj.topology_frame
+        self.n_ref = topology_frame.get_member_count(self.ref_type)
+        self.n_obs = topology_frame.get_member_count(self.obs_type)
         self.angle_edges = np.linspace(0, 180, self.bin_count + 1)
         self.hist = HistogramND([self.angle_edges])
         self.mark_configured()
 
     def rebuild_runtime_state(self):
+        topology_frame = self.traj.topology_frame
         self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids = build_vector_lists(
-            self.ref_comp,
-            self.obs_comp,
+            topology_frame,
+            self.ref_type,
+            self.obs_type,
             self.ref_base_source,
             self.ref_tip_source,
             self.obs_base_source,
             self.obs_tip_source,
-            self.ref_base_labels,
-            self.ref_tip_labels,
-            self.obs_base_labels,
-            self.obs_tip_labels,
+            self.ref_base_selection.local_indices,
+            self.ref_tip_selection.local_indices,
+            self.obs_base_selection.local_indices,
+            self.obs_tip_selection.local_indices,
             self.enforce_shared_atom,
         )
 
         self.metric = AngleMetric(
-            selector_ref_base=Selector(np.array(self.ref_base_ids)),
-            selector_ref_tip=Selector(np.array(self.ref_tip_ids)),
-            selector_obs_base=Selector(np.array(self.obs_base_ids)),
-            selector_obs_tip=Selector(np.array(self.obs_tip_ids)),
+            selector_ref_base=Selector(self.ref_base_ids),
+            selector_ref_tip=Selector(self.ref_tip_ids),
+            selector_obs_base=Selector(self.obs_base_ids),
+            selector_obs_tip=Selector(self.obs_tip_ids),
             box=self.traj.box_size,
             enforce_shared_atom=self.enforce_shared_atom,
             v1_cutoff=self.v1_cutoff,
@@ -133,17 +152,21 @@ class ADF(BaseAnalysis):
         )
 
     def post_compound_update(self):
-        try:
-            self.ref_comp, self.obs_comp = self.reattach_compounds([self.ref_key, self.obs_key])
-        except KeyError:
+        topology_frame = self.traj.topology_frame
+        if not topology_frame.has_compound_type_key(self.ref_key) or not topology_frame.has_compound_type_key(self.obs_key):
             return False
+        self.ref_type, self.obs_type = self.reattach_compound_types([self.ref_key, self.obs_key])
 
         self.rebuild_runtime_state()
-        if not all([self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids]):
+        if any(arr.size == 0 for arr in (self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids)):
             return False
 
-        self.n_ref = (self.n_ref * self.processed_frames + len(self.ref_comp.members)) / (self.processed_frames + 1)
-        self.n_obs = (self.n_obs * self.processed_frames + len(self.obs_comp.members)) / (self.processed_frames + 1)
+        self.n_ref = (
+            self.n_ref * self.processed_frames + topology_frame.get_member_count(self.ref_type)
+        ) / (self.processed_frames + 1)
+        self.n_obs = (
+            self.n_obs * self.processed_frames + topology_frame.get_member_count(self.obs_type)
+        ) / (self.processed_frames + 1)
         return True
 
     def process_frame(self):
@@ -165,45 +188,53 @@ class ADF(BaseAnalysis):
         fname = build_output_filename(
             "adf",
             [
-                format_selection(self.ref_base_labels, self.ref_comp.rep),
-                format_selection(self.ref_tip_labels, self.ref_comp.rep),
-                format_selection(self.obs_base_labels, self.obs_comp.rep),
-                format_selection(self.obs_tip_labels, self.obs_comp.rep),
+                format_selection(self.ref_base_labels, self.ref_type.rep if self.ref_base_source == "r" else self.obs_type.rep),
+                format_selection(self.ref_tip_labels, self.ref_type.rep if self.ref_tip_source == "r" else self.obs_type.rep),
+                format_selection(self.obs_base_labels, self.obs_type.rep if self.obs_base_source == "o" else self.ref_type.rep),
+                format_selection(self.obs_tip_labels, self.obs_type.rep if self.obs_tip_source == "o" else self.ref_type.rep),
             ],
         )
         write_histogram_1d(fname, self.hist)
         print(f"Saved ADF results to {fname}")
 
 def build_vector_lists(
-    ref_comp,
-    obs_comp,
+    topology_frame,
+    ref_type,
+    obs_type,
     ref_base_source,
     ref_tip_source,
     obs_base_source,
     obs_tip_source,
-    ref_base_labels,
-    ref_tip_labels,
-    obs_base_labels,
-    obs_tip_labels,
+    ref_base_local_indices,
+    ref_tip_local_indices,
+    obs_base_local_indices,
+    obs_tip_local_indices,
     enforce_shared_atom,
 ):
-    ref_base_ids, ref_tip_ids = [], []
-    obs_base_ids, obs_tip_ids = [], []
+    ref_members = topology_frame.get_member_atom_ids(ref_type)
+    obs_members = topology_frame.get_member_atom_ids(obs_type)
 
-    for ref_mol in ref_comp.members:
-        for obs_mol in obs_comp.members:
-            if ref_mol == obs_mol:
+    ref_base_ids = []
+    ref_tip_ids = []
+    obs_base_ids = []
+    obs_tip_ids = []
+
+    same_type = ref_type.key == obs_type.key
+
+    for ref_member_index, ref_atom_ids in enumerate(ref_members):
+        for obs_member_index, obs_atom_ids in enumerate(obs_members):
+            if same_type and ref_member_index == obs_member_index:
                 continue
 
-            rb_mol = ref_mol if ref_base_source == "r" else obs_mol
-            rt_mol = ref_mol if ref_tip_source == "r" else obs_mol
-            ob_mol = obs_mol if obs_base_source == "o" else ref_mol
-            ot_mol = obs_mol if obs_tip_source == "o" else ref_mol
+            rb_source = ref_atom_ids if ref_base_source == "r" else obs_atom_ids
+            rt_source = ref_atom_ids if ref_tip_source == "r" else obs_atom_ids
+            ob_source = obs_atom_ids if obs_base_source == "o" else ref_atom_ids
+            ot_source = obs_atom_ids if obs_tip_source == "o" else ref_atom_ids
 
-            rb_ids = find_matching_labels(rb_mol, ref_base_labels)
-            rt_ids = find_matching_labels(rt_mol, ref_tip_labels)
-            ob_ids = find_matching_labels(ob_mol, obs_base_labels)
-            ot_ids = find_matching_labels(ot_mol, obs_tip_labels)
+            rb_ids = rb_source[list(ref_base_local_indices)]
+            rt_ids = rt_source[list(ref_tip_local_indices)]
+            ob_ids = ob_source[list(obs_base_local_indices)]
+            ot_ids = ot_source[list(obs_tip_local_indices)]
 
             for rb in rb_ids:
                 for rt in rt_ids:
@@ -211,9 +242,14 @@ def build_vector_lists(
                         if enforce_shared_atom and rt != ob:
                             continue
                         for ot in ot_ids:
-                            ref_base_ids.append(rb)
-                            ref_tip_ids.append(rt)
-                            obs_base_ids.append(ob)
-                            obs_tip_ids.append(ot)
+                            ref_base_ids.append(int(rb))
+                            ref_tip_ids.append(int(rt))
+                            obs_base_ids.append(int(ob))
+                            obs_tip_ids.append(int(ot))
 
-    return ref_base_ids, ref_tip_ids, obs_base_ids, obs_tip_ids
+    return (
+        np.asarray(ref_base_ids, dtype=np.int32),
+        np.asarray(ref_tip_ids, dtype=np.int32),
+        np.asarray(obs_base_ids, dtype=np.int32),
+        np.asarray(obs_tip_ids, dtype=np.int32),
+    )

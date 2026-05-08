@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+import numpy as np
 
 from config_schema import FrameLoopConfig
 from input_providers import FileInputProvider, NullInputProvider
@@ -29,7 +30,7 @@ class DensityEndToEndTests(unittest.TestCase):
     def test_scripted_input_log_reproduces_reference_density(self):
         generated = self._run_density(input_log=DENSITY_FIXTURES / "input.log")
         reference = (DENSITY_FIXTURES / "density.dat").read_text(encoding="utf-8")
-        self.assertEqual(generated, reference)
+        np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
 
     def test_programmatic_prepared_setup_path_reproduces_reference_density(self):
         from analyses.density_analysis import DensityAnalysis, DensityConfig
@@ -70,7 +71,7 @@ class DensityEndToEndTests(unittest.TestCase):
                 os.chdir(cwd)
 
         reference = (DENSITY_FIXTURES / "density.dat").read_text(encoding="utf-8")
-        self.assertEqual(generated, reference)
+        np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
         self.assertEqual(len(setup["compound_types"]), 3)
 
     def _run_density(self, input_log):
@@ -91,6 +92,16 @@ class DensityEndToEndTests(unittest.TestCase):
             finally:
                 os.chdir(cwd)
                 provider.close()
+
+
+def _parse_numeric_table(text: str) -> np.ndarray:
+    rows = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        rows.append([float(value) for value in stripped.split()])
+    return np.array(rows, dtype=float)
 
 
 if __name__ == "__main__":

@@ -2,12 +2,12 @@ import importlib.util
 import os
 import tempfile
 import unittest
-from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
 
 from config_schema import FrameLoopConfig
+from core.topology import CompoundType, TopologyFrame, TypeRegistry
 from input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
@@ -15,21 +15,6 @@ if importlib.util.find_spec("scipy") is None:
     NeighborCountConfig = None
 else:
     from analyses.neighbor_count_analysis import NeighborCountAnalysis, NeighborCountConfig
-
-
-class DummyMolecule:
-    def __init__(self, global_ids, com=(0.0, 0.0, 0.0)):
-        self.label_to_global_id = dict(global_ids)
-        self.label_to_id = {label: i for i, label in enumerate(global_ids)}
-        self.com = np.array(com, dtype=float)
-
-
-class DummyCompound:
-    def __init__(self, rep, comp_id, molecules):
-        self.rep = rep
-        self.comp_id = comp_id
-        self.members = molecules
-
 
 class DummyTrajectory:
     def __init__(self):
@@ -43,29 +28,37 @@ class DummyTrajectory:
             ],
             dtype=float,
         )
-        self.compounds = OrderedDict(
-            [
-                (
-                    ("H2O", (), "water"),
-                    DummyCompound(
-                        "H2O",
-                        0,
-                        [DummyMolecule([("O1", 0), ("H1", 1), ("H2", 2)])],
-                    ),
-                ),
-                (
-                    ("Na", (), "na"),
-                    DummyCompound(
-                        "Na",
-                        1,
-                        [DummyMolecule([("Na1", 3)])],
-                    ),
-                ),
-            ]
+        water_type = CompoundType(
+            type_id=0,
+            key=("H2O", (), "water"),
+            rep="H2O",
+            canonical_labels=("H1", "H2", "O1"),
+            label_to_local_index={"H1": 0, "H2": 1, "O1": 2},
+            local_bonds=((0, 2), (1, 2)),
+            local_elements=("H", "H", "O"),
+            atomic_masses=(1.0, 1.0, 16.0),
         )
-
-    def update_molecule_coords(self):
-        return None
+        na_type = CompoundType(
+            type_id=1,
+            key=("Na", (), "na"),
+            rep="Na",
+            canonical_labels=("Na1",),
+            label_to_local_index={"Na1": 0},
+            local_bonds=tuple(),
+            local_elements=("Na",),
+            atomic_masses=(23.0,),
+        )
+        self.topology_registry = TypeRegistry([water_type, na_type])
+        self.topology_frame = TopologyFrame(
+            registry=self.topology_registry,
+            member_atom_ids_by_key={
+                ("H2O", (), "water"): np.array([[1, 2, 0]], dtype=np.int32),
+                ("Na", (), "na"): np.array([[3]], dtype=np.int32),
+            },
+            atom_to_type_id=np.array([0, 0, 0, 1], dtype=np.int32),
+            atom_to_member_index=np.array([0, 0, 0, 0], dtype=np.int32),
+            atom_to_local_index=np.array([2, 0, 1, 0], dtype=np.int32),
+        )
 
     def read_frame(self):
         raise ValueError("End of trajectory")
@@ -137,8 +130,12 @@ class NeighborCountConfigTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(analysis.ref_indices, [0])
-        self.assertEqual(sorted(analysis.obs_indices), [1, 2, 3])
+        self.assertEqual(analysis.ref_indices.tolist(), [0])
+        self.assertEqual(sorted(analysis.obs_indices.tolist()), [1, 2, 3])
+        self.assertEqual(analysis.ref_selection.resolved_labels, ("O1",))
+        self.assertEqual(analysis.ref_selection.local_indices, (2,))
+        self.assertEqual(analysis.obs_selections_by_key[("H2O", (), "water")].resolved_labels, ("H1", "H2"))
+        self.assertEqual(analysis.obs_selections_by_key[("H2O", (), "water")].local_indices, (0, 1))
 
     def test_run_uses_programmatic_configuration_without_prompting(self):
         analysis = NeighborCountAnalysis(DummyTrajectory(), input_provider=NullInputProvider())
@@ -165,8 +162,15 @@ class NeighborCountConfigTests(unittest.TestCase):
             finally:
                 os.chdir(cwd)
 
+        rows = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            rows.append([float(value) for value in stripped.split()])
+
         self.assertIn("P(n)", text)
-        self.assertIn("1  1.000000", text)
+        self.assertEqual(rows, [[0.0, 0.0], [1.0, 1.0]])
 
 
 if __name__ == "__main__":

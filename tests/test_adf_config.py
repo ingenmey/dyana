@@ -2,12 +2,12 @@ import importlib.util
 import os
 import tempfile
 import unittest
-from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
 
 from config_schema import FrameLoopConfig
+from core.topology import CompoundType, TopologyFrame, TypeRegistry
 from input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
@@ -15,20 +15,6 @@ if importlib.util.find_spec("scipy") is None:
     ADFConfig = None
 else:
     from analyses.adf_analysis import ADF, ADFConfig
-
-
-class DummyMolecule:
-    def __init__(self, global_ids):
-        self.label_to_global_id = dict(global_ids)
-        self.label_to_id = {label: i for i, label in enumerate(global_ids)}
-
-
-class DummyCompound:
-    def __init__(self, rep, comp_id, molecules):
-        self.rep = rep
-        self.comp_id = comp_id
-        self.members = molecules
-
 
 class DummyTrajectory:
     def __init__(self):
@@ -42,21 +28,37 @@ class DummyTrajectory:
             ],
             dtype=float,
         )
-        self.compounds = OrderedDict(
-            [
-                (
-                    ("H2O", (), "ref"),
-                    DummyCompound("H2O", 0, [DummyMolecule([("O1", 0), ("H1", 1)])]),
-                ),
-                (
-                    ("OH", (), "obs"),
-                    DummyCompound("OH", 1, [DummyMolecule([("O1", 2), ("H1", 3)])]),
-                ),
-            ]
+        ref_type = CompoundType(
+            type_id=0,
+            key=("H2O", (), "ref"),
+            rep="H2O",
+            canonical_labels=("H1", "O1"),
+            label_to_local_index={"H1": 0, "O1": 1},
+            local_bonds=((0, 1),),
+            local_elements=("H", "O"),
+            atomic_masses=(1.0, 16.0),
         )
-
-    def update_molecule_coords(self):
-        return None
+        obs_type = CompoundType(
+            type_id=1,
+            key=("OH", (), "obs"),
+            rep="OH",
+            canonical_labels=("H1", "O1"),
+            label_to_local_index={"H1": 0, "O1": 1},
+            local_bonds=((0, 1),),
+            local_elements=("H", "O"),
+            atomic_masses=(1.0, 16.0),
+        )
+        self.topology_registry = TypeRegistry([ref_type, obs_type])
+        self.topology_frame = TopologyFrame(
+            registry=self.topology_registry,
+            member_atom_ids_by_key={
+                ("H2O", (), "ref"): np.array([[1, 0]], dtype=np.int32),
+                ("OH", (), "obs"): np.array([[3, 2]], dtype=np.int32),
+            },
+            atom_to_type_id=np.array([0, 0, 1, 1], dtype=np.int32),
+            atom_to_member_index=np.array([0, 0, 0, 0], dtype=np.int32),
+            atom_to_local_index=np.array([1, 0, 1, 0], dtype=np.int32),
+        )
 
     def read_frame(self):
         raise ValueError("End of trajectory")
@@ -153,6 +155,10 @@ class ADFConfigTests(unittest.TestCase):
         )
 
         self.assertTrue(len(analysis.ref_base_ids) > 0)
+        self.assertEqual(analysis.ref_base_selection.resolved_labels, ("O1",))
+        self.assertEqual(analysis.ref_base_selection.local_indices, (1,))
+        self.assertEqual(analysis.ref_tip_selection.resolved_labels, ("H1",))
+        self.assertEqual(analysis.ref_tip_selection.local_indices, (0,))
         self.assertEqual(len(analysis.angle_edges), 19)
 
     def test_run_uses_programmatic_configuration_without_prompting(self):

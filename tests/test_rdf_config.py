@@ -2,12 +2,12 @@ import importlib.util
 import os
 import tempfile
 import unittest
-from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
 
 from config_schema import FrameLoopConfig
+from core.topology import CompoundType, TopologyFrame, TypeRegistry
 from input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
@@ -15,28 +15,29 @@ if importlib.util.find_spec("scipy") is None:
 else:
     from analyses.rdf_analysis import RDF, RDFConfig
 
-
-class DummyMolecule:
-    def __init__(self):
-        self.label_to_global_id = {"O1": 0, "H1": 1}
-
-
-class DummyCompound:
-    def __init__(self):
-        self.members = [DummyMolecule()]
-        self.rep = "OH"
-        self.comp_id = 0
-
-
 class DummyTrajectory:
     def __init__(self):
         self.box_size = np.array([10.0, 10.0, 10.0])
         self.coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
-        self.compounds = OrderedDict([(("OH", (), "hash"), DummyCompound())])
+        compound_type = CompoundType(
+            type_id=0,
+            key=("OH", (), "hash"),
+            rep="OH",
+            canonical_labels=("H1", "O1"),
+            label_to_local_index={"H1": 0, "O1": 1},
+            local_bonds=((0, 1),),
+            local_elements=("H", "O"),
+            atomic_masses=(1.0, 16.0),
+        )
+        self.topology_registry = TypeRegistry([compound_type])
+        self.topology_frame = TopologyFrame(
+            registry=self.topology_registry,
+            member_atom_ids_by_key={("OH", (), "hash"): np.array([[1, 0]], dtype=np.int32)},
+            atom_to_type_id=np.array([0, 0], dtype=np.int32),
+            atom_to_member_index=np.array([0, 0], dtype=np.int32),
+            atom_to_local_index=np.array([1, 0], dtype=np.int32),
+        )
         self.read_calls = 0
-
-    def update_molecule_coords(self):
-        return None
 
     def read_frame(self):
         self.read_calls += 1
@@ -90,8 +91,12 @@ class RDFConfigTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(rdf.ref_indices, [0])
-        self.assertEqual(rdf.obs_indices, [1])
+        self.assertEqual(rdf.ref_indices.tolist(), [0])
+        self.assertEqual(rdf.obs_indices.tolist(), [1])
+        self.assertEqual(rdf.ref_selection.resolved_labels, ("O1",))
+        self.assertEqual(rdf.ref_selection.local_indices, (1,))
+        self.assertEqual(rdf.obs_selection.resolved_labels, ("H1",))
+        self.assertEqual(rdf.obs_selection.local_indices, (0,))
         np.testing.assert_allclose(rdf.hist.bin_edges[0], [0.0, 1.0, 2.0])
 
     def test_prompt_config_uses_shared_schema_and_provider(self):

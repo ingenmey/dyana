@@ -1,8 +1,10 @@
 import tempfile
 import unittest
-from collections import OrderedDict
 from pathlib import Path
 
+import numpy as np
+
+from core.topology import CompoundType, TopologyFrame, TypeRegistry
 from prepared_setup import (
     PreparedSetupValidationError,
     apply_prepared_setup_recipe,
@@ -13,32 +15,67 @@ from prepared_setup import (
 )
 
 
-class DummyMember:
-    def __init__(self, labels):
-        self.label_to_id = {label: i for i, label in enumerate(labels)}
-
-
-class DummyCompound:
-    def __init__(self, rep, key, labels, count):
-        self.rep = rep
-        self.key = key
-        self.members = [DummyMember(labels) for _ in range(count)]
-
-
 class DummyTrajectory:
-    def __init__(self, compounds, forbidden_bonds=None):
-        self.compounds = OrderedDict((compound.key, compound) for compound in compounds)
+    def __init__(self, compound_specs, forbidden_bonds=None):
         self.forbidden_bonds = set(forbidden_bonds or set())
+        compound_types = []
+        member_atom_ids_by_key = {}
+        atom_to_type_id_parts = []
+        atom_to_member_index_parts = []
+        atom_to_local_index_parts = []
+        next_atom_id = 0
+
+        for type_id, spec in enumerate(compound_specs):
+            compound_type = CompoundType(
+                type_id=type_id,
+                key=spec["key"],
+                rep=spec["rep"],
+                canonical_labels=tuple(spec["labels"]),
+                label_to_local_index={label: i for i, label in enumerate(spec["labels"])},
+                local_bonds=tuple(spec.get("local_bonds", tuple())),
+                local_elements=tuple(label.rstrip("0123456789") for label in spec["labels"]),
+                atomic_masses=tuple(1.0 for _ in spec["labels"]),
+            )
+            compound_types.append(compound_type)
+
+            n_members = spec["count"]
+            n_local = len(spec["labels"])
+            member_atom_ids = np.arange(next_atom_id, next_atom_id + n_members * n_local, dtype=np.int32).reshape(n_members, n_local)
+            next_atom_id += n_members * n_local
+            member_atom_ids_by_key[spec["key"]] = member_atom_ids
+
+            atom_to_type_id_parts.append(np.full(n_members * n_local, type_id, dtype=np.int32))
+            atom_to_member_index_parts.append(
+                np.repeat(np.arange(n_members, dtype=np.int32), n_local)
+            )
+            atom_to_local_index_parts.append(
+                np.tile(np.arange(n_local, dtype=np.int32), n_members)
+            )
+
+        self.topology_registry = TypeRegistry(compound_types)
+        self.topology_frame = TopologyFrame(
+            registry=self.topology_registry,
+            member_atom_ids_by_key=member_atom_ids_by_key,
+            atom_to_type_id=np.concatenate(atom_to_type_id_parts) if atom_to_type_id_parts else np.empty(0, dtype=np.int32),
+            atom_to_member_index=np.concatenate(atom_to_member_index_parts) if atom_to_member_index_parts else np.empty(0, dtype=np.int32),
+            atom_to_local_index=np.concatenate(atom_to_local_index_parts) if atom_to_local_index_parts else np.empty(0, dtype=np.int32),
+        )
 
 
 def make_water_na_cl_traj(water_count=10, na_count=1, cl_count=1, water_labels=None):
     water_labels = water_labels or ["O1", "H1", "H2"]
-    compounds = [
-        DummyCompound("Cl", ("Cl", tuple(), "hash_cl"), ["Cl1"], cl_count),
-        DummyCompound("H2O", ("H2O", (("H", "O"), ("H", "O")), "hash_h2o"), water_labels, water_count),
-        DummyCompound("Na", ("Na", tuple(), "hash_na"), ["Na1"], na_count),
+    compound_specs = [
+        {"rep": "Cl", "key": ("Cl", tuple(), "hash_cl"), "labels": ["Cl1"], "count": cl_count},
+        {
+            "rep": "H2O",
+            "key": ("H2O", (("H", "O"), ("H", "O")), "hash_h2o"),
+            "labels": water_labels,
+            "count": water_count,
+            "local_bonds": ((0, 1), (0, 2)),
+        },
+        {"rep": "Na", "key": ("Na", tuple(), "hash_na"), "labels": ["Na1"], "count": na_count},
     ]
-    return DummyTrajectory(compounds, forbidden_bonds={(1, 3)})
+    return DummyTrajectory(compound_specs, forbidden_bonds={(1, 3)})
 
 
 class PreparedSetupTests(unittest.TestCase):

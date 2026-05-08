@@ -27,29 +27,29 @@ class BaseAnalysis(ABC):
     def get_input_provider(self, provider=None):
         return provider or self.input_provider
 
-    def get_compounds(self):
-        return list(self.traj.compounds.values())
+    def get_compound_types(self):
+        return list(self.traj.topology_frame.get_compound_types())
 
-    def compound_by_index(self, index):
-        compounds = self.get_compounds()
+    def compound_type_by_index(self, index):
+        compound_types = self.get_compound_types()
         try:
-            return compounds[index]
+            return compound_types[index]
         except IndexError as exc:
-            raise ValueError(f"{type(self).__name__} compound index is out of range.") from exc
+            raise ValueError(f"{type(self).__name__} compound type index is out of range.") from exc
 
-    def resolve_compounds(self, indices):
-        compounds = self.get_compounds()
-        keys = list(self.traj.compounds.keys())
+    def resolve_compound_types(self, indices):
+        compound_types = self.get_compound_types()
         resolved = []
         for index in indices:
             try:
-                resolved.append((compounds[index], keys[index]))
+                compound_type = compound_types[index]
             except IndexError as exc:
-                raise ValueError(f"{type(self).__name__} compound index is out of range.") from exc
+                raise ValueError(f"{type(self).__name__} compound type index is out of range.") from exc
+            resolved.append((compound_type, compound_type.key))
         return resolved
 
-    def reattach_compounds(self, keys):
-        return [self.traj.compounds[key] for key in keys]
+    def reattach_compound_types(self, keys):
+        return [self.traj.topology_frame.get_compound_type_by_key(key) for key in keys]
 
     def skip_to_start(self):
         self.frame_idx = 0
@@ -64,14 +64,11 @@ class BaseAnalysis(ABC):
             try:
                 if self.update_compounds:
                     self.traj.guess_molecules()
-                    self.traj.update_molecule_coords()
                     if not self.post_compound_update():
                         self.frame_idx += 1
                         self.nframes -= 1
                         self.traj.read_frame()
                         continue
-                else:
-                    self.traj.update_molecule_coords()
 
                 self.process_frame()
                 self.processed_frames += 1
@@ -182,20 +179,21 @@ class BaseAnalysis(ABC):
 
     def compound_selection(self, role="reference", multi=False, prompt_text=None, provider=None):
         input_provider = self.get_input_provider(provider)
-        compounds = self.get_compounds()
+        compound_types = self.get_compound_types()
         print("\nAvailable Compounds:")
-        for i, c in enumerate(compounds, start=1):
-            print(f"{i}: {c.rep} (Number: {len(c.members)})")
+        for i, compound_type in enumerate(compound_types, start=1):
+            count = self.traj.topology_frame.get_member_count(compound_type)
+            print(f"{i}: {compound_type.rep} (Number: {count})")
 
         if multi:
             prompt_str = prompt_text or f"Choose the {role} compounds (comma-separated numbers): "
             choices = input_provider.ask_str(prompt_str).strip()
             idxs = [int(x.strip()) - 1 for x in choices.split(',') if x.strip()]
-            return [(i, compounds[i]) for i in idxs]
+            return [(i, compound_types[i]) for i in idxs]
         else:
             prompt_str = prompt_text or f"Choose the {role} compound (number): "
             idx = input_provider.ask_int(prompt_str, 1, minval=1) - 1
-            return idx, compounds[idx]
+            return idx, compound_types[idx]
 
 
     def atom_selection(self, role="reference", compound=None, prompt_text=None, allow_empty=False, provider=None):
@@ -219,9 +217,12 @@ class BaseAnalysis(ABC):
 
         prompt_str = (prompt_text or default_prompt).format(
             role=role,
-            compound_num=compound.comp_id + 1 if compound else "",
+            compound_num=compound.type_id + 1 if compound else "",
             compound_name=compound.rep if compound else ""
         )
+
+        if compound is not None:
+            print("Available labels:", ", ".join(compound.canonical_labels))
 
         if allow_empty:
             # Accept Enter as empty selection

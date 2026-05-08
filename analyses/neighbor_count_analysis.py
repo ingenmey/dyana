@@ -3,11 +3,11 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 
+import numpy as np
 from scipy.spatial import cKDTree
 
 from analysis_params import AtomLabelsParam, BoolParam, CompoundParam, FloatParam, ForEach
 from analyses.base_analysis import BaseAnalysis
-from analyses.selection import build_atom_to_molecule, collect_indices_for_compounds, collect_atom_indices
 from output_writer import build_output_filename, format_selection, format_selection_group, write_table
 
 
@@ -92,21 +92,31 @@ class NeighborCountAnalysis(BaseAnalysis):
 
     def configure(self, config: NeighborCountConfig):
         self.config = config
-        (self.ref_comp, self.ref_key), = self.resolve_compounds([config.ref_compound_index])
-        resolved_obs = self.resolve_compounds(config.obs_compound_indices)
-        self.obs_comps = [comp for comp, _ in resolved_obs]
+        (self.ref_type, self.ref_key), = self.resolve_compound_types([config.ref_compound_index])
+        resolved_obs = self.resolve_compound_types(config.obs_compound_indices)
+        self.obs_types = [compound_type for compound_type, _ in resolved_obs]
         self.obs_keys = [key for _, key in resolved_obs]
+        topology_frame = self.traj.topology_frame
 
         self.ref_labels = list(config.ref_labels)
         self.obs_labels_per_compound = {
             key: list(config.obs_labels_per_compound[idx])
             for idx, key in zip(config.obs_compound_indices, self.obs_keys)
         }
+        self.ref_selection = topology_frame.resolve_selection(self.ref_type, self.ref_labels)
+        self.obs_selections_by_key = {
+            key: topology_frame.resolve_selection(compound_type, self.obs_labels_per_compound[key])
+            for compound_type, key in zip(self.obs_types, self.obs_keys)
+        }
+        self.observed_selection_entries = [
+            (self.obs_labels_per_compound[key], compound_type.rep)
+            for compound_type, key in zip(self.obs_types, self.obs_keys)
+        ]
         self.exclude_same_molecule = config.exclude_same_molecule
         self.r_cut = config.r_cut
 
         self.rebuild_runtime_state()
-        if not self.ref_indices or not self.obs_indices:
+        if self.ref_indices.size == 0 or self.obs_indices.size == 0:
             raise ValueError("No atoms matched the given labels in the initial frame.")
 
         self.n_hist = Counter()
@@ -114,27 +124,45 @@ class NeighborCountAnalysis(BaseAnalysis):
         self.mark_configured()
 
     def rebuild_runtime_state(self):
-        self.ref_indices = collect_atom_indices(self.ref_comp, self.ref_labels)
-        self.obs_indices = collect_indices_for_compounds(self.obs_comps, self.obs_labels_per_compound, self.obs_keys)
-        self.ref_atom_to_mol = build_atom_to_molecule(self.ref_comp)
-        self.obs_atom_to_mol = {}
-        for comp in self.obs_comps:
-            self.obs_atom_to_mol.update(build_atom_to_molecule(comp))
+        topology_frame = self.traj.topology_frame
+        self.ref_indices = topology_frame.get_atom_indices_for_local_indices(
+            self.ref_type,
+            self.ref_selection.local_indices,
+        )
+        obs_parts = [
+            topology_frame.get_atom_indices_for_local_indices(
+                compound_type,
+                self.obs_selections_by_key[key].local_indices,
+            )
+            for compound_type, key in zip(self.obs_types, self.obs_keys)
+        ]
+        self.obs_indices = (
+            np.concatenate([part for part in obs_parts if part.size > 0])
+            if any(part.size > 0 for part in obs_parts)
+            else np.empty(0, dtype=np.int32)
+        )
 
     def post_compound_update(self):
-        try:
-            self.ref_comp = self.reattach_compounds([self.ref_key])[0]
-            self.obs_comps = self.reattach_compounds(self.obs_keys)
-        except KeyError:
+        topology_frame = self.traj.topology_frame
+        if not topology_frame.has_compound_type_key(self.ref_key):
+            return False
+        if any(not topology_frame.has_compound_type_key(key) for key in self.obs_keys):
             return False
 
+        self.ref_type = self.reattach_compound_types([self.ref_key])[0]
+        self.obs_types = self.reattach_compound_types(self.obs_keys)
+
         self.rebuild_runtime_state()
-        if not self.ref_indices or not self.obs_indices:
+        self.observed_selection_entries = [
+            (self.obs_labels_per_compound[key], compound_type.rep)
+            for compound_type, key in zip(self.obs_types, self.obs_keys)
+        ]
+        if self.ref_indices.size == 0 or self.obs_indices.size == 0:
             return False
         return True
 
     def process_frame(self):
-        if not self.ref_indices or not self.obs_indices:
+        if self.ref_indices.size == 0 or self.obs_indices.size == 0:
             return
 
         coords = self.traj.coords
@@ -143,19 +171,24 @@ class NeighborCountAnalysis(BaseAnalysis):
         ref_coords = coords[self.ref_indices]
         neighbours = tree.query_ball_point(ref_coords, self.r_cut)
         obs_global = self.obs_indices
+        atom_to_type_id = self.traj.topology_frame.atom_to_type_id
+        atom_to_member_index = self.traj.topology_frame.atom_to_member_index
 
-        self.total_ref_atoms += len(self.ref_indices)
+        self.total_ref_atoms += int(self.ref_indices.size)
         for ref_idx, nb_list in zip(self.ref_indices, neighbours):
             count = 0
-            ref_mol = self.ref_atom_to_mol.get(ref_idx)
+            ref_type_id = int(atom_to_type_id[ref_idx])
+            ref_member_index = int(atom_to_member_index[ref_idx])
 
             for nb in nb_list:
                 obs_idx = obs_global[nb]
                 if obs_idx == ref_idx:
                     continue
                 if self.exclude_same_molecule:
-                    obs_mol = self.obs_atom_to_mol.get(obs_idx)
-                    if obs_mol == ref_mol:
+                    if (
+                        int(atom_to_type_id[obs_idx]) == ref_type_id
+                        and int(atom_to_member_index[obs_idx]) == ref_member_index
+                    ):
                         continue
                 count += 1
 
@@ -169,15 +202,11 @@ class NeighborCountAnalysis(BaseAnalysis):
         max_n = max(self.n_hist) if self.n_hist else 0
         probs = {n: self.n_hist[n] / self.total_ref_atoms for n in range(max_n + 1)}
 
-        observed_pairs = [
-            (self.obs_labels_per_compound[key], comp.rep)
-            for key, comp in zip(self.obs_keys, self.obs_comps)
-        ]
         fname = build_output_filename(
             "ncount",
             [
-                format_selection(self.ref_labels, self.ref_comp.rep),
-                format_selection_group(observed_pairs),
+                format_selection(self.ref_labels, self.ref_type.rep),
+                format_selection_group(self.observed_selection_entries),
             ],
         )
         write_table(

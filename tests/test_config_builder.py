@@ -24,16 +24,20 @@ class DynamicConfig:
     note: str | None = None
 
 
-class DummyCompound:
-    def __init__(self, rep, comp_id):
+class DummyCompoundType:
+    def __init__(self, rep, type_id, canonical_labels):
         self.rep = rep
-        self.comp_id = comp_id
+        self.type_id = type_id
+        self.canonical_labels = canonical_labels
 
 
 class DummyAnalysis:
     def __init__(self, provider=None):
         self.input_provider = provider
-        self.compounds = [DummyCompound("H2O", 0), DummyCompound("Na+", 1)]
+        self.compound_types = [
+            DummyCompoundType("H2O", 0, ("O1", "H1", "H2")),
+            DummyCompoundType("Na+", 1, ("Na1",)),
+        ]
 
     def compound_selection(self, role="reference", multi=False, prompt_text=None, provider=None):
         input_provider = provider or self.input_provider
@@ -41,17 +45,17 @@ class DummyAnalysis:
             prompt = prompt_text or f"Choose the {role} compounds (comma-separated numbers): "
             choices = input_provider.ask_str(prompt).strip()
             idxs = [int(x.strip()) - 1 for x in choices.split(",") if x.strip()]
-            return [(idx, self.compounds[idx]) for idx in idxs]
+            return [(idx, self.compound_types[idx]) for idx in idxs]
         prompt = prompt_text or f"Choose the {role} compound (number): "
         idx = input_provider.ask_int(prompt, 1, minval=1) - 1
-        return idx, self.compounds[idx]
+        return idx, self.compound_types[idx]
 
-    def compound_by_index(self, index):
-        return self.compounds[index]
+    def compound_type_by_index(self, index):
+        return self.compound_types[index]
 
     def atom_selection(self, role="reference", compound=None, prompt_text=None, allow_empty=False, provider=None):
         input_provider = provider or self.input_provider
-        prompt = prompt_text or f"Which atom(s) in {role} compound {compound.comp_id + 1} ({compound.rep})? (comma-separated) "
+        prompt = prompt_text or f"Which atom(s) in {role} compound {compound.type_id + 1} ({compound.rep})? (comma-separated) "
         answer = input_provider.ask_str(prompt, default="" if allow_empty else None)
         return [s.strip() for s in answer.split(",") if s.strip()]
 

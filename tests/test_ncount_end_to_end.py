@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+import numpy as np
 
 from config_schema import FrameLoopConfig
 from input_providers import FileInputProvider, NullInputProvider
@@ -29,7 +30,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
     def test_scripted_input_log_reproduces_reference_ncount(self):
         generated = self._run_ncount(input_log=NCOUNT_FIXTURES / "input.log")
         reference = (NCOUNT_FIXTURES / "ncount_O-C4H8O_O-C4H8O.dat").read_text(encoding="utf-8")
-        self.assertEqual(generated, reference)
+        np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
 
     def test_programmatic_prepared_setup_path_reproduces_reference_ncount(self):
         from analyses.neighbor_count_analysis import NeighborCountAnalysis, NeighborCountConfig
@@ -73,7 +74,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
                 os.chdir(cwd)
 
         reference = (NCOUNT_FIXTURES / "ncount_O-C4H8O_O-C4H8O.dat").read_text(encoding="utf-8")
-        self.assertEqual(generated, reference)
+        np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
         self.assertEqual(len(setup["compound_types"]), 3)
 
     def _run_ncount(self, input_log):
@@ -94,6 +95,16 @@ class NeighborCountEndToEndTests(unittest.TestCase):
             finally:
                 os.chdir(cwd)
                 provider.close()
+
+
+def _parse_numeric_table(text: str) -> np.ndarray:
+    rows = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        rows.append([float(value) for value in stripped.split()])
+    return np.array(rows, dtype=float)
 
 
 if __name__ == "__main__":

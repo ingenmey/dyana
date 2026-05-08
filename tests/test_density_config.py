@@ -1,41 +1,58 @@
 import os
 import tempfile
 import unittest
-from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
 
 from analyses.density_analysis import DensityAnalysis, DensityConfig
 from config_schema import FrameLoopConfig
+from core.topology import CompoundType, TopologyFrame, TypeRegistry
 from input_providers import FileInputProvider, NullInputProvider
-
-
-class DummyMolecule:
-    def __init__(self, com, labels=None):
-        self.com = np.array(com, dtype=float)
-        self.label_to_id = labels or {"O1": 0}
-
-
-class DummyCompound:
-    def __init__(self, rep, comp_id, coms):
-        self.rep = rep
-        self.comp_id = comp_id
-        self.members = [DummyMolecule(com) for com in coms]
 
 
 class DummyTrajectory:
     def __init__(self):
         self.box_size = np.array([4.0, 5.0, 6.0], dtype=float)
-        self.compounds = OrderedDict(
+        self.coords = np.array(
             [
-                (("H2O", (), "water"), DummyCompound("H2O", 0, [[0.0, 0.0, 1.0], [0.0, 0.0, 2.0]])),
-                (("Na", (), "na"), DummyCompound("Na", 1, [[0.0, 0.0, 3.0]])),
-            ]
+                [0.0, 0.0, 1.0],
+                [0.0, 0.0, 2.0],
+                [0.0, 0.0, 3.0],
+            ],
+            dtype=float,
         )
-
-    def update_molecule_coords(self):
-        return None
+        water_type = CompoundType(
+            type_id=0,
+            key=("H2O", (), "water"),
+            rep="H2O",
+            canonical_labels=("O1",),
+            label_to_local_index={"O1": 0},
+            local_bonds=tuple(),
+            local_elements=("O",),
+            atomic_masses=(16.0,),
+        )
+        na_type = CompoundType(
+            type_id=1,
+            key=("Na", (), "na"),
+            rep="Na",
+            canonical_labels=("Na1",),
+            label_to_local_index={"Na1": 0},
+            local_bonds=tuple(),
+            local_elements=("Na",),
+            atomic_masses=(23.0,),
+        )
+        self.topology_registry = TypeRegistry([water_type, na_type])
+        self.topology_frame = TopologyFrame(
+            registry=self.topology_registry,
+            member_atom_ids_by_key={
+                ("H2O", (), "water"): np.array([[0], [1]], dtype=np.int32),
+                ("Na", (), "na"): np.array([[2]], dtype=np.int32),
+            },
+            atom_to_type_id=np.array([0, 0, 1], dtype=np.int32),
+            atom_to_member_index=np.array([0, 1, 0], dtype=np.int32),
+            atom_to_local_index=np.array([0, 0, 0], dtype=np.int32),
+        )
 
     def read_frame(self):
         raise ValueError("End of trajectory")
