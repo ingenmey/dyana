@@ -31,6 +31,19 @@ class DummyCompoundType:
         self.canonical_labels = canonical_labels
 
 
+class DummyTopologyFrame:
+    def __init__(self, compound_types):
+        self.compound_types = compound_types
+
+    def get_compound_type_by_index(self, index):
+        return self.compound_types[index]
+
+
+class DummyTrajectory:
+    def __init__(self, compound_types):
+        self.topology_frame = DummyTopologyFrame(compound_types)
+
+
 class DummyAnalysis:
     def __init__(self, provider=None):
         self.input_provider = provider
@@ -38,6 +51,7 @@ class DummyAnalysis:
             DummyCompoundType("H2O", 0, ("O1", "H1", "H2")),
             DummyCompoundType("Na+", 1, ("Na1",)),
         ]
+        self.traj = DummyTrajectory(self.compound_types)
 
     def compound_selection(self, role="reference", multi=False, prompt_text=None, provider=None):
         input_provider = provider or self.input_provider
@@ -49,9 +63,6 @@ class DummyAnalysis:
         prompt = prompt_text or f"Choose the {role} compound (number): "
         idx = input_provider.ask_int(prompt, 1, minval=1) - 1
         return idx, self.compound_types[idx]
-
-    def compound_type_by_index(self, index):
-        return self.compound_types[index]
 
     def atom_selection(self, role="reference", compound=None, prompt_text=None, allow_empty=False, provider=None):
         input_provider = provider or self.input_provider

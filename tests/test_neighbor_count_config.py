@@ -132,10 +132,14 @@ class NeighborCountConfigTests(unittest.TestCase):
 
         self.assertEqual(analysis.ref_indices.tolist(), [0])
         self.assertEqual(sorted(analysis.obs_indices.tolist()), [1, 2, 3])
-        self.assertEqual(analysis.ref_selection.resolved_labels, ("O1",))
         self.assertEqual(analysis.ref_selection.local_indices, (2,))
-        self.assertEqual(analysis.obs_selections_by_key[("H2O", (), "water")].resolved_labels, ("H1", "H2"))
         self.assertEqual(analysis.obs_selections_by_key[("H2O", (), "water")].local_indices, (0, 1))
+        self.assertEqual(tuple(analysis.ref_type.canonical_labels[i] for i in analysis.ref_selection.local_indices), ("O1",))
+        water_type = analysis.obs_types[0]
+        self.assertEqual(
+            tuple(water_type.canonical_labels[i] for i in analysis.obs_selections_by_key[("H2O", (), "water")].local_indices),
+            ("H1", "H2"),
+        )
 
     def test_run_uses_programmatic_configuration_without_prompting(self):
         analysis = NeighborCountAnalysis(DummyTrajectory(), input_provider=NullInputProvider())

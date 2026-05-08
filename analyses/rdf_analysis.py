@@ -106,7 +106,8 @@ class RDF(BaseAnalysis):
         topology_frame = self.traj.topology_frame
         if not topology_frame.has_compound_type_key(self.ref_key) or not topology_frame.has_compound_type_key(self.obs_key):
             return False
-        self.ref_type, self.obs_type = self.reattach_compound_types([self.ref_key, self.obs_key])
+        self.ref_type = topology_frame.get_compound_type_by_key(self.ref_key)
+        self.obs_type = topology_frame.get_compound_type_by_key(self.obs_key)
 
         self.rebuild_runtime_state()
         self.n_ref = (

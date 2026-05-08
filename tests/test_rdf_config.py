@@ -93,10 +93,10 @@ class RDFConfigTests(unittest.TestCase):
 
         self.assertEqual(rdf.ref_indices.tolist(), [0])
         self.assertEqual(rdf.obs_indices.tolist(), [1])
-        self.assertEqual(rdf.ref_selection.resolved_labels, ("O1",))
         self.assertEqual(rdf.ref_selection.local_indices, (1,))
-        self.assertEqual(rdf.obs_selection.resolved_labels, ("H1",))
         self.assertEqual(rdf.obs_selection.local_indices, (0,))
+        self.assertEqual(tuple(rdf.ref_type.canonical_labels[i] for i in rdf.ref_selection.local_indices), ("O1",))
+        self.assertEqual(tuple(rdf.obs_type.canonical_labels[i] for i in rdf.obs_selection.local_indices), ("H1",))
         np.testing.assert_allclose(rdf.hist.bin_edges[0], [0.0, 1.0, 2.0])
 
     def test_prompt_config_uses_shared_schema_and_provider(self):

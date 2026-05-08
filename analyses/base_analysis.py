@@ -9,7 +9,6 @@ from input_providers import InteractiveInputProvider
 class BaseAnalysis(ABC):
     CONFIG_CLASS = None
     CONFIG_SCHEMA = None
-    CONFIG_BUILDER = None
 
     def __init__(self, traj, input_provider=None):
         self.traj = traj
@@ -28,28 +27,17 @@ class BaseAnalysis(ABC):
         return provider or self.input_provider
 
     def get_compound_types(self):
-        return list(self.traj.topology_frame.get_compound_types())
-
-    def compound_type_by_index(self, index):
-        compound_types = self.get_compound_types()
-        try:
-            return compound_types[index]
-        except IndexError as exc:
-            raise ValueError(f"{type(self).__name__} compound type index is out of range.") from exc
+        return self.traj.topology_frame.get_compound_types()
 
     def resolve_compound_types(self, indices):
-        compound_types = self.get_compound_types()
         resolved = []
         for index in indices:
             try:
-                compound_type = compound_types[index]
+                compound_type = self.traj.topology_frame.get_compound_type_by_index(index)
             except IndexError as exc:
                 raise ValueError(f"{type(self).__name__} compound type index is out of range.") from exc
             resolved.append((compound_type, compound_type.key))
         return resolved
-
-    def reattach_compound_types(self, keys):
-        return [self.traj.topology_frame.get_compound_type_by_key(key) for key in keys]
 
     def skip_to_start(self):
         self.frame_idx = 0
@@ -116,7 +104,6 @@ class BaseAnalysis(ABC):
             self.CONFIG_SCHEMA,
             self.CONFIG_CLASS,
             provider=provider,
-            builder=self.CONFIG_BUILDER,
         )
 
     def configure_frame_loop(self, frame_loop):
@@ -179,7 +166,7 @@ class BaseAnalysis(ABC):
 
     def compound_selection(self, role="reference", multi=False, prompt_text=None, provider=None):
         input_provider = self.get_input_provider(provider)
-        compound_types = self.get_compound_types()
+        compound_types = list(self.get_compound_types())
         print("\nAvailable Compounds:")
         for i, compound_type in enumerate(compound_types, start=1):
             count = self.traj.topology_frame.get_member_count(compound_type)

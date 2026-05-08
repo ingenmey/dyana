@@ -10,26 +10,20 @@ class PromptContext:
     owner: object
     input_provider: object
     values: dict[str, object] = field(default_factory=dict)
-    root_values: dict[str, object] | None = None
     scope: dict[str, object] = field(default_factory=dict)
 
 
-def prompt_config_from_schema(owner, schema, config_class, provider=None, builder=None):
+def prompt_config_from_schema(owner, schema, config_class, provider=None):
     values = {}
     context = PromptContext(
         owner=owner,
         input_provider=provider or owner.input_provider,
         values=values,
-        root_values=values,
     )
 
     for step in schema:
         prompt_step(step, context)
 
-    if builder is None:
-        builder = getattr(owner, "CONFIG_BUILDER", None)
-    if builder is not None:
-        return builder(values)
     return config_class(**values)
 
 
@@ -90,17 +84,21 @@ def _run_for_each(step, context):
         raise ValueError(f"Unsupported ForEach collect_mode: {step.collect_mode}")
 
     for item in items:
-        child_values = {}
+        inherited_keys = set(context.values)
         child_context = PromptContext(
             owner=context.owner,
             input_provider=context.input_provider,
-            values=child_values,
-            root_values=context.root_values,
+            values=dict(context.values),
             scope={**context.scope, step.item_name: item},
         )
         for child_step in step.steps:
             prompt_step(child_step, child_context)
 
+        child_values = {
+            key: value
+            for key, value in child_context.values.items()
+            if key not in inherited_keys
+        }
         collected_value = _collapse_collected_values(child_values)
         if step.collect_mode == "dict":
             collected[item] = collected_value
@@ -135,7 +133,7 @@ def _prompt_atom_labels(param, context):
     compound = None
     if param.compound is not None:
         compound_idx = _resolve_name(param.compound, context)
-        compound = context.owner.compound_type_by_index(compound_idx)
+        compound = context.owner.traj.topology_frame.get_compound_type_by_index(compound_idx)
 
     return context.owner.atom_selection(
         role=param.role,
@@ -151,8 +149,6 @@ def _resolve_name(name, context):
         return context.scope[name]
     if name in context.values:
         return context.values[name]
-    if context.root_values is not None and name in context.root_values:
-        return context.root_values[name]
     raise KeyError(f"Unknown schema value reference: {name}")
 
 

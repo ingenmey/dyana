@@ -53,8 +53,10 @@ class TrajectoryFixtureTests(unittest.TestCase):
 
         member_atom_ids = traj.topology_frame.get_member_atom_ids(water_type)
         self.assertEqual(member_atom_ids.shape, (128, 3))
-        self.assertEqual(len(traj.topology_frame.get_atom_indices(water_type, ["O"])), 128)
-        self.assertEqual(len(traj.topology_frame.get_atom_indices(water_type, ["H"])), 256)
+        o_selection = traj.topology_frame.resolve_selection(water_type, ["O"])
+        h_selection = traj.topology_frame.resolve_selection(water_type, ["H"])
+        self.assertEqual(len(traj.topology_frame.get_atom_indices_for_local_indices(water_type, o_selection.local_indices)), 128)
+        self.assertEqual(len(traj.topology_frame.get_atom_indices_for_local_indices(water_type, h_selection.local_indices)), 256)
 
         atom_type_id, member_index, local_index = traj.topology_frame.get_atom_location(int(member_atom_ids[0, 0]))
         self.assertEqual(atom_type_id, water_type.type_id)

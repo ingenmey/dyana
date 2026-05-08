@@ -155,10 +155,10 @@ class ADFConfigTests(unittest.TestCase):
         )
 
         self.assertTrue(len(analysis.ref_base_ids) > 0)
-        self.assertEqual(analysis.ref_base_selection.resolved_labels, ("O1",))
         self.assertEqual(analysis.ref_base_selection.local_indices, (1,))
-        self.assertEqual(analysis.ref_tip_selection.resolved_labels, ("H1",))
         self.assertEqual(analysis.ref_tip_selection.local_indices, (0,))
+        self.assertEqual(tuple(analysis.ref_type.canonical_labels[i] for i in analysis.ref_base_selection.local_indices), ("O1",))
+        self.assertEqual(tuple(analysis.ref_type.canonical_labels[i] for i in analysis.ref_tip_selection.local_indices), ("H1",))
         self.assertEqual(len(analysis.angle_edges), 19)
 
     def test_run_uses_programmatic_configuration_without_prompting(self):

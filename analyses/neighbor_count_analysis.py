@@ -149,8 +149,8 @@ class NeighborCountAnalysis(BaseAnalysis):
         if any(not topology_frame.has_compound_type_key(key) for key in self.obs_keys):
             return False
 
-        self.ref_type = self.reattach_compound_types([self.ref_key])[0]
-        self.obs_types = self.reattach_compound_types(self.obs_keys)
+        self.ref_type = topology_frame.get_compound_type_by_key(self.ref_key)
+        self.obs_types = [topology_frame.get_compound_type_by_key(key) for key in self.obs_keys]
 
         self.rebuild_runtime_state()
         self.observed_selection_entries = [

@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import networkx as nx
 import numpy as np
 
-from atomic_properties import elem_color, elem_vdW
 from geometry import distance_squared, periodic_center
 from utils import label_matches
 
@@ -25,48 +23,10 @@ class CompoundType:
     def n_local_atoms(self) -> int:
         return len(self.canonical_labels)
 
-    def draw_graph(self, compound_id_for_output: int = 0):
-        import matplotlib.pyplot as plt
-
-        graph = nx.Graph()
-        for label in self.canonical_labels:
-            graph.add_node(label)
-        for local_a, local_b in self.local_bonds:
-            graph.add_edge(self.canonical_labels[local_a], self.canonical_labels[local_b])
-
-        node_sizes = [
-            elem_vdW.get(element, 1.0) * 2000
-            for element in self.local_elements
-        ]
-        node_colors = [
-            elem_color.get(element, "lightgray")
-            for element in self.local_elements
-        ]
-
-        pos = nx.spring_layout(graph, k=0.2, iterations=300)
-        labels = {node: node for node in graph.nodes()}
-
-        nx.draw(
-            graph,
-            pos,
-            labels=labels,
-            with_labels=True,
-            node_size=node_sizes,
-            node_color=node_colors,
-            font_size=16,
-            font_weight="bold",
-            width=2.0,
-        )
-
-        plt.savefig(f"compound{compound_id_for_output}.pdf", format="pdf")
-        plt.close()
-
 
 @dataclass(frozen=True)
 class SelectionSpec:
     type_key: tuple
-    label_patterns: tuple[str, ...]
-    resolved_labels: tuple[str, ...]
     local_indices: tuple[int, ...]
 
 
@@ -162,46 +122,30 @@ class TopologyFrame:
                 total_sq += distance_squared(coords[atom_ids[local_a]], coords[atom_ids[local_b]], box_size)
             mean_length = float(np.sqrt(total_sq / len(member_atom_ids)))
             bond_sum_sq[f"{label_a} {label_b}"] = mean_length
-            bond_sum_sq[f"{label_b} {label_a}"] = mean_length
         return bond_sum_sq
 
     def resolve_selection(self, compound_type_or_key, labels) -> SelectionSpec:
         compound_type = self._resolve_compound_type(compound_type_or_key)
-        patterns = (labels,) if isinstance(labels, str) else tuple(labels)
-        resolved_labels, local_indices = self.resolve_local_indices(compound_type, patterns)
+        local_indices = self._resolve_local_indices(compound_type, labels)
         return SelectionSpec(
             type_key=compound_type.key,
-            label_patterns=patterns,
-            resolved_labels=resolved_labels,
             local_indices=local_indices,
         )
 
-    def resolve_local_indices(self, compound_type_or_key, labels) -> tuple[tuple[str, ...], tuple[int, ...]]:
+    def _resolve_local_indices(self, compound_type_or_key, labels) -> tuple[int, ...]:
         compound_type = self._resolve_compound_type(compound_type_or_key)
         patterns = (labels,) if isinstance(labels, str) else tuple(labels)
-        matching_labels = tuple(
-            label
+        return tuple(
+            compound_type.label_to_local_index[label]
             for label in compound_type.canonical_labels
             if any(label_matches(pattern, label) for pattern in patterns)
         )
-        return (
-            matching_labels,
-            tuple(compound_type.label_to_local_index[label] for label in matching_labels),
-        )
-
-    def get_local_indices(self, compound_type_or_key, labels) -> np.ndarray:
-        _, local_indices = self.resolve_local_indices(compound_type_or_key, labels)
-        return np.array(local_indices, dtype=np.int32)
 
     def get_atom_indices_for_local_indices(self, compound_type_or_key, local_indices) -> np.ndarray:
         member_atom_ids = self.get_member_atom_ids(compound_type_or_key)
         if len(member_atom_ids) == 0 or len(local_indices) == 0:
             return np.empty(0, dtype=np.int32)
         return member_atom_ids[:, list(local_indices)].reshape(-1)
-
-    def get_atom_indices(self, compound_type_or_key, labels) -> np.ndarray:
-        _, local_indices = self.resolve_local_indices(compound_type_or_key, labels)
-        return self.get_atom_indices_for_local_indices(compound_type_or_key, local_indices)
 
     def get_member_coords(self, compound_type_or_key, coords: np.ndarray) -> np.ndarray:
         member_atom_ids = self.get_member_atom_ids(compound_type_or_key)
@@ -212,12 +156,6 @@ class TopologyFrame:
             int(self.atom_to_type_id[atom_index]),
             int(self.atom_to_member_index[atom_index]),
             int(self.atom_to_local_index[atom_index]),
-        )
-
-    def get_type_member_pair(self, atom_index: int) -> tuple[int, int]:
-        return (
-            int(self.atom_to_type_id[atom_index]),
-            int(self.atom_to_member_index[atom_index]),
         )
 
     def _resolve_compound_type(self, compound_type_or_key) -> CompoundType:

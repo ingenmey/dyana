@@ -195,7 +195,6 @@ Notes:
 
 - [ ] Reassess `config_schema.py` scaffolding that is not part of the current working path.
 - [ ] Reassess whether `PromptContext` in `config_builder.py` is more machinery than the current size needs.
-- [ ] Reassess whether `CONFIG_BUILDER` is actually needed once more schema-migrated analyses exist; remove it if direct dataclass construction remains sufficient.
 - [ ] Split responsibilities inside `workflow_prompts.py` if the current single class becomes harder to read.
 - [ ] Revisit the non-XYZ `prompt_cell_vectors(...)` behavior so the method name and return semantics line up more cleanly.
 - [ ] Tighten validation and error handling in `BaseAnalysis.compound_selection(..., multi=True)`.
