@@ -7,10 +7,10 @@ import json
 import os
 from pathlib import Path
 
-import constants
-from input_providers import FileInputProvider, InteractiveInputProvider
-from output_writer import configure_output, restore_output
-from workflow_prompts import WorkflowPrompts
+from core import constants
+from io_support.input_providers import FileInputProvider, InteractiveInputProvider
+from io_support.output_writer import configure_output, restore_output
+from workflow.workflow_prompts import WorkflowPrompts
 
 AVAILABLE_ANALYSES = {
     "rdf": ("Radial distribution function analysis", "analyses.rdf_analysis", "RDF"),

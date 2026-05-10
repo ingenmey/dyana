@@ -4,8 +4,8 @@ import numpy as np
 from collections import defaultdict
 from scipy.spatial import cKDTree
 
-from analyses.base_analysis import BaseAnalysis
-from geometry import minimum_image
+from analyses.common.base_analysis import BaseAnalysis
+from core.geometry import minimum_image
 from utils import (
     prompt,
     prompt_int,

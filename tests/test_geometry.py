@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from geometry import distance_squared, minimum_image, periodic_center, wrap
+from core.geometry import distance_squared, minimum_image, periodic_center, wrap
 
 
 class GeometryTests(unittest.TestCase):
@@ -31,4 +31,3 @@ class GeometryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

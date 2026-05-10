@@ -14,7 +14,7 @@ avoid carrying competing framework guidance.
 
 ## 1. Stabilize Current Behavior
 
-- [x] Add project/package metadata (`pyproject.toml`).
+- [x] Add project/package metadata (`setup.cfg` plus `pyproject.toml` build config).
 - [x] Declare core dependencies (`numpy`, `scipy`, `networkx`, `matplotlib`).
 - [x] Declare optional dependencies for Voronoi support (`pyvoro`).
 - [x] Declare development dependencies (`pytest`, `ruff`).
@@ -35,8 +35,8 @@ avoid carrying competing framework guidance.
 ## 2. Package Structure
 
 - [~] Start moving toward a package layout.
-  - Current state still uses top-level modules (`main.py`, `utils.py`, `geometry.py`, `config_schema.py`).
-  - `analyses` and `core` are now importable packages.
+  - `framework`, `io_support`, `workflow`, `analyses`, and `core` are now grouped as importable packages.
+  - `main.py` and `utils.py` still remain at the top level for now.
 - [ ] Move to `src/dyana/` layout.
 - [ ] Move `main.py` into `dyana.cli`.
 - [ ] Replace top-level imports such as `from utils import ...` with explicit package imports.
@@ -49,7 +49,7 @@ avoid carrying competing framework guidance.
 ## 3. Separate CLI Interaction From Scientific Logic
 
 - [x] Document the target framework split in the framework checklist.
-- [~] Add typed config scaffolding in `config_schema.py`.
+- [~] Add typed config scaffolding in `framework/config_schema.py`.
 - [x] Keep the current `CONFIG_SCHEMA` plus explicit per-analysis config-dataclass design for the supported path; do not collapse those layers as part of current productionization work.
 - [x] Add per-analysis config objects, starting with RDF.
 - [~] Convert analyses so prompting only builds config objects, using the framework checklist plan.
@@ -84,7 +84,7 @@ avoid carrying competing framework guidance.
 - [ ] Allow config path from CLI.
 - [ ] Save resolved config into every output directory.
 - [~] Include Dyana version, Python version, dependency versions, and git commit in run metadata.
-  - `output_metadata.py` writes Python/dependency/git metadata.
+  - `io_support/output_metadata.py` writes Python/dependency/git metadata.
   - Dyana package version is still missing.
 
 ## 6. Strengthen Trajectory I/O
@@ -107,7 +107,7 @@ avoid carrying competing framework guidance.
 
 ## 7. Centralize Periodic Geometry
 
-- [x] Add shared periodic geometry module (`geometry.py`).
+- [x] Add shared periodic geometry module (`core/geometry.py`).
 - [x] Add `wrap`.
 - [x] Add `minimum_image`.
 - [x] Add `distance_squared`.
@@ -231,7 +231,7 @@ avoid carrying competing framework guidance.
 
 ## 16. Dependency Hygiene
 
-- [x] Declare core dependencies in `pyproject.toml`.
+- [x] Declare core dependencies in packaging config.
 - [x] Declare `pyvoro` as an optional extra.
 - [ ] Move optional imports such as `pyvoro` inside optional analysis setup.
 - [ ] Fail gracefully when optional dependencies are missing.

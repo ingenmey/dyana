@@ -1,7 +1,7 @@
 # utils.py
 
 import re
-from input_providers import FileInputProvider, InteractiveInputProvider
+from io_support.input_providers import FileInputProvider, InteractiveInputProvider
 
 _input_provider = InteractiveInputProvider()
 

@@ -4,7 +4,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from output_writer import configure_output, restore_output, write_table
+from io_support.output_writer import configure_output, restore_output, write_table
 
 
 class OutputWriterTests(unittest.TestCase):

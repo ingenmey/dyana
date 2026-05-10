@@ -2,12 +2,12 @@
 
 import numpy as np
 from scipy.spatial import cKDTree
-from analyses.base_analysis import BaseAnalysis
-from analyses.histogram import HistogramND
-from analyses.selection import collect_atom_indices
-from geometry import minimum_image
+from analyses.common.base_analysis import BaseAnalysis
+from analyses.common.histogram import HistogramND
+from analyses.legacy.selection import collect_atom_indices
+from core.geometry import minimum_image
 from utils import prompt, prompt_int, prompt_yn, prompt_float
-from output_writer import write_histogram_1d
+from io_support.output_writer import write_histogram_1d
 
 class TetrahedralOrderAnalysis(BaseAnalysis):
     def setup(self):

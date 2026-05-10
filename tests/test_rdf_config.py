@@ -6,9 +6,9 @@ from pathlib import Path
 
 import numpy as np
 
-from config_schema import FrameLoopConfig
+from framework.config_schema import FrameLoopConfig
 from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
-from input_providers import FileInputProvider, NullInputProvider
+from io_support.input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
     RDFConfig = None

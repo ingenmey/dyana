@@ -2,11 +2,11 @@
 
 import numpy as np
 from scipy.spatial import cKDTree
-from analyses.base_analysis import BaseAnalysis
-from geometry import minimum_image
+from analyses.common.base_analysis import BaseAnalysis
+from analyses.common.histogram import HistogramND
+from core.geometry import minimum_image
 from utils import prompt, prompt_int, prompt_float, prompt_yn, label_matches
-from analyses.histogram import HistogramND
-from output_writer import write_histogram_1d
+from io_support.output_writer import write_histogram_1d
 
 class ADFThreeBody(BaseAnalysis):
     def setup(self):

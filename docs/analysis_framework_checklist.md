@@ -160,8 +160,8 @@ Rule:
 
 ## 11. Proposed Minimal Framework API
 
-- [x] Add `analysis_params.py` or equivalent shared parameter-spec module.
-- [x] Add `config_builder.py` or equivalent shared prompt-dispatch module.
+- [x] Add `framework/analysis_params.py` or equivalent shared parameter-spec module.
+- [x] Add `framework/config_builder.py` or equivalent shared prompt-dispatch module.
 - [x] Extend `BaseAnalysis` minimally before migrating more analyses.
 - [x] Avoid introducing a separate runner right now.
 
@@ -200,8 +200,8 @@ Notes:
 ## Later Cleanup Notes
 
 - [ ] Reassess remaining shared schema/config scaffolding that is not part of the main migrated-analysis path.
-- [ ] Reassess whether `PromptContext` in `config_builder.py` is more machinery than the current size needs.
-- [ ] Split responsibilities inside `workflow_prompts.py` if the current single class becomes harder to read.
+- [ ] Reassess whether `PromptContext` in `framework/config_builder.py` is more machinery than the current size needs.
+- [ ] Split responsibilities inside `workflow/workflow_prompts.py` if the current single class becomes harder to read.
 - [ ] Revisit the non-XYZ `prompt_cell_vectors(...)` behavior so the method name and return semantics line up more cleanly.
 - [ ] Tighten validation and error handling in `BaseAnalysis.compound_selection(..., multi=True)`.
 

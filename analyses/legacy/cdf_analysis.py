@@ -2,8 +2,8 @@
 
 import numpy as np
 from utils import prompt, prompt_int, prompt_float, prompt_choice, prompt_yn, label_matches
-from analyses.metrics import Selector, DistanceMetric, AngleMetric
-from analyses.histogram import HistogramND
+from analyses.common.metrics import Selector, DistanceMetric, AngleMetric
+from analyses.common.histogram import HistogramND
 
 
 def find_matching_labels(mol, user_label):
@@ -197,4 +197,3 @@ def cdf(traj):
     base = "cdf"
     histogram.save_all(base)
     print(f"Histogram saved to {base}.npy and {base}.dat")
-

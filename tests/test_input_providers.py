@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from input_providers import FileInputProvider, InteractiveInputProvider, NullInputProvider
+from io_support.input_providers import FileInputProvider, InteractiveInputProvider, NullInputProvider
 
 
 class InputProviderTests(unittest.TestCase):

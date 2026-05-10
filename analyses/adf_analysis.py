@@ -4,11 +4,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, IntParam, When
-from analyses.base_analysis import BaseAnalysis
-from analyses.histogram import HistogramND
-from analyses.metrics import AngleMetric, Selector
-from output_writer import build_output_filename, format_selection, write_histogram_1d
+from framework.analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, IntParam, When
+from analyses.common.base_analysis import BaseAnalysis
+from analyses.common.histogram import HistogramND
+from analyses.common.metrics import AngleMetric, Selector
+from io_support.output_writer import build_output_filename, format_selection, write_histogram_1d
 
 
 @dataclass(frozen=True)

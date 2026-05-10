@@ -5,9 +5,9 @@ import importlib.util
 
 import numpy as np
 
-from input_providers import FileInputProvider, NullInputProvider
-from workflow_prompts import WorkflowPrompts
-from prepared_setup import build_prepared_setup, save_prepared_setup
+from io_support.input_providers import FileInputProvider, NullInputProvider
+from workflow.workflow_prompts import WorkflowPrompts
+from workflow.prepared_setup import build_prepared_setup, save_prepared_setup
 
 if importlib.util.find_spec("networkx") is None:
     load_trajectory = None

@@ -11,11 +11,12 @@ import networkx as nx
 import hashlib
 import matplotlib.pyplot as plt
 
-from analyses.base_analysis import BaseAnalysis
-from geometry import minimum_image
+from analyses.common.base_analysis import BaseAnalysis
+from core.geometry import minimum_image
 from utils import (
     label_matches, prompt, prompt_int, prompt_float, prompt_yn, prompt_choice
 )
+from core.atomic_properties import elem_vdW, elem_color
 
 
 class ClusterAnalysis(BaseAnalysis):
@@ -554,8 +555,6 @@ def get_graph_id(graph):
 
 
 def draw_graph(graph, filename="graph.png"):
-    from atomic_properties import elem_vdW, elem_color
-
     def get_element(atom_label):
         return "".join([c for c in atom_label if not c.isdigit()])
 

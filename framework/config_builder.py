@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, ForEach, IntParam, When
+from framework.analysis_params import (
+    AtomLabelsParam,
+    BoolParam,
+    ChoiceParam,
+    CompoundParam,
+    FloatParam,
+    ForEach,
+    IntParam,
+    When,
+)
 
 
 @dataclass

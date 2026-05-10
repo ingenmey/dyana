@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 import numpy as np
 
-from config_schema import FrameLoopConfig
-from input_providers import FileInputProvider, NullInputProvider
+from framework.config_schema import FrameLoopConfig
+from io_support.input_providers import FileInputProvider, NullInputProvider
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -34,7 +34,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
 
     def test_programmatic_prepared_setup_path_reproduces_reference_ncount(self):
         from analyses.neighbor_count_analysis import NeighborCountAnalysis, NeighborCountConfig
-        from workflow_prompts import WorkflowPrompts
+        from workflow.workflow_prompts import WorkflowPrompts
 
         setup = json.loads((NCOUNT_FIXTURES / "setup.json").read_text(encoding="utf-8"))
         workflow = WorkflowPrompts()

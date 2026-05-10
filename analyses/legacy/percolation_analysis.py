@@ -2,8 +2,8 @@ import numpy as np
 from collections import deque, defaultdict
 from scipy.spatial import cKDTree
 
-from analyses.base_analysis import BaseAnalysis
-#from analyses.histogram import HistogramND
+from analyses.common.base_analysis import BaseAnalysis
+#from analyses.common.histogram import HistogramND
 from utils import prompt, prompt_int, prompt_float, prompt_yn, label_matches
 
 
@@ -214,4 +214,3 @@ class PercolationAnalysis(BaseAnalysis):
             for d, count in enumerate(avg_counts, 1):
                 f.write(f"{d} {count:.6f}\n")
         print("Results written to percolation_depths.dat")
-

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from output_metadata import build_run_metadata, write_metadata
+from io_support.output_metadata import build_run_metadata, write_metadata
 
 
 class OutputMetadataTests(unittest.TestCase):

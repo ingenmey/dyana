@@ -4,8 +4,8 @@ import numpy as np
 from collections import defaultdict
 from scipy.spatial import cKDTree
 
-from analyses.base_analysis import BaseAnalysis
-from analyses.selection import collect_atom_indices
+from analyses.common.base_analysis import BaseAnalysis
+from analyses.legacy.selection import collect_atom_indices
 from utils import (
     prompt,
     prompt_int,

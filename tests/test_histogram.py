@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from analyses.histogram import HistogramND
+from analyses.common.histogram import HistogramND
 
 
 class HistogramTests(unittest.TestCase):
@@ -31,4 +31,3 @@ class HistogramTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

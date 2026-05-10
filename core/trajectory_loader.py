@@ -11,9 +11,9 @@ import numpy as np
 from networkx.algorithms import isomorphism
 from scipy.spatial import cKDTree
 
-from atomic_properties import elem_covalent, elem_masses, elem_number, elem_vdW
+from .atomic_properties import elem_covalent, elem_masses, elem_number, elem_vdW
 from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
-from geometry import distance_squared
+from .geometry import distance_squared
 
 config_file_path = os.path.join(os.path.dirname(__file__), "../config.json")
 with open(config_file_path, "r", encoding="utf-8") as config_file:

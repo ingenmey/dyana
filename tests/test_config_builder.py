@@ -1,9 +1,9 @@
 import unittest
 from dataclasses import dataclass
 
-from analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, ForEach, IntParam, When
-from config_builder import prompt_config_from_schema
-from input_providers import FileInputProvider, NullInputProvider
+from framework.analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, ForEach, IntParam, When
+from framework.config_builder import prompt_config_from_schema
+from io_support.input_providers import FileInputProvider, NullInputProvider
 
 
 @dataclass(frozen=True)

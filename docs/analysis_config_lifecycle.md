@@ -13,7 +13,7 @@ It is a reference for the current path, not a migration plan.
 ## 1. Design Summary
 
 Supported analyses in Dyana share one canonical shape built around
-[BaseAnalysis](D:/python/dyana/analyses/base_analysis.py).
+[BaseAnalysis](D:/python/dyana/analyses/common/base_analysis.py).
 
 The central ideas are:
 
@@ -45,7 +45,7 @@ Each migrated analysis also defines a schema describing the interactive prompt
 flow.
 
 The schema is built from shared parameter specs in
-[analysis_params.py](D:/python/dyana/analysis_params.py), such as:
+[analysis_params.py](D:/python/dyana/framework/analysis_params.py), such as:
 
 - `CompoundParam`
 - `AtomLabelsParam`
@@ -81,7 +81,7 @@ This is the supported entry point for analysis setup.
 ## 3. `BaseAnalysis` Lifecycle
 
 The shared lifecycle lives in
-[analyses/base_analysis.py](D:/python/dyana/analyses/base_analysis.py).
+[analyses/common/base_analysis.py](D:/python/dyana/analyses/common/base_analysis.py).
 
 The high-level flow is:
 
@@ -142,7 +142,7 @@ replace the typed config dataclass or `configure(config)` as a design layer.
 ## 7. Frame-Loop Configuration
 
 Frame-loop settings are represented by
-[FrameLoopConfig](D:/python/dyana/config_schema.py).
+[FrameLoopConfig](D:/python/dyana/framework/config_schema.py).
 
 The main fields are:
 
@@ -208,4 +208,3 @@ analyses only:
 
 Older analyses that still use legacy patterns should not be treated as the
 reference design for future framework work.
-

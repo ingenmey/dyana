@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from geometry import distance_squared, periodic_center
+from .geometry import distance_squared, periodic_center
 from utils import label_matches
 
 

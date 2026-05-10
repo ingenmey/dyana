@@ -1,8 +1,8 @@
 import unittest
 
-from analyses.base_analysis import BaseAnalysis
-from config_schema import FrameLoopConfig
-from input_providers import NullInputProvider
+from analyses.common.base_analysis import BaseAnalysis
+from framework.config_schema import FrameLoopConfig
+from io_support.input_providers import NullInputProvider
 
 
 class RecordingTrajectory:

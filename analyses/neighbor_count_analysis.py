@@ -6,9 +6,9 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.spatial import cKDTree
 
-from analysis_params import AtomLabelsParam, BoolParam, CompoundParam, FloatParam, ForEach
-from analyses.base_analysis import BaseAnalysis
-from output_writer import build_output_filename, format_selection, format_selection_group, write_table
+from framework.analysis_params import AtomLabelsParam, BoolParam, CompoundParam, FloatParam, ForEach
+from analyses.common.base_analysis import BaseAnalysis
+from io_support.output_writer import build_output_filename, format_selection, format_selection_group, write_table
 
 
 @dataclass(frozen=True)

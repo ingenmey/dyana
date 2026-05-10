@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.spatial import cKDTree
 
-from geometry import minimum_image
+from core.geometry import minimum_image
 
 
 @dataclass

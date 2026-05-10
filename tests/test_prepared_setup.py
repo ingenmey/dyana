@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
-from prepared_setup import (
+from workflow.prepared_setup import (
     PreparedSetupValidationError,
     apply_prepared_setup,
     build_prepared_setup,

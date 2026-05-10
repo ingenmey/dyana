@@ -10,6 +10,7 @@ import matplotlib.patches as patches
 from scipy.spatial import cKDTree
 from collections import defaultdict
 from utils import prompt_float, prompt_int, prompt_yn
+from core.atomic_properties import elem_vdW, elem_color
 
 
 def get_surface_atoms(traj, z0, z1):
@@ -118,7 +119,6 @@ def compute_compactness_for_sets(voronoi_cells, atoms, sets):
 
 def visualize_voronoi(result, atoms, dimx, dimy, filename="voronoi_vis.png"):
     from matplotlib import cm
-    from atomic_properties import elem_vdW, elem_color
 
     def get_element(symbol):
         return ''.join(c for c in symbol if not c.isdigit())
@@ -398,4 +398,3 @@ def surface_voronoi(traj):
 
     if do_visualize:
         visualize_voronoi(voronoi_cells, atoms, dimx, dimy)
-

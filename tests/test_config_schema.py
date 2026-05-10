@@ -1,6 +1,6 @@
 import unittest
 
-from config_schema import FrameLoopConfig, TopologyConfig
+from framework.config_schema import FrameLoopConfig, TopologyConfig
 
 
 class ConfigSchemaTests(unittest.TestCase):
