@@ -3,11 +3,11 @@
 
 import argparse
 import importlib
-import json
 import os
 from pathlib import Path
 
 from core import constants
+from core.app_config import load_app_config
 from io_support.input_providers import FileInputProvider, InteractiveInputProvider
 from io_support.output_writer import configure_output, restore_output
 from workflow.workflow_prompts import WorkflowPrompts
@@ -54,13 +54,7 @@ def choose_analysis(input_provider):
 
 
 def _load_output_defaults(config_path: str | Path | None = None) -> dict[str, bool]:
-    path = Path(config_path) if config_path is not None else Path(__file__).resolve().with_name("config.json")
-    try:
-        with open(path, "r", encoding="utf-8") as fin:
-            raw = json.load(fin)
-    except (OSError, json.JSONDecodeError):
-        return {"force_overwrite": False}
-
+    raw = load_app_config(config_path)
     return {
         "force_overwrite": bool(raw.get("OUTPUT_FORCE_DEFAULT", False)),
     }

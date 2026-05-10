@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import os
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import dataclass
@@ -11,14 +9,12 @@ import numpy as np
 from networkx.algorithms import isomorphism
 from scipy.spatial import cKDTree
 
+from .app_config import load_app_config
 from .atomic_properties import elem_covalent, elem_masses, elem_number, elem_vdW
 from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from .geometry import distance_squared
 
-config_file_path = os.path.join(os.path.dirname(__file__), "../config.json")
-with open(config_file_path, "r", encoding="utf-8") as config_file:
-    config = json.load(config_file)
-
+config = load_app_config()
 EXCLUDED_ELEMENTS = set(config["EXCLUDED_ELEMENTS"])
 NEIGHBOR_SEARCH_SCALE = config.get("NEIGHBOR_SEARCH_SCALE", 1.164)
 BOND_DISTANCE_SCALE = config.get("BOND_DISTANCE_SCALE", 1.4)
