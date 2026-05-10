@@ -1,0 +1,381 @@
+Command line:
+"travis -p ../water128.xyz -i input.txt"
+
+
+  ________                                 __
+ /        |                               /  |
+ ########/ ______    ______    __     __  ##/    _______
+    ## |  /      \  /      \  /  \   /  | /  |  /       |
+    ## | /######  | ######  | ##  \ /##/  ## | /#######/
+    ## | ## |  ##/  /    ## |  ##  /##/   ## | ##      \
+    ## | ## |      /####### |   ## ##/    ## |  ######  |
+    ## | ## |      ##    ## |    ###/     ## | /     ##/
+    ##/  ##/        #######/      #/      ##/  #######/
+
+    TRajectory Analyzer and VISualizer  -  Open-source free software under GNU GPL v3
+
+    Copyright (c) Martin Brehm      (2009-2023), University of Paderborn
+                  Barbara Kirchner  (2009-2023), University of Bonn
+                  Martin Thomas     (2012-2017)
+                  Sascha Gehrke     (2016-2020)
+
+    http://www.travis-analyzer.de
+
+    Please cite: J. Chem. Phys. 2020, 152 (16), 164105.         (DOI 10.1063/5.0005078 )
+                 J. Chem. Inf. Model. 2011, 51 (8), 2007-2023.  (DOI 10.1021/ci200217w )
+
+    There is absolutely no warranty on any results obtained from TRAVIS.
+
+ #  Beta features included
+ #  Running on k28 at Sun May 10 21:04:39 2026 (PID 19414)
+ #  Running in /mnt/d/python/dyana/tests/fixtures/travis
+ #  Version: Oct 20 2023, built at Dec 18 2023, 17:06:48, compiler "7.5.0", GCC 7.5.0
+ #  Target platform: Linux, __cplusplus=201103L, Compile flags: DEBUG_ARRAYS 
+ #  Machine: x86_64, char=8bits, int=4b, long=8b, addr=8b, 0xA0B0C0D0=D0,C0,B0,A0.
+ #  Home: /home/ingenmey,  Executable: /home/ingenmey/bin/travis
+ #  Input from input.txt, Output to terminal
+
+    >>> Please use a color scheme with dark background or specify "-nocolor"! <<<
+
+    Loading configuration from /home/ingenmey/.travis.conf ...
+
+    Opening position trajectory ../water128.xyz ...
+
+    Trajectory contains approximately 10 frames (just a *guess* from the file size of 173.15 KiB).
+
+    384 atoms in the system: 256x H, 128x O
+
+    System extent:  X = {    -63 ..  +1652 pm }, dX = 1715 pm
+      (in step 1)   Y = {    -21 ..  +1632 pm }, dY = 1654 pm
+                    Z = {    -24 ..  +1633 pm }, dZ = 1657 pm
+
+    The "advanced mode" offers seldomly required features, including support for non-orthorhombic
+    simulation cells, NPT ensemble, non-periodic systems, user-definded virtual atoms, pseudomolecules, ...
+
+    Use the advanced mode until the analysis selection menu (y/n)? [no] <RETURN>
+
+    A cell vector of 1564.47 pm would result in a density of 1.0 g/cm^3.
+
+    Are the 3 cell vectors of the same size (yes/no)? [yes] <RETURN>
+    Enter length of cell vector in pm: 1567
+
+    The box size is 1567.00 x 1567.00 x 1567.00 pm.
+    The overall box density is 0.995165 g/cm^3.
+
+    Using the following element data:
+
+      Element | Ord. Number |  Mass / u | Cov. Radius / pm | VdW Radius / pm | Color
+    ----------|-------------|-----------|------------------|-----------------|----------
+      H       |           1 |   1.00798 |            37.00 |          109.00 | #FFFFFF
+      O       |           8 |  15.99940 |            75.00 |          152.00 | #FF0000
+
+
+    Initialized spatial domain engine with 9 x 9 x 9 cells, min. diameter = 172 pm.
+
+    Molecule recognition [######################################################]
+
+    128 molecules found.
+
+    Molecule recognition took 0.0003 seconds.
+
+    Sorting atom types...
+    Setting up bond lists...
+    Building atom codes...
+    Creating refined topological atom order...
+      [############################################################] Done.
+    Creating bond list...
+    Creating angle list...
+    Grouping together equivalent molecules...
+    Found 1 unique molecule types.
+    Sorting molecule types by molecular mass...
+    Found 0 rings.
+    Molecule recognition finished.
+
+Output of bond matrices:
+
+*** Molecule 1: H2O; Representant 1; Distances in pm ***
+
+    H1  H2  O1 
+H1  ***  -  102 
+H2   -  ***  99 
+O1  102  99 *** 
+
+    Atoms H1, H2 are equivalent.
+
+
+*** The following 1 kind of molecules has been recognized:
+    (ordered by molecular mass)
+
+  - Molecule 1:  H2O (128 pieces, 18.02 g/mol)
+      (2 noneq. atoms, 1 noneq. bond, 1 noneq. angle)
+      Concentration:  55.239797 mol/liter
+
+
+    If you switch on "USE_OPENBABEL" in config.h, TRAVIS can print SMILES strings of your molecules.
+
+    You can create images of the structural formulas with the atom labels for easier
+    identification of the atoms (requires installed GraphViz package - see www.graphviz.org).
+
+    Create images of the structural formulas (y/n)? [no] <RETURN>
+
+    Accept these molecules (y) or change something (n)? [yes] <RETURN>
+
+    Uniting molecules which have been broken by wrapping...
+
+    Determining maximum molecular diameters...
+
+    Found the following maximal molecular diameters:
+
+      (*) Molecule 1 (H2O):    176.77 pm
+
+
+    The atoms are currently ordered by topological priority.
+
+    Defining virtual atom #1 as molecular Center of Geometry:
+      - H2O...
+
+    Defining virtual atom #2 as molecular Center of Mass:
+      - H2O...
+
+    Defining molecular dipole vectors:
+
+      The last virtual atom of each molecule is defined as the tip of the dipole vector
+      starting in center of mass (#2). 1 Debye corresponds to 100 pm of vector length.
+      Only useful if dipole/charge data is provided. Otherwise vector has always length of zero.
+
+      - Dipole vector #2 --> #3 in H2O ...
+
+>>> 3 virtual atoms have been defined: >>>
+
+    #1 in H2O: Center of Geometry.
+    #2 in H2O: Center of Mass.
+
+    #3 in H2O - tip of molecular dipole vector starting in #2.
+
+<<< End of virtual atoms <<<
+
+
+>>> List of functions <<<
+
+ *** Static (time independent) Functions
+ cdf      - Combined Distribution Function
+ rdf      - Radial Distribution Function
+ adf      - Angular Distribution Function
+ ddf      - Dihedral Distribution Function
+ pldf     - Point-Plane Distance Distribution
+ lidf     - Point-Line Distance Distribution
+ plproj   - Plane Projection Distribution
+ dprof    - Fixed Plane Density Profile
+ fpp      - Fixed Plane Projection
+ dens     - Density Distribution Function
+ sdf      - Spatial Distribution Function
+ psdf     - Pseudo SDF (only 2 ref. atoms)
+ dip      - Dipole Distribution Function
+ cond     - Evaluate Structural Condition
+ sfac     - Compute Structure Factor
+ agtopo   - Aggregation Topology Analysis
+ sankey   - Sankey diagram plot
+ cmat     - Contact Matrix / Connection Matrix
+ geodens  - Particle Density inside Geometric Object
+
+ *** Dynamic (time dependent) Functions
+ vdf      - Velocity Distribution Function
+ fdf      - Force Distribution Function
+ msd      - Mean Square Displacement / Diffusion Coefficients
+ acf      - Velocity Autocorrelation Functions
+ rdyn     - Vector Reorientation Dynamics
+ vhcf     - Van Hove Correlation Function
+ aggr     - Aggregation Functions (DACF, DLDF, DDisp)
+ hbond    - Hydrogen Bond Dynamics
+ ionpair  - Diffusion Corrected Ion Pair Dynamics
+ tddf     - Time Dependent Distribution Functions
+
+ *** Spectroscopic Functions
+ spec     - New Spectroscopy Module (IR, Raman, VCD, ROA)
+ power    - Calculate Power Spectrum
+ nc       - Normal Coordinate Analysis
+ ir       - (old) Calculate IR Spectrum
+ raman    - (old) Calculate Raman Spectrum
+ vcd      - (old) Calculate VCD Spectrum
+ rera     - Calculate Resonance Raman Spectrum
+ drst     - Save Dipole Restart File
+ mrst     - Save Magnetic Moment Restart File
+ pol      - Set up Polarizability Calculation
+
+ *** Miscellaneous Functions
+ env      - Save Trajectory of RM Environment / TDO Plot
+ proc     - Save Processed Trajectory
+ cut      - Cut Clusters
+ reg      - Region-specific Analysis
+ chi      - Chirality Analysis
+ eck      - Transform to Eckart Frame
+ swan     - Sort Wannier Centers
+ voro     - Basic Voronoi Analysis
+ vori     - Voronoi Integration Functions
+ vorochg  - Voronoi Charge Optimization
+ doma     - Domain Analysis
+ order    - Order Parameters
+ hole     - Hole Theory based Analysis
+ cla      - Cluster Analysis
+
+   (You may specify multiple analyses at once, but
+    the safe way is to perform only one kind of analysis at a time.)
+
+    Which functions to compute (comma separated)? rdf
+
+ rdf     - Radial Distribution Function
+
+    The advanced mode includes some options which are quite powerful,
+    yet possibly weird or seldomly required.
+
+    Use the advanced mode for the main part (y/n)? [no] <RETURN>
+
+
+    H2O is the reference molecule.
+
+
+>>> Observation 1 >>>
+
+    Perform this observation intramolecular (within the reference molecule) (0) or intermolecular (1)? [1] <RETURN>
+
+    Only one molecule type, choosing H2O as observed molecule (OM).
+
+>>> Radial Distribution Function >>>
+
+    Take reference atom(s) from RM H2O (0) or from OM H2O (1)? [0] <RETURN>
+    Take observed atom(s) from RM H2O (0) or from OM H2O (1)? [1] <RETURN>
+
+    Which atom(s) to take from RM H2O (e.g. "C1,C3-5,H", "*"=all)? [#2] O
+    Which atom(s) to take from OM H2O (e.g. "C1,C3-5,H", "*"=all)? [#2] H
+    This yields in 2 combinations.
+
+    The smallest periodic cell half diameter is 783.50 pm. You can compute meaningful RDFs up to this distance.
+
+    There is also a long-range RDF formula by Roehrig & Kuehne which works up to 1357.06 pm.
+    If you enter a max. radius of > 783.50 pm, you will be asked to switch it on.
+
+    Using 0 pm as the minimal radius of the RDF.
+
+    Enter the maximal radius of this RDF (in pm): [700.0] 1000
+
+    The maximal radius is larger than the cell half diameter.
+    Switch on the long-range mode by Kuehne and Roehrig (y/n)? [yes] n
+
+    Warning: The maximal radius is larger than allowed by the cell. The RDF will start to decay at 783.50 pm.
+
+
+    The default resolution is 300 bins per nm, corresponding to a bin width of 3.33 pm.
+
+    Enter the resolution (bin count) for this RDF: [300] 1000
+    Correct radial distribution for this RDF (y/n)? [yes] <RETURN>
+
+<<< End of Radial Distribution Function <<<
+
+    Save temporal development for this observation (y/n)? [no] <RETURN>
+    Add a condition to this observation (y/n)? [no] <RETURN>
+
+<<< End of Observation 1 <<<
+
+    Add another observation (y/n)? [no] <RETURN>
+
+>>> Observation List >>>
+
+  *** Observation 1
+    - RDF: H2O_H2O_[Or_Ho]
+
+<<< End of Observation List <<<
+
+
+    Not wrapping molecules into the box.
+
+    Not removing center of mass movement of the box.
+
+    Skip repeated time steps (y/n)? [no] <RETURN>
+    In which trajectory frame to start processing the trajectory? [1] <RETURN>
+    How many trajectory frames to read (from this position on)? [all] <RETURN>
+    Use every n-th read trajectory frame for the analysis: [1] <RETURN>
+
+    Using 10 time steps: Every 1st within range 1 - approx. 10.
+
+########## All information collected ##########
+
+>>> Initialization >>>
+
+Initializing observation 1...
+  Creating RDF...
+
+<<< End of Initialization <<<
+
+
+##########   Starting Main Pass   ##########
+
+Hint: Press CTRL+C once to softly interrupt analysis and still write the results.
+      Creating an empty file named EXIT ("touch EXIT") has the same effect.
+
+Step      0 ..........
+End of trajectory file reached.
+
+
+##########   Main pass done   ##########
+
+10 time steps processed.
+
+
+
+    Finishing analyses:
+----------------------------------------------------------------------------------------------------------
+
+
+>>> Observation 1 >>>
+
+* Radial Distribution Function
+    284062 bin entries, 41058 out of bin range (12.63 percent).
+    Max. bin entry: 7.329740E+02  -->  EPS: 1.136868E-13
+    Mean value:    757.379 pm    Standard deviation:    211.792 pm
+    Min. value:      142.9 pm    Max.value:             1339.23 pm
+    Scaling RDF to uniform density ...
+    Correcting radial distribution...
+    Performing automatic peak detection...
+    >>> Peak Data >>>
+      1. maximum at  171.50 pm, height  1.8200
+      1. minimum at  255.50 pm, height  0.0144,  2.0086 particles in 1. solvation shell.
+      2. maximum at  311.50 pm, height  1.8544
+      2. minimum at  419.50 pm, height  0.7340, 17.1492 particles in 2. solvation shell.
+      3. maximum at  450.50 pm, height  1.1950
+      3. minimum at  582.50 pm, height  0.7983, 34.6048 particles in 3. solvation shell.
+      4. maximum at  700.50 pm, height  1.2061
+    <<< Peak Data <<<
+    Saving RDF as "rdf_H2O_H2O_[Or_Ho].csv"...
+[Renaming existing File rdf_H2O_H2O_[Or_Ho].csv to #1#[...].csv ...OK.]
+      Note: The third column of the text file contains the number integral / coordination number.
+    Saving RDF AGR file as "rdf_H2O_H2O_[Or_Ho].agr"...
+[Renaming existing File rdf_H2O_H2O_[Or_Ho].agr to #1#[...].agr ...OK.]
+
+
+----------------------------------------------------------------------------------------------------------
+    Finished all analyses.
+
+
+    Note: To show a list of all persons who contributed to TRAVIS,
+          please add "-credits" to your command line arguments, or set the
+          variable "SHOWCREDITS" to "TRUE" in your travis.conf file.
+
+    Source code from other projects used in TRAVIS:
+      - lmfit     from Joachim Wuttke
+      - kiss_fft  from Mark Borgerding
+      - voro++    from Chris Rycroft
+
+    http://www.travis-analyzer.de
+
+    Please cite all of the following articles for the analyses you have used:
+
+  * For TRAVIS in general:
+
+    "TRAVIS - A Free Analyzer for Trajectories from Molecular Simulation",
+    M. Brehm, M. Thomas, S. Gehrke, B. Kirchner; J. Chem. Phys. 2020, 152 (16), 164105.   (DOI 10.1063/5.0005078 )
+
+    "TRAVIS - A Free Analyzer and Visualizer for Monte Carlo and Molecular Dynamics Trajectories",
+    M. Brehm, B. Kirchner; J. Chem. Inf. Model. 2011, 51 (8), pp 2007-2023.   (DOI 10.1021/ci200217w )
+
+*** The End ***
+

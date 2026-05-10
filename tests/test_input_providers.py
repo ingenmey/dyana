@@ -59,6 +59,27 @@ class InputProviderTests(unittest.TestCase):
 
         self.assertEqual(text, "# Question? [fallback]\n\n")
 
+    def test_interactive_provider_creates_log_parent_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "nested" / "logs" / "input.log"
+            provider = InteractiveInputProvider(log_path=log_path)
+
+            with patch("builtins.input", return_value="answer"):
+                self.assertEqual(provider.ask_str("Question?"), "answer")
+            provider.close()
+
+            self.assertTrue(log_path.exists())
+
+    def test_file_provider_creates_log_parent_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "nested" / "logs" / "input.log"
+            provider = FileInputProvider(lines=["answer"], fallback=NullInputProvider(), log_path=log_path)
+
+            self.assertEqual(provider.ask_str("Question?"), "answer")
+            provider.close()
+
+            self.assertTrue(log_path.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 
 class InputProvider(ABC):
@@ -81,7 +82,9 @@ class InteractiveInputProvider(InputProvider):
 
     def set_log_file(self, log_path):
         self.close()
-        self.log_file = open(log_path, "w", buffering=1, encoding="utf-8")
+        path = Path(log_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.log_file = open(path, "w", buffering=1, encoding="utf-8")
 
     def close(self):
         if self.log_file:
@@ -128,7 +131,9 @@ class FileInputProvider(InputProvider):
 
     def set_log_file(self, log_path):
         self.close()
-        self.log_file = open(log_path, "w", buffering=1, encoding="utf-8")
+        path = Path(log_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.log_file = open(path, "w", buffering=1, encoding="utf-8")
 
     def close(self):
         if self.log_file:

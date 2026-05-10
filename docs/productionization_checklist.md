@@ -40,16 +40,17 @@ avoid carrying competing framework guidance.
 - [ ] Move to `src/dyana/` layout.
 - [ ] Move `main.py` into `dyana.cli`.
 - [ ] Replace top-level imports such as `from utils import ...` with explicit package imports.
-- [ ] Split trajectory reading, topology detection, and data objects into smaller modules.
+- [x] Do not split trajectory reading, topology detection, and data objects further unless a concrete readability or reuse problem appears.
 - [ ] Add `dyana.__version__`.
 - [~] Add `docs/` reference pages for architecture and analyses.
-  - Productionization checklist exists.
-  - Architecture and per-analysis reference pages are still missing.
+  - Architecture/reference pages now exist for the runtime topology model, analysis/config lifecycle, output-table format, and documentation/comment policy.
+  - Per-analysis reference pages are still missing.
 
 ## 3. Separate CLI Interaction From Scientific Logic
 
 - [x] Document the target framework split in the framework checklist.
 - [~] Add typed config scaffolding in `config_schema.py`.
+- [x] Keep the current `CONFIG_SCHEMA` plus explicit per-analysis config-dataclass design for the supported path; do not collapse those layers as part of current productionization work.
 - [x] Add per-analysis config objects, starting with RDF.
 - [~] Convert analyses so prompting only builds config objects, using the framework checklist plan.
 - [x] Make analyses runnable directly from config, starting with RDF.
@@ -122,7 +123,7 @@ avoid carrying competing framework guidance.
 - [x] Add explicit topology tests for water.
   - Tiny water fixture recognizes one `H2O` compound with 128 members and stable `H1/H2/O1` labels.
 - [x] Make topology rebuilding produce the authoritative runtime topology model used by the supported analyses.
-- [~] Enforce canonical local ordering for runtime topology membership rows.
+- [x] Enforce canonical local ordering for runtime topology membership rows.
   - Equivalent molecules are canonicalized into template-local order.
   - Direct regression coverage now protects canonical paired-subgroup mapping across equivalent members.
   - For truly equivalent atoms, Dyana uses deterministic conventional numbering rather than pretending there is a chemically privileged distinction.
@@ -132,9 +133,7 @@ avoid carrying competing framework guidance.
 - [ ] Store topology/bond criteria in output metadata.
 - [ ] Warn clearly on unknown elements or missing radii.
 - [ ] Validate all members of a compound are isomorphic.
-- [~] Decouple topology detection/building further from trajectory-reader responsibilities.
-  - The authoritative runtime model is no longer the old mutable analysis-facing object graph.
-  - The builder still lives in `core/trajectory_loader.py`.
+- [x] Keep topology building inside the trajectory layer unless a concrete readability or reuse problem justifies separating it later.
 - [ ] Support fixed/static topology loaded from file.
 - [x] Document static vs dynamic topology modes.
   - Direct frame-loop tests protect the current static vs dynamic behavior.
@@ -150,15 +149,16 @@ avoid carrying competing framework guidance.
 
 ## 10. Standardize Output Handling
 
-- [ ] Add output-directory option to CLI.
-- [ ] Prevent accidental overwrite unless `--force`.
+- [x] Add output-directory option to CLI.
+- [x] Prevent accidental overwrite unless `--force`.
 - [x] Add run metadata writer.
 - [ ] Add resolved-config writer.
 - [x] Centralize plain-text table writing.
   - A shared output writer now exists for the migrated analyses.
   - The migrated analyses now share one documented text-table format.
 - [ ] Add consistent naming conventions for output files.
-- [ ] Put analysis outputs into timestamped or user-selected run directories.
+- [x] Put analysis outputs into user-selected run directories.
+- [x] Do not add timestamped run directories on top of the current explicit `--output-dir` support.
 - [~] Include units, frame range, stride, and normalization in headers/metadata.
   - Migrated analyses now share a common output direction and documented table format.
   - Some analysis-specific metadata is still not written consistently.
@@ -260,8 +260,8 @@ avoid carrying competing framework guidance.
 ## 19. Frame Indexing
 
 - [ ] Document zero-based internal vs one-based user frame numbering.
-- [ ] Replace `nframes=-1` sentinel with `None` in config-level APIs.
-- [ ] Remove the `nframes=-1` sentinel once the framework path is ready to replace it cleanly.
+- [x] Keep `nframes=-1` as the accepted frame-count sentinel in the current frame-loop API.
+- [x] Do not replace the `nframes=-1` sentinel unless the frame-loop API itself changes materially.
 - [ ] Store frame-indexing convention in output metadata.
 
 ## 20. Reduce Duplicate Analysis Code
@@ -296,6 +296,8 @@ avoid carrying competing framework guidance.
 - [ ] Invalid bin ranges or zero bin widths.
 - [ ] Missing optional dependency.
 - [ ] Output file already exists.
+- [x] Output file already exists.
+  - Managed analysis outputs are now rotated through `#1#<filename>`, `#2#<filename>`, and so on unless `--force` is used.
 
 ## 23. Documentation
 
@@ -325,6 +327,9 @@ avoid carrying competing framework guidance.
 
 ## Immediate Next-Step Candidates
 
-1. Keep this checklist aligned with [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md) and [trajectory_topology_restructure_checklist.md](D:/python/dyana/docs/trajectory_topology_restructure_checklist.md) now that the supported path is broader than RDF alone.
-2. Resume version/metadata/output-directory work here.
+1. Keep this checklist aligned with [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md) and the current reference docs now that the runtime topology work is complete.
+2. Version/metadata/output-directory work here means:
+   - add a resolved-config writer
+   - add consistent naming conventions for output files
+   - add `dyana.__version__` and include it in output metadata
 3. Add opt-in slow smoke tests for the documented example trajectories.

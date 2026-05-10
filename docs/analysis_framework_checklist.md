@@ -52,9 +52,9 @@ Status markers:
   - `ForEach`
   - `When`
 - [x] Keep parameter specs focused on gathering/validating config, not science.
-- [~] Reassess the duplicated field definitions between `CONFIG_SCHEMA` and explicit config dataclasses such as `RDFConfig` / `ADFConfig`.
+- [x] Keep the current `CONFIG_SCHEMA` plus explicit config-dataclass design for the supported path, even though both layers list the same fields.
 - [x] Keep explicit config dataclasses for now as the typed programmatic API and validation layer, even when `CONFIG_SCHEMA` duplicates the field list.
-- [x] Treat deeper collapse of `CONFIG_SCHEMA` and explicit config classes as later work only if the schema becomes expressive enough to cover field defaults, prompt defaults, and validation semantics cleanly.
+- [x] Do not spend framework time collapsing `CONFIG_SCHEMA` and explicit config classes unless a later concrete problem justifies it.
 - [ ] Add room for later param types without overdesign:
   - `StringParam`
   - `PathParam`
@@ -94,8 +94,8 @@ Status markers:
 - [x] Keep `FrameLoopConfig` as the shared frame-loop config object.
 - [x] Let `BaseAnalysis` own prompting for frame-loop config.
 - [x] Let programmatic mode inject `FrameLoopConfig` without prompts.
-- [~] Keep the current `nframes=-1` sentinel consistently through the frame-loop path until the loop itself is redesigned.
-- [ ] Replace `nframes=-1` with a cleaner frame-count API as part of a later frame-loop redesign.
+- [x] Keep the current `nframes=-1` sentinel consistently through the frame-loop path.
+- [x] Keep `nframes=-1` as the accepted frame-count sentinel; do not redesign it unless the frame-loop API itself changes materially.
 - [x] Mirror the analysis-config flow: prompt a frame-loop config object, then apply it with `configure_frame_loop(...)`.
 
 ## 7. Analysis File Readability

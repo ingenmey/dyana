@@ -3,10 +3,13 @@
 
 import argparse
 import importlib
+import json
 import os
+from pathlib import Path
 
 import constants
 from input_providers import FileInputProvider, InteractiveInputProvider
+from output_writer import configure_output, restore_output
 from workflow_prompts import WorkflowPrompts
 
 AVAILABLE_ANALYSES = {
@@ -50,11 +53,38 @@ def choose_analysis(input_provider):
         print("Invalid choice. Please choose an analysis from the above list.")
 
 
-def main(traj_file, input_provider=None, prepared_setup=None, save_prepared_setup_path=None):
+def _load_output_defaults(config_path: str | Path | None = None) -> dict[str, bool]:
+    path = Path(config_path) if config_path is not None else Path(__file__).resolve().with_name("config.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fin:
+            raw = json.load(fin)
+    except (OSError, json.JSONDecodeError):
+        return {"force_overwrite": False}
+
+    return {
+        "force_overwrite": bool(raw.get("OUTPUT_FORCE_DEFAULT", False)),
+    }
+
+
+def _resolve_log_path(output_dir: str | Path, log_path: str | None) -> str:
+    if log_path is not None:
+        return log_path
+    return str(Path(output_dir) / "input.log")
+
+
+def main(
+    traj_file,
+    input_provider=None,
+    prepared_setup=None,
+    save_prepared_setup_path=None,
+    output_dir=".",
+    force_overwrite=False,
+):
     """Run the interactive workflow for one trajectory file."""
     workflow_prompts = WorkflowPrompts(input_provider=input_provider)
     input_provider = workflow_prompts.input_provider
     traj = None
+    previous_output_policy = configure_output(output_dir=output_dir, force_overwrite=force_overwrite)
 
     try:
         if prepared_setup is not None:
@@ -75,26 +105,42 @@ def main(traj_file, input_provider=None, prepared_setup=None, save_prepared_setu
         fin = getattr(traj, "fin", None)
         if fin is not None and not fin.closed:
             fin.close()
+        restore_output(previous_output_policy)
 
 
 def cli():
     """Parse CLI arguments and run the supported Dyana entry path."""
+    output_defaults = _load_output_defaults()
     parser = argparse.ArgumentParser(description="Molecular dynamics trajectory analyzer.")
     parser.add_argument("traj_file", type=str, help="Path to the trajectory file in XYZ format")
     parser.add_argument("-i", "--input", type=str, help="Path to the input file")
-    parser.add_argument("-l", "--log", type=str, default="input.log", help="Path to the log file")
+    parser.add_argument("-o", "--output-dir", type=str, default=".", help="Directory for managed analysis output files")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        default=output_defaults["force_overwrite"],
+        help="Overwrite existing managed analysis output files instead of rotating older files",
+    )
+    parser.add_argument(
+        "-l",
+        "--log",
+        type=str,
+        default=None,
+        help="Path to the input log file (defaults to <output-dir>/input.log)",
+    )
     parser.add_argument("--prepared-setup", type=str, help="Path to a prepared setup JSON file")
     parser.add_argument("--save-prepared-setup", type=str, help="Write the accepted prepared setup to this JSON file")
     args = parser.parse_args()
+    log_path = _resolve_log_path(args.output_dir, args.log)
 
     if args.input is not None:
         input_provider = FileInputProvider(
             file_path=args.input,
             fallback=InteractiveInputProvider(),
-            log_path=args.log,
+            log_path=log_path,
         )
     else:
-        input_provider = InteractiveInputProvider(log_path=args.log)
+        input_provider = InteractiveInputProvider(log_path=log_path)
 
     try:
         main(
@@ -102,6 +148,8 @@ def cli():
             input_provider=input_provider,
             prepared_setup=args.prepared_setup,
             save_prepared_setup_path=args.save_prepared_setup,
+            output_dir=args.output_dir,
+            force_overwrite=args.force,
         )
     finally:
         close = getattr(input_provider, "close", None)

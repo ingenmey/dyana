@@ -4,10 +4,13 @@ import hashlib
 import numbers
 import re
 from collections.abc import Iterable
+from pathlib import Path
 
 
 _SAFE_TOKEN_RE = re.compile(r"[^A-Za-z0-9+.-]+")
 _DEFAULT_DATA_COLUMN_WIDTH = 16
+_OUTPUT_DIR = Path(".")
+_FORCE_OVERWRITE = False
 
 
 def build_output_filename(analysis_name: str, explicit_parts: list[str] | None = None, max_length: int = 60) -> str:
@@ -21,6 +24,21 @@ def build_output_filename(analysis_name: str, explicit_parts: list[str] | None =
 
     short_id = hashlib.sha1(explicit_stem.encode("utf-8")).hexdigest()[:8]
     return f"{analysis_name}_{short_id}.dat"
+
+
+def configure_output(output_dir: str | Path = ".", force_overwrite: bool = False) -> tuple[Path, bool]:
+    """Set the shared output directory and overwrite policy, returning the previous policy."""
+    global _OUTPUT_DIR, _FORCE_OVERWRITE
+    previous = (_OUTPUT_DIR, _FORCE_OVERWRITE)
+    _OUTPUT_DIR = Path(output_dir)
+    _FORCE_OVERWRITE = bool(force_overwrite)
+    return previous
+
+
+def restore_output(previous: tuple[Path, bool]) -> None:
+    """Restore a previously captured shared output policy."""
+    global _OUTPUT_DIR, _FORCE_OVERWRITE
+    _OUTPUT_DIR, _FORCE_OVERWRITE = previous
 
 
 def format_selection(labels: Iterable[str], compound_rep: str) -> str:
@@ -80,7 +98,9 @@ def write_table(
         for idx, value in enumerate(row):
             widths[idx] = max(widths[idx], len(value))
 
-    with open(filename, "w", encoding="utf-8") as f:
+    output_path = _prepare_output_path(filename)
+
+    with open(output_path, "w", encoding="utf-8") as f:
         for line in comment_lines or []:
             f.write(f"# {line}\n")
 
@@ -102,6 +122,43 @@ def _sanitize_token(value: str) -> str:
     if not cleaned:
         raise ValueError(f"Could not build a filename token from {value!r}.")
     return cleaned
+
+
+def _prepare_output_path(filename: str | Path) -> Path:
+    path = Path(filename)
+    if not path.is_absolute():
+        path = _OUTPUT_DIR / path
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if path.exists() and not _FORCE_OVERWRITE:
+        rotated_path, shifted_count = _rotate_existing_output(path)
+        if shifted_count > 1:
+            print(
+                f"Output file {path.name} already existed; moved the previous file to "
+                f"{rotated_path.name} and shifted {shifted_count - 1} older backup(s)."
+            )
+        else:
+            print(f"Output file {path.name} already existed; moved the previous file to {rotated_path.name}.")
+
+    return path
+
+
+def _rotate_existing_output(path: Path) -> tuple[Path, int]:
+    max_index = 0
+    while _backup_path(path, max_index + 1).exists():
+        max_index += 1
+
+    for index in range(max_index, 0, -1):
+        _backup_path(path, index).replace(_backup_path(path, index + 1))
+
+    rotated_path = _backup_path(path, 1)
+    path.replace(rotated_path)
+    return rotated_path, max_index + 1
+
+
+def _backup_path(path: Path, index: int) -> Path:
+    return path.with_name(f"#{index}#{path.name}")
 
 
 def _render_table_line(values: Iterable[str], widths: list[int]) -> str:

@@ -41,7 +41,6 @@ The checklist documents in [docs](D:/python/dyana/docs) exist to track design
 direction and project state:
 
 - [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md)
-- [trajectory_topology_restructure_checklist.md](D:/python/dyana/docs/trajectory_topology_restructure_checklist.md)
 - [productionization_checklist.md](D:/python/dyana/docs/productionization_checklist.md)
 
 These documents answer:
@@ -199,4 +198,3 @@ Given the current state of Dyana, the highest-value documentation work is:
    analyses rely on
 
 This should happen before broad expansion into more analyses.
-
