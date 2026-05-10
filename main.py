@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""CLI entry point for Dyana's supported interactive workflow."""
 
 import argparse
 import importlib
@@ -24,6 +25,7 @@ AVAILABLE_ANALYSES = {
 
 
 def determine_traj_format(traj_file):
+    """Infer trajectory format from the filename extension."""
     _, ext = os.path.splitext(traj_file)
     ext = ext.lower()
     if ext in constants.EXT_XYZ:
@@ -34,6 +36,7 @@ def determine_traj_format(traj_file):
 
 
 def choose_analysis(input_provider):
+    """Prompt for one of the currently supported analyses."""
     print("\nAvailable analyses:")
     for key, (description, _, _) in AVAILABLE_ANALYSES.items():
         print(f"{key}: {description}")
@@ -48,6 +51,7 @@ def choose_analysis(input_provider):
 
 
 def main(traj_file, input_provider=None, prepared_setup=None, save_prepared_setup_path=None):
+    """Run the interactive workflow for one trajectory file."""
     workflow_prompts = WorkflowPrompts(input_provider=input_provider)
     input_provider = workflow_prompts.input_provider
     traj = None
@@ -74,6 +78,7 @@ def main(traj_file, input_provider=None, prepared_setup=None, save_prepared_setu
 
 
 def cli():
+    """Parse CLI arguments and run the supported Dyana entry path."""
     parser = argparse.ArgumentParser(description="Molecular dynamics trajectory analyzer.")
     parser.add_argument("traj_file", type=str, help="Path to the trajectory file in XYZ format")
     parser.add_argument("-i", "--input", type=str, help="Path to the input file")
@@ -89,7 +94,7 @@ def cli():
             log_path=args.log,
         )
     else:
-        input_provider = InteractiveInputProvider()
+        input_provider = InteractiveInputProvider(log_path=args.log)
 
     try:
         main(

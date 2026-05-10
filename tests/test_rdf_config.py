@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from config_schema import FrameLoopConfig
-from core.topology import CompoundType, TopologyFrame, TypeRegistry
+from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
@@ -22,19 +22,19 @@ class DummyTrajectory:
         compound_type = CompoundType(
             type_id=0,
             key=("OH", (), "hash"),
-            rep="OH",
+            formula="OH",
             canonical_labels=("H1", "O1"),
             label_to_local_index={"H1": 0, "O1": 1},
             local_bonds=((0, 1),),
             local_elements=("H", "O"),
             atomic_masses=(1.0, 16.0),
         )
-        self.topology_registry = TypeRegistry([compound_type])
+        self.topology_registry = CompoundTypeRegistry([compound_type])
         self.topology_frame = TopologyFrame(
             registry=self.topology_registry,
-            member_atom_ids_by_key={("OH", (), "hash"): np.array([[1, 0]], dtype=np.int32)},
+            molecule_atom_ids_by_key={("OH", (), "hash"): np.array([[1, 0]], dtype=np.int32)},
             atom_to_type_id=np.array([0, 0], dtype=np.int32),
-            atom_to_member_index=np.array([0, 0], dtype=np.int32),
+            atom_to_molecule_index=np.array([0, 0], dtype=np.int32),
             atom_to_local_index=np.array([1, 0], dtype=np.int32),
         )
         self.read_calls = 0

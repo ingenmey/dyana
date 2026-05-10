@@ -31,7 +31,6 @@
   },
   "compound_types": [
     {
-      "rep": "ClO4",
       "formula": "ClO4",
       "bond_types": [
         [
@@ -61,7 +60,6 @@
       ]
     },
     {
-      "rep": "H2O",
       "formula": "H2O",
       "bond_types": [
         [
@@ -81,7 +79,6 @@
       ]
     },
     {
-      "rep": "Na",
       "formula": "Na",
       "bond_types": [],
       "graph_hash": "2dc6c4c9db4c23be67409261d7b92731",

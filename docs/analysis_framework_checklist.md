@@ -33,6 +33,7 @@ Status markers:
 - [x] Add a default `prompt_config()` path driven by schema.
 - [x] Support `configure(config)` in migrated analyses.
 - [x] Add a small `configure_frame_loop(frame_loop)` helper to `BaseAnalysis`.
+- [x] Add `bind_config(config)` in `BaseAnalysis` so analyses can bind config fields automatically instead of copying them one by one in `configure()`.
 - [x] Use a single public `run()` entry point for both interactive and programmatic execution.
 - [ ] Add `from_config(...)` only where it reduces boilerplate.
 - [x] Allow temporary breakage of non-RDF analyses while the framework is being cleaned up.
@@ -51,6 +52,9 @@ Status markers:
   - `ForEach`
   - `When`
 - [x] Keep parameter specs focused on gathering/validating config, not science.
+- [~] Reassess the duplicated field definitions between `CONFIG_SCHEMA` and explicit config dataclasses such as `RDFConfig` / `ADFConfig`.
+- [x] Keep explicit config dataclasses for now as the typed programmatic API and validation layer, even when `CONFIG_SCHEMA` duplicates the field list.
+- [x] Treat deeper collapse of `CONFIG_SCHEMA` and explicit config classes as later work only if the schema becomes expressive enough to cover field defaults, prompt defaults, and validation semantics cleanly.
 - [ ] Add room for later param types without overdesign:
   - `StringParam`
   - `PathParam`
@@ -74,7 +78,7 @@ Status markers:
 - [x] Dispatch conditional prompt groups through `When`.
 - [x] Support dependencies between parameters through context.
 - [x] Support loop-local scoped values inside schema-driven prompts.
-- [x] Allow an optional config-builder hook when intermediate prompt values need assembly.
+- [x] Avoid speculative config-builder hooks; only add special prompt-to-config assembly paths when a concrete migrated analysis truly needs one.
 - [x] Keep prompt builders easy to extend without editing each analysis.
 - [x] Reuse the same `InputProvider` abstraction across workflow and analysis code.
 - [x] Keep the schema engine focused on migrated analyses rather than forcing it into the workflow layer.
@@ -151,8 +155,8 @@ Rule:
 - [x] Add a shared output-writing layer for migrated analyses.
 - [x] Keep `HistogramND` as a data/binning container rather than a text-output API.
 - [x] Avoid per-analysis formatting code when a shared writer can handle it.
-- [ ] Standardize one clear text-table format across migrated analyses instead of reproducing legacy spacing per analysis.
-- [ ] Apply the shared output layer only to the currently migrated analyses until more migrations are requested.
+- [x] Standardize one clear text-table format across migrated analyses instead of reproducing legacy spacing per analysis.
+- [x] Apply the shared output layer only to the currently migrated analyses until more migrations are requested.
 
 ## 11. Proposed Minimal Framework API
 
@@ -171,12 +175,14 @@ Rule:
   - RDF uses schema-driven prompting through shared framework code.
 - [x] Step 4: Add tests for schema-driven config building.
 - [x] Step 5: Migrate density.
-- [~] Step 6: Migrate simple analyses.
+- [x] Step 6: Migrate the currently supported simple analyses.
+  - RDF, density, and neighbor count are on the canonical framework path.
+  - Other simple legacy analyses remain intentionally out of scope.
 - [ ] Step 7: Leave complex analyses custom until last.
 
 Notes:
 
-- [x] During framework work, RDF is the only analysis that must remain fully functional.
+- [x] During framework work, RDF remains the reference analysis, but RDF, density, neighbor count, and ADF now define the supported migrated set that should remain functional.
 - [x] Other analyses may break temporarily and be reintroduced after the framework is clean.
 - [x] Do not preserve legacy code paths solely for compatibility if they make the framework harder to read.
 - [x] Treat the workflow layer and the analysis layer as separate design problems.
@@ -193,7 +199,7 @@ Notes:
 
 ## Later Cleanup Notes
 
-- [ ] Reassess `config_schema.py` scaffolding that is not part of the current working path.
+- [ ] Reassess remaining shared schema/config scaffolding that is not part of the main migrated-analysis path.
 - [ ] Reassess whether `PromptContext` in `config_builder.py` is more machinery than the current size needs.
 - [ ] Split responsibilities inside `workflow_prompts.py` if the current single class becomes harder to read.
 - [ ] Revisit the non-XYZ `prompt_cell_vectors(...)` behavior so the method name and return semantics line up more cleanly.
@@ -205,6 +211,5 @@ Notes:
 2. Keep the workflow/session layer imperative and provider-driven.
 3. Use prepared setups as the practical bridge from interactive topology review to Python-driven analysis runs.
 4. Use the strengthened schema system, not ad hoc prompt flows, as the default path for further migrated analyses.
-5. Simplify the shared output writer toward one readable, harmonized format instead of preserving legacy per-analysis spacing.
-6. Revisit compound-selection stability once multiple migrated analyses put real pressure on index-based configs.
-7. Only then resume wider productionization tasks in depth.
+5. Revisit compound-selection stability once multiple migrated analyses put real pressure on index-based configs.
+6. Only then resume wider productionization tasks in depth.

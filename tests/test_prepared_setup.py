@@ -4,10 +4,10 @@ from pathlib import Path
 
 import numpy as np
 
-from core.topology import CompoundType, TopologyFrame, TypeRegistry
+from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from prepared_setup import (
     PreparedSetupValidationError,
-    apply_prepared_setup_recipe,
+    apply_prepared_setup,
     build_prepared_setup,
     load_prepared_setup,
     save_prepared_setup,
@@ -19,9 +19,9 @@ class DummyTrajectory:
     def __init__(self, compound_specs, forbidden_bonds=None):
         self.forbidden_bonds = set(forbidden_bonds or set())
         compound_types = []
-        member_atom_ids_by_key = {}
+        molecule_atom_ids_by_key = {}
         atom_to_type_id_parts = []
-        atom_to_member_index_parts = []
+        atom_to_molecule_index_parts = []
         atom_to_local_index_parts = []
         next_atom_id = 0
 
@@ -29,7 +29,7 @@ class DummyTrajectory:
             compound_type = CompoundType(
                 type_id=type_id,
                 key=spec["key"],
-                rep=spec["rep"],
+                formula=spec["formula"],
                 canonical_labels=tuple(spec["labels"]),
                 label_to_local_index={label: i for i, label in enumerate(spec["labels"])},
                 local_bonds=tuple(spec.get("local_bonds", tuple())),
@@ -40,24 +40,24 @@ class DummyTrajectory:
 
             n_members = spec["count"]
             n_local = len(spec["labels"])
-            member_atom_ids = np.arange(next_atom_id, next_atom_id + n_members * n_local, dtype=np.int32).reshape(n_members, n_local)
+            molecule_atom_ids = np.arange(next_atom_id, next_atom_id + n_members * n_local, dtype=np.int32).reshape(n_members, n_local)
             next_atom_id += n_members * n_local
-            member_atom_ids_by_key[spec["key"]] = member_atom_ids
+            molecule_atom_ids_by_key[spec["key"]] = molecule_atom_ids
 
             atom_to_type_id_parts.append(np.full(n_members * n_local, type_id, dtype=np.int32))
-            atom_to_member_index_parts.append(
+            atom_to_molecule_index_parts.append(
                 np.repeat(np.arange(n_members, dtype=np.int32), n_local)
             )
             atom_to_local_index_parts.append(
                 np.tile(np.arange(n_local, dtype=np.int32), n_members)
             )
 
-        self.topology_registry = TypeRegistry(compound_types)
+        self.topology_registry = CompoundTypeRegistry(compound_types)
         self.topology_frame = TopologyFrame(
             registry=self.topology_registry,
-            member_atom_ids_by_key=member_atom_ids_by_key,
+            molecule_atom_ids_by_key=molecule_atom_ids_by_key,
             atom_to_type_id=np.concatenate(atom_to_type_id_parts) if atom_to_type_id_parts else np.empty(0, dtype=np.int32),
-            atom_to_member_index=np.concatenate(atom_to_member_index_parts) if atom_to_member_index_parts else np.empty(0, dtype=np.int32),
+            atom_to_molecule_index=np.concatenate(atom_to_molecule_index_parts) if atom_to_molecule_index_parts else np.empty(0, dtype=np.int32),
             atom_to_local_index=np.concatenate(atom_to_local_index_parts) if atom_to_local_index_parts else np.empty(0, dtype=np.int32),
         )
 
@@ -65,15 +65,15 @@ class DummyTrajectory:
 def make_water_na_cl_traj(water_count=10, na_count=1, cl_count=1, water_labels=None):
     water_labels = water_labels or ["O1", "H1", "H2"]
     compound_specs = [
-        {"rep": "Cl", "key": ("Cl", tuple(), "hash_cl"), "labels": ["Cl1"], "count": cl_count},
+        {"formula": "Cl", "key": ("Cl", tuple(), "hash_cl"), "labels": ["Cl1"], "count": cl_count},
         {
-            "rep": "H2O",
+            "formula": "H2O",
             "key": ("H2O", (("H", "O"), ("H", "O")), "hash_h2o"),
             "labels": water_labels,
             "count": water_count,
             "local_bonds": ((0, 1), (0, 2)),
         },
-        {"rep": "Na", "key": ("Na", tuple(), "hash_na"), "labels": ["Na1"], "count": na_count},
+        {"formula": "Na", "key": ("Na", tuple(), "hash_na"), "labels": ["Na1"], "count": na_count},
     ]
     return DummyTrajectory(compound_specs, forbidden_bonds={(1, 3)})
 
@@ -90,7 +90,7 @@ class PreparedSetupTests(unittest.TestCase):
 
         self.assertEqual(loaded.recipe["trajectory_format"], "lammps")
         self.assertEqual(loaded.recipe["forbidden_bonds"], [[1, 3]])
-        self.assertEqual([entry["rep"] for entry in loaded.compound_types], ["Cl", "H2O", "Na"])
+        self.assertEqual([entry["formula"] for entry in loaded.compound_types], ["Cl", "H2O", "Na"])
 
     def test_validation_accepts_same_compound_types_with_different_counts(self):
         saved_traj = make_water_na_cl_traj(water_count=100, na_count=1, cl_count=1)
@@ -107,13 +107,13 @@ class PreparedSetupTests(unittest.TestCase):
         with self.assertRaises(PreparedSetupValidationError):
             validate_prepared_setup(loaded_traj, prepared)
 
-    def test_apply_prepared_setup_recipe_restores_forbidden_bonds(self):
+    def test_apply_prepared_setup_restores_forbidden_bonds(self):
         source_traj = make_water_na_cl_traj()
         prepared = build_prepared_setup(source_traj, "lowconc.lmp", "lammps", [0.0, 0.0, 0.0])
         target_traj = make_water_na_cl_traj()
         target_traj.forbidden_bonds = set()
 
-        apply_prepared_setup_recipe(target_traj, prepared)
+        apply_prepared_setup(target_traj, prepared)
 
         self.assertEqual(target_traj.forbidden_bonds, {(1, 3)})
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from config_schema import FrameLoopConfig
-from core.topology import CompoundType, TopologyFrame, TypeRegistry
+from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
@@ -31,7 +31,7 @@ class DummyTrajectory:
         ref_type = CompoundType(
             type_id=0,
             key=("H2O", (), "ref"),
-            rep="H2O",
+            formula="H2O",
             canonical_labels=("H1", "O1"),
             label_to_local_index={"H1": 0, "O1": 1},
             local_bonds=((0, 1),),
@@ -41,22 +41,22 @@ class DummyTrajectory:
         obs_type = CompoundType(
             type_id=1,
             key=("OH", (), "obs"),
-            rep="OH",
+            formula="OH",
             canonical_labels=("H1", "O1"),
             label_to_local_index={"H1": 0, "O1": 1},
             local_bonds=((0, 1),),
             local_elements=("H", "O"),
             atomic_masses=(1.0, 16.0),
         )
-        self.topology_registry = TypeRegistry([ref_type, obs_type])
+        self.topology_registry = CompoundTypeRegistry([ref_type, obs_type])
         self.topology_frame = TopologyFrame(
             registry=self.topology_registry,
-            member_atom_ids_by_key={
+            molecule_atom_ids_by_key={
                 ("H2O", (), "ref"): np.array([[1, 0]], dtype=np.int32),
                 ("OH", (), "obs"): np.array([[3, 2]], dtype=np.int32),
             },
             atom_to_type_id=np.array([0, 0, 1, 1], dtype=np.int32),
-            atom_to_member_index=np.array([0, 0, 0, 0], dtype=np.int32),
+            atom_to_molecule_index=np.array([0, 0, 0, 0], dtype=np.int32),
             atom_to_local_index=np.array([1, 0, 1, 0], dtype=np.int32),
         )
 
@@ -191,7 +191,8 @@ class ADFConfigTests(unittest.TestCase):
             finally:
                 os.chdir(cwd)
 
-        self.assertIn("count", text)
+        self.assertIn("angle/deg", text)
+        self.assertIn("ADF", text)
 
 
 if __name__ == "__main__":

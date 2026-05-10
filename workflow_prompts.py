@@ -5,7 +5,7 @@ import numpy as np
 from core.trajectory_loader import load_trajectory
 from input_providers import InteractiveInputProvider
 from prepared_setup import (
-    apply_prepared_setup_recipe,
+    apply_prepared_setup,
     build_prepared_setup,
     load_prepared_setup,
     save_prepared_setup,
@@ -14,6 +14,7 @@ from prepared_setup import (
 
 
 def draw_compound_graph(compound_type, compound_id_for_output: int = 0):
+    """Render one compound-type graph to a PDF file."""
     import matplotlib.pyplot as plt
     import networkx as nx
 
@@ -54,6 +55,8 @@ def draw_compound_graph(compound_type, compound_id_for_output: int = 0):
 
 
 class WorkflowPrompts:
+    """Interactive workflow for preparing trajectory and topology state."""
+
     def __init__(self, input_provider=None):
         self.input_provider = input_provider or InteractiveInputProvider()
 
@@ -62,10 +65,10 @@ class WorkflowPrompts:
         if traj_format != "xyz":
             return np.array([0.0, 0.0, 0.0])
 
-        dimx = input_provider.ask_float("Enter cell vector length in X dimension (in Angstrom): ", minval=0.0)
-        dimy = input_provider.ask_float("Enter cell vector length in Y dimension (in Angstrom): ", minval=0.0)
-        dimz = input_provider.ask_float("Enter cell vector length in Z dimension (in Angstrom): ", minval=0.0)
-        return np.array([dimx, dimy, dimz], dtype=float)
+        box_x = input_provider.ask_float("Enter cell vector length in X dimension (in Angstrom): ", minval=0.0)
+        box_y = input_provider.ask_float("Enter cell vector length in Y dimension (in Angstrom): ", minval=0.0)
+        box_z = input_provider.ask_float("Enter cell vector length in Z dimension (in Angstrom): ", minval=0.0)
+        return np.array([box_x, box_y, box_z], dtype=float)
 
     def prepare_trajectory(self, traj_file, traj_format, provider=None, save_prepared_setup_path=None):
         input_provider = provider or self.input_provider
@@ -88,15 +91,15 @@ class WorkflowPrompts:
         cell_vectors = np.array(recipe["cell_vectors"], dtype=float)
 
         traj = self._load_initial_trajectory(traj_file, traj_format, cell_vectors)
-        apply_prepared_setup_recipe(traj, prepared_setup)
-        traj.guess_molecules()
+        apply_prepared_setup(traj, prepared_setup)
+        traj.rebuild_topology()
         validate_prepared_setup(traj, prepared_setup)
         return traj
 
     def process_compounds(self, traj, provider=None):
         input_provider = provider or self.input_provider
         frame_idx = 0
-        traj.guess_molecules()
+        traj.rebuild_topology()
 
         while True:
             compound_types = list(traj.topology_frame.get_compound_types())
@@ -114,7 +117,7 @@ class WorkflowPrompts:
             is_keep_compounds = input_provider.ask_bool("Accept these molecules (y) or change something (n)", True)
             if is_keep_compounds:
                 if frame_idx > 0:
-                    traj.reset_frame_idx()
+                    traj.rewind_to_first_frame()
                 break
 
             should_break = input_provider.ask_int(
@@ -126,7 +129,7 @@ class WorkflowPrompts:
             else:
                 frame_idx = self.skip_to_frame(traj, frame_idx, provider=input_provider)
 
-            traj.guess_molecules()
+            traj.rebuild_topology()
 
     def break_bonds(self, traj, provider=None):
         input_provider = provider or self.input_provider
@@ -134,7 +137,7 @@ class WorkflowPrompts:
             print("\nCurrent Compounds:")
             compound_types = list(traj.topology_frame.get_compound_types())
             for i, compound_type in enumerate(compound_types, start=1):
-                print(f"{i}: {compound_type.rep}")
+                print(f"{i}: {compound_type.formula}")
 
             comp_id = input_provider.ask_int("Which compound to modify?", -1, "[done]") - 1
             if comp_id < 0:
@@ -155,8 +158,8 @@ class WorkflowPrompts:
 
             local_idx1 = compound_type.label_to_local_index[atom1]
             local_idx2 = compound_type.label_to_local_index[atom2]
-            member_atom_ids = traj.topology_frame.get_member_atom_ids(compound_type)
-            for atom_ids in member_atom_ids:
+            molecule_atom_ids = traj.topology_frame.get_molecule_atom_ids(compound_type)
+            for atom_ids in molecule_atom_ids:
                 global_idx1 = int(atom_ids[local_idx1])
                 global_idx2 = int(atom_ids[local_idx2])
                 traj.forbidden_bonds.add((min(global_idx1, global_idx2), max(global_idx1, global_idx2)))
@@ -170,7 +173,7 @@ class WorkflowPrompts:
         if target_frame > frame_idx:
             nframes = target_frame - frame_idx
         else:
-            traj.reset_frame_idx()
+            traj.rewind_to_first_frame()
             nframes = target_frame
             frame_idx = 0
 
@@ -188,8 +191,8 @@ class WorkflowPrompts:
 
     def _print_compound_summary(self, traj, compound_types):
         for i, compound_type in enumerate(compound_types):
-            count = traj.topology_frame.get_member_count(compound_type)
-            print(f"Compound {i + 1}: {compound_type.rep}, Number: {count}")
+            count = traj.topology_frame.get_molecule_count(compound_type)
+            print(f"Compound {i + 1}: {compound_type.formula}, Number: {count}")
 
     def _print_bond_length_matrix(self, traj, compound_type):
         bond_lengths = traj.topology_frame.get_average_bond_lengths(

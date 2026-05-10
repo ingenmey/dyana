@@ -25,8 +25,8 @@ class DynamicConfig:
 
 
 class DummyCompoundType:
-    def __init__(self, rep, type_id, canonical_labels):
-        self.rep = rep
+    def __init__(self, formula, type_id, canonical_labels):
+        self.formula = formula
         self.type_id = type_id
         self.canonical_labels = canonical_labels
 
@@ -66,7 +66,7 @@ class DummyAnalysis:
 
     def atom_selection(self, role="reference", compound=None, prompt_text=None, allow_empty=False, provider=None):
         input_provider = provider or self.input_provider
-        prompt = prompt_text or f"Which atom(s) in {role} compound {compound.type_id + 1} ({compound.rep})? (comma-separated) "
+        prompt = prompt_text or f"Which atom(s) in {role} compound {compound.type_id + 1} ({compound.formula})? (comma-separated) "
         answer = input_provider.ask_str(prompt, default="" if allow_empty else None)
         return [s.strip() for s in answer.split(",") if s.strip()]
 

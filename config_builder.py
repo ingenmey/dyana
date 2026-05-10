@@ -14,6 +14,7 @@ class PromptContext:
 
 
 def prompt_config_from_schema(owner, schema, config_class, provider=None):
+    """Prompt for a config object using a declarative schema."""
     values = {}
     context = PromptContext(
         owner=owner,

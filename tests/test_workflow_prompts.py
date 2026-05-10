@@ -30,7 +30,7 @@ H -0.139 0.927 0.000
 
 class NonInteractiveWorkflowPrompts(WorkflowPrompts):
     def process_compounds(self, traj, provider=None):
-        traj.guess_molecules()
+        traj.rebuild_topology()
 
 
 class WorkflowPromptsTests(unittest.TestCase):
@@ -77,7 +77,7 @@ class WorkflowPromptsTests(unittest.TestCase):
             with open(traj_path, "r", encoding="utf-8") as fin:
                 traj = load_trajectory(fin, "xyz", np.array([10.0, 10.0, 10.0]))
                 traj.read_frame()
-                traj.guess_molecules()
+                traj.rebuild_topology()
                 prepared = build_prepared_setup(traj, str(traj_path), "xyz", [10.0, 10.0, 10.0])
                 save_prepared_setup(setup_path, prepared)
 

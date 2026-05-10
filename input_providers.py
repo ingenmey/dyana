@@ -74,6 +74,20 @@ class InputProvider(ABC):
 class InteractiveInputProvider(InputProvider):
     """Prompt through stdin/stdout."""
 
+    def __init__(self, log_path=None):
+        self.log_file = None
+        if log_path:
+            self.set_log_file(log_path)
+
+    def set_log_file(self, log_path):
+        self.close()
+        self.log_file = open(log_path, "w", buffering=1, encoding="utf-8")
+
+    def close(self):
+        if self.log_file:
+            self.log_file.close()
+            self.log_file = None
+
     def ask_str(self, question: str, default=None, display_default=None) -> str:
         question = _format_question(question, default, display_default)
         while True:
@@ -83,10 +97,17 @@ class InteractiveInputProvider(InputProvider):
                 raise SystemExit("\nInput interrupted. Exiting.")
 
             if answer:
+                self._write_log(question, answer)
                 return answer
             if default is not None:
+                self._write_log(question, "")
                 return default
             print("Invalid input. Try again.")
+
+    def _write_log(self, question, answer):
+        if self.log_file:
+            self.log_file.write(f"# {question.strip()}\n{answer}\n")
+            self.log_file.flush()
 
 
 class FileInputProvider(InputProvider):

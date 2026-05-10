@@ -15,6 +15,8 @@ from typing import Any
 
 @dataclass(frozen=True)
 class FrameLoopConfig:
+    """Shared frame-loop settings for migrated analyses."""
+
     start_frame: int = 1
     nframes: int = -1
     frame_stride: int = 1
@@ -31,6 +33,8 @@ class FrameLoopConfig:
 
 @dataclass(frozen=True)
 class TopologyConfig:
+    """Topology-recognition settings for non-interactive runs."""
+
     excluded_elements: set[str] = field(default_factory=set)
     neighbor_search_scale: float = 1.164
     bond_distance_scale: float = 1.4
@@ -44,6 +48,8 @@ class TopologyConfig:
 
 @dataclass(frozen=True)
 class AnalysisRunConfig:
+    """Top-level non-interactive run configuration."""
+
     analysis: str
     trajectory_file: str
     trajectory_format: str | None = None

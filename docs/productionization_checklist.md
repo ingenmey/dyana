@@ -121,24 +121,31 @@ avoid carrying competing framework guidance.
 
 - [x] Add explicit topology tests for water.
   - Tiny water fixture recognizes one `H2O` compound with 128 members and stable `H1/H2/O1` labels.
+- [x] Make topology rebuilding produce the authoritative runtime topology model used by the supported analyses.
+- [~] Enforce canonical local ordering for runtime topology membership rows.
+  - Equivalent molecules are canonicalized into template-local order.
+  - Direct regression coverage now protects canonical paired-subgroup mapping across equivalent members.
+  - For truly equivalent atoms, Dyana uses deterministic conventional numbering rather than pretending there is a chemically privileged distinction.
 - [ ] Add explicit topology tests for ions / excluded elements.
 - [ ] Add explicit topology tests for molecules crossing periodic boundaries.
 - [ ] Make bond rules configurable per element pair.
 - [ ] Store topology/bond criteria in output metadata.
 - [ ] Warn clearly on unknown elements or missing radii.
 - [ ] Validate all members of a compound are isomorphic.
-- [ ] Add deterministic molecule atom ordering.
-- [ ] Decouple topology detection from mutable trajectory state.
+- [~] Decouple topology detection/building further from trajectory-reader responsibilities.
+  - The authoritative runtime model is no longer the old mutable analysis-facing object graph.
+  - The builder still lives in `core/trajectory_loader.py`.
 - [ ] Support fixed/static topology loaded from file.
-- [ ] Document static vs dynamic topology modes.
+- [x] Document static vs dynamic topology modes.
+  - Direct frame-loop tests protect the current static vs dynamic behavior.
 
 ## 9. Improve Compound Identity
 
 - [~] Current compound keys include formula, bond-type multiset, and graph hash.
-- [ ] Expose stable compound IDs based on structural key.
-- [ ] Separate internal compound ID from human display name.
+- [x] Use stable structural keys as the primary internal compound-type identity.
+- [x] Separate internal compound-type identity from human display name / formula.
 - [ ] Include compound graph hash in logs/metadata.
-- [ ] Prevent output-field collisions when compounds share `rep`.
+- [ ] Prevent output-field collisions when compounds share `formula`.
 - [ ] Update density and multi-field outputs to use unique internal field names plus display labels.
 
 ## 10. Standardize Output Handling
@@ -147,19 +154,18 @@ avoid carrying competing framework guidance.
 - [ ] Prevent accidental overwrite unless `--force`.
 - [x] Add run metadata writer.
 - [ ] Add resolved-config writer.
-- [~] Centralize plain-text table writing.
+- [x] Centralize plain-text table writing.
   - A shared output writer now exists for the migrated analyses.
-  - The current implementation still needs simplification toward one harmonized text format.
+  - The migrated analyses now share one documented text-table format.
 - [ ] Add consistent naming conventions for output files.
 - [ ] Put analysis outputs into timestamped or user-selected run directories.
 - [~] Include units, frame range, stride, and normalization in headers/metadata.
-  - Migrated analyses now share a common output direction.
-  - Headers and formatting still need cleanup to become truly consistent.
+  - Migrated analyses now share a common output direction and documented table format.
+  - Some analysis-specific metadata is still not written consistently.
 
 ## 11. Normalize Analysis APIs
 
-- [~] RDF now validates the new `BaseAnalysis` design; the remaining analyses still need migration.
-- [~] RDF, density, neighbor count, and ADF now validate the new `BaseAnalysis` design; the remaining analyses still need migration.
+- [x] RDF, density, neighbor count, and ADF now validate the new `BaseAnalysis` design; the remaining analyses are intentionally out of scope for the current cleanup phase.
 - [x] Keep `BaseAnalysis` as the near-term canonical shared frame-loop/lifecycle base.
 - [x] Introduce config-driven setup independent of prompts, following the framework checklist.
 - [ ] Add `from_config` constructors only where they reduce boilerplate.
@@ -236,17 +242,20 @@ avoid carrying competing framework guidance.
 - [ ] Add profiling scripts.
 - [ ] Add benchmark notes for example trajectories.
 - [ ] Measure per-frame topology-recognition cost.
-- [ ] Cache selectors when topology is static.
+- [x] Resolve supported-analysis selections once and reuse canonical local indices across topology rebuilds.
+- [x] Keep static-topology mode as the no-rebuild path that avoids unnecessary topology rebuild work.
 - [ ] Avoid recomputing topology unless needed.
 - [ ] Review memory use in cluster/DACF/CMSD correlation trackers.
 - [ ] Consider streaming autocorrelation implementations.
 
 ## 18. Data Model Typing And Invariants
 
-- [ ] Convert suitable data containers to dataclasses.
-- [ ] Document invariants for `Atom`, `Molecule`, `Compound`, and trajectory state.
-- [ ] Add tests for label/global/local-index consistency.
-- [ ] Add serialization-safe metadata representations separate from cyclic runtime objects.
+- [~] Convert suitable runtime/data containers to dataclasses where that improves clarity.
+- [~] Document invariants for `CompoundType`, `CompoundTypeRegistry`, `TopologyFrame`, `ResolvedSelection`, and trajectory state.
+  - Legacy `Atom` / `Molecule` / `Compound` invariants are no longer the main supported runtime model.
+- [x] Add tests for label/global/local-index consistency.
+- [~] Add serialization-safe metadata representations separate from runtime topology objects.
+  - Prepared setups already provide part of this path.
 
 ## 19. Frame Indexing
 
@@ -257,11 +266,10 @@ avoid carrying competing framework guidance.
 
 ## 20. Reduce Duplicate Analysis Code
 
-- [x] Add `collect_atom_indices`.
-- [x] Add `collect_indices_for_compounds`.
-- [x] Add `build_atom_to_molecule`.
-- [~] Use shared selection helpers in RDF, DACF, neighbor-count, and tetrahedral order analyses.
-- [ ] Continue migrating ADF, ADF3B, percolation, PCCF, CMSD, and CDF selection paths.
+- [x] Add shared selection/helper utilities needed during the migration away from the legacy object-graph path.
+- [x] Move the supported analyses onto the shared topology-frame selection path with resolved selections and canonical local indices.
+- [~] Keep trimming shared selection/access helpers so the supported path does not grow parallel legacy-object and topology-frame helper stacks.
+- [ ] Migrate additional analyses only when they are explicitly brought back into scope.
 
 ## 21. Review Scientific Normalizations
 
@@ -317,8 +325,6 @@ avoid carrying competing framework guidance.
 
 ## Immediate Next-Step Candidates
 
-1. Keep the productionization checklist aligned with [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md) while the framework remains RDF-first.
-2. Simplify and standardize the shared output writer for the currently migrated analyses instead of preserving legacy formatting quirks.
-3. After that, resume version/metadata/output-directory work here.
-4. Add opt-in slow smoke tests for the documented example trajectories.
-5. Then continue the larger package-layout and trajectory/core module split.
+1. Keep this checklist aligned with [analysis_framework_checklist.md](D:/python/dyana/docs/analysis_framework_checklist.md) and [trajectory_topology_restructure_checklist.md](D:/python/dyana/docs/trajectory_topology_restructure_checklist.md) now that the supported path is broader than RDF alone.
+2. Resume version/metadata/output-directory work here.
+3. Add opt-in slow smoke tests for the documented example trajectories.

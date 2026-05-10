@@ -1,3 +1,5 @@
+"""Declarative prompt-schema primitives for migrated analyses."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,6 +8,8 @@ from typing import Any
 
 @dataclass(frozen=True)
 class Param:
+    """Base parameter spec for one prompted config field."""
+
     name: str
     prompt: str | None = None
     default: Any = None
@@ -14,12 +18,16 @@ class Param:
 
 @dataclass(frozen=True)
 class CompoundParam(Param):
+    """Prompt for one or more compound-type selections."""
+
     role: str = "reference"
     multi: bool = False
 
 
 @dataclass(frozen=True)
 class AtomLabelsParam(Param):
+    """Prompt for one or more atom-label selections."""
+
     role: str = "reference"
     compound: str | None = None
     allow_empty: bool = False
@@ -50,6 +58,8 @@ class ChoiceParam(Param):
 
 @dataclass(frozen=True)
 class ForEach:
+    """Repeat a prompt sub-schema for each item from a prior value."""
+
     source: str
     item_name: str
     steps: list[object]
@@ -59,6 +69,8 @@ class ForEach:
 
 @dataclass(frozen=True)
 class When:
+    """Conditionally run a prompt sub-schema."""
+
     source: str
     op: str = "=="
     value: object = True

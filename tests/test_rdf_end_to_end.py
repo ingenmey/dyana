@@ -12,7 +12,9 @@ from input_providers import FileInputProvider, NullInputProvider
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 RDF_FIXTURES = FIXTURES / "rdf"
+RDF_DYNAMIC_FIXTURES = FIXTURES / "rdf_dt"
 WATER_FIXTURE = FIXTURES / "water128.xyz"
+KOH_FIXTURE = FIXTURES / "koh_h2o.xyz"
 
 
 def _required_deps_available():
@@ -80,7 +82,72 @@ class RDFEndToEndTests(unittest.TestCase):
 
         self.assertEqual(len(setup["compound_types"]), 1)
 
+    def test_dynamic_topology_rdf_matches_reference_for_h3o2_fixture(self):
+        generated = self._run_main_workflow(
+            traj_path=KOH_FIXTURE,
+            input_log=RDF_DYNAMIC_FIXTURES / "input.log",
+            output_name="rdf_O-H3O2_H1-H3O2.dat",
+        )
+        reference = (RDF_DYNAMIC_FIXTURES / "rdf_O-H3O2_H1-H3O2.dat").read_text(encoding="utf-8")
+        np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
+
+    def test_static_topology_h3o2_rdf_differs_from_dynamic_reference(self):
+        from analyses.rdf_analysis import RDF, RDFConfig
+        from core.trajectory_loader import load_trajectory
+
+        generated = None
+        traj = None
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = os.getcwd()
+            try:
+                os.chdir(tmp)
+                with open(KOH_FIXTURE, "r", encoding="utf-8") as fin:
+                    traj = load_trajectory(fin, "xyz", np.array([22.7274, 22.7274, 22.7274]))
+                    traj.read_frame()
+                    traj.rebuild_topology()
+
+                    analysis = RDF(traj)
+                    analysis.configure(
+                        RDFConfig(
+                            ref_compound_index=1,
+                            obs_compound_index=1,
+                            ref_labels=["O"],
+                            obs_labels=["H1"],
+                            max_distance=10.0,
+                            bin_count=1000,
+                        )
+                    )
+                    analysis.configure_frame_loop(
+                        FrameLoopConfig(
+                            start_frame=1,
+                            nframes=-1,
+                            frame_stride=1,
+                            update_compounds=False,
+                        )
+                    )
+                    analysis.run()
+                    output = Path("rdf_O-H3O2_H1-H3O2.dat")
+                    self.assertTrue(output.exists())
+                    generated = output.read_text(encoding="utf-8")
+            finally:
+                if traj is not None and getattr(traj, "fin", None) is not None and not traj.fin.closed:
+                    traj.fin.close()
+                os.chdir(cwd)
+
+        static_table = _parse_numeric_table(generated)
+        dynamic_reference = _parse_numeric_table(
+            (RDF_DYNAMIC_FIXTURES / "rdf_O-H3O2_H1-H3O2.dat").read_text(encoding="utf-8")
+        )
+        self.assertGreater(np.max(np.abs(static_table - dynamic_reference)), 10.0)
+
     def _run_rdf(self, input_log):
+        return self._run_main_workflow(
+            traj_path=WATER_FIXTURE,
+            input_log=input_log,
+            output_name="rdf_O-H2O_H-H2O.dat",
+        )
+
+    def _run_main_workflow(self, traj_path, input_log, output_name):
         import main as dyana_main
 
         provider = FileInputProvider(file_path=input_log, fallback=NullInputProvider())
@@ -89,10 +156,10 @@ class RDFEndToEndTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 dyana_main.main(
-                    str(WATER_FIXTURE),
+                    str(traj_path),
                     input_provider=provider,
                 )
-                output = Path("rdf_O-H2O_H-H2O.dat")
+                output = Path(output_name)
                 self.assertTrue(output.exists())
                 return output.read_text(encoding="utf-8")
             finally:

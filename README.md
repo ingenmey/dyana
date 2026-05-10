@@ -39,3 +39,11 @@ metadata, shared periodic-boundary geometry helpers, shared atom-selection
 helpers, typed configuration scaffolding for future non-interactive runs, and
 unit tests around the most reusable behavior.
 
+## Reference Docs
+
+Current architecture/reference docs live in [docs](D:/python/dyana/docs):
+
+- [runtime_topology_model.md](D:/python/dyana/docs/runtime_topology_model.md)
+- [analysis_config_lifecycle.md](D:/python/dyana/docs/analysis_config_lifecycle.md)
+- [output_table_format.md](D:/python/dyana/docs/output_table_format.md)
+- [documentation_comment_policy.md](D:/python/dyana/docs/documentation_comment_policy.md)

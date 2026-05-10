@@ -17,6 +17,7 @@ demonstration trajectories live in `examples/`.
 | File | Format | System | Frames | Stored-frame spacing | Box | Intended use |
 | --- | --- | --- | ---: | --- | --- | --- |
 | `water128.xyz` | XYZ | 128 H2O | 10 | 1 fs | cubic, 15.67 | XYZ parsing, water topology, RDF smoke tests |
+| `koh_h2o.xyz` | XYZ | 150 KOH + 150 H2O | 14 | 1000 fs | cubic, 22.7274 | dynamic topology tests |
 | `ca(bf4)2_thf.lmp` | LAMMPS dump | 200 THF + 2 Ca(BF4)2 | 10 | 2000 fs | cubic, 30.5247410713473 | LAMMPS parsing, excluded-ion/topology smoke tests |
 
 ## Fixture Placement

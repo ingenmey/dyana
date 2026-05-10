@@ -7,9 +7,11 @@ from collections.abc import Iterable
 
 
 _SAFE_TOKEN_RE = re.compile(r"[^A-Za-z0-9+.-]+")
+_DEFAULT_DATA_COLUMN_WIDTH = 16
 
 
 def build_output_filename(analysis_name: str, explicit_parts: list[str] | None = None, max_length: int = 60) -> str:
+    """Build an output filename from an analysis name and optional selection parts."""
     if not explicit_parts:
         return f"{analysis_name}.dat"
 
@@ -22,11 +24,13 @@ def build_output_filename(analysis_name: str, explicit_parts: list[str] | None =
 
 
 def format_selection(labels: Iterable[str], compound_rep: str) -> str:
+    """Format one label/compound selection for filenames."""
     label_part = "+".join(_sanitize_token(label) for label in labels)
     return f"{label_part}-{_sanitize_token(compound_rep)}"
 
 
 def format_selection_group(selections: Iterable[tuple[Iterable[str], str]]) -> str:
+    """Format a group of selections for filenames."""
     return "+".join(format_selection(labels, compound_rep) for labels, compound_rep in selections)
 
 
@@ -37,6 +41,7 @@ def write_histogram_1d(
     fields: list[str] | None = None,
     comment_lines: list[str] | None = None,
 ) -> None:
+    """Write a one-dimensional histogram through the shared table writer."""
     if len(hist.bin_edges) != 1:
         raise ValueError("write_histogram_1d only supports one-dimensional histograms.")
 
@@ -60,6 +65,7 @@ def write_table(
     data: Iterable[Iterable[object]],
     comment_lines: list[str] | None = None,
 ) -> None:
+    """Write a plain-text numeric table using the shared Dyana format."""
     rows = [list(row) for row in data]
     ncols = len(headers)
     for row in rows:
@@ -67,19 +73,20 @@ def write_table(
             raise ValueError(f"All rows must have {ncols} values, got {len(row)}.")
 
     formatted_rows = [[_format_default(value) for value in row] for row in rows]
-    widths = [len(header) for header in headers]
+    widths = [_DEFAULT_DATA_COLUMN_WIDTH for _ in headers]
+    for idx, header in enumerate(headers):
+        widths[idx] = max(widths[idx], len(header))
     for row in formatted_rows:
         for idx, value in enumerate(row):
-            widths[idx] = max(widths[idx], len(value), 12)
+            widths[idx] = max(widths[idx], len(value))
 
     with open(filename, "w", encoding="utf-8") as f:
         for line in comment_lines or []:
             f.write(f"# {line}\n")
 
-        f.write("# columns: " + " ".join(headers) + "\n")
+        f.write("# " + _render_table_line(headers, widths) + "\n")
         for row in formatted_rows:
-            rendered = [_align_text(value, width) for value, width in zip(row, widths)]
-            f.write(" ".join(rendered) + "\n")
+            f.write(_render_table_line(row, widths) + "\n")
 
 
 def _format_default(value: object) -> str:
@@ -97,5 +104,12 @@ def _sanitize_token(value: str) -> str:
     return cleaned
 
 
-def _align_text(value: str, width: int) -> str:
-    return f"{value:>{width}}"
+def _render_table_line(values: Iterable[str], widths: list[int]) -> str:
+    values = list(values)
+    if not values:
+        return ""
+    if len(values) == 1:
+        return values[0]
+    rendered = [values[0].ljust(widths[0])]
+    rendered.extend(value.rjust(width) for value, width in zip(values[1:], widths[1:]))
+    return " ".join(rendered)

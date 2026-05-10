@@ -13,6 +13,8 @@ from output_writer import build_output_filename, format_selection, write_histogr
 
 @dataclass(frozen=True)
 class ADFConfig:
+    """Configuration for ADF analysis."""
+
     ref_compound_index: int
     obs_compound_index: int
     ref_base_source: str
@@ -48,6 +50,8 @@ class ADFConfig:
 
 
 class ADF(BaseAnalysis):
+    """Angular distribution function analysis."""
+
     CONFIG_CLASS = ADFConfig
     CONFIG_SCHEMA = [
         CompoundParam(name="ref_compound_index", role="reference"),
@@ -78,23 +82,11 @@ class ADF(BaseAnalysis):
     ]
 
     def configure(self, config: ADFConfig):
-        self.config = config
-        (self.ref_type, self.ref_key), = self.resolve_compound_types([config.ref_compound_index])
-        (self.obs_type, self.obs_key), = self.resolve_compound_types([config.obs_compound_index])
+        self.bind_config(config)
+        (self.ref_type, self.ref_key), = self.resolve_compound_types([self.ref_compound_index])
+        (self.obs_type, self.obs_key), = self.resolve_compound_types([self.obs_compound_index])
         topology_frame = self.traj.topology_frame
 
-        self.ref_base_source = config.ref_base_source
-        self.ref_tip_source = config.ref_tip_source
-        self.ref_base_labels = list(config.ref_base_labels)
-        self.ref_tip_labels = list(config.ref_tip_labels)
-        self.obs_base_source = config.obs_base_source
-        self.obs_tip_source = config.obs_tip_source
-        self.obs_base_labels = list(config.obs_base_labels)
-        self.obs_tip_labels = list(config.obs_tip_labels)
-        self.enforce_shared_atom = config.enforce_shared_atom
-        self.bin_count = config.bin_count
-        self.v1_cutoff = config.v1_cutoff
-        self.v2_cutoff = config.v2_cutoff
         self.ref_base_selection = topology_frame.resolve_selection(
             self.ref_type if self.ref_base_source == "r" else self.obs_type,
             self.ref_base_labels,
@@ -117,8 +109,8 @@ class ADF(BaseAnalysis):
             raise ValueError("No angle vectors matched the given labels in the initial frame.")
 
         topology_frame = self.traj.topology_frame
-        self.n_ref = topology_frame.get_member_count(self.ref_type)
-        self.n_obs = topology_frame.get_member_count(self.obs_type)
+        self.n_ref = topology_frame.get_molecule_count(self.ref_type)
+        self.n_obs = topology_frame.get_molecule_count(self.obs_type)
         self.angle_edges = np.linspace(0, 180, self.bin_count + 1)
         self.hist = HistogramND([self.angle_edges])
         self.mark_configured()
@@ -163,10 +155,10 @@ class ADF(BaseAnalysis):
             return False
 
         self.n_ref = (
-            self.n_ref * self.processed_frames + topology_frame.get_member_count(self.ref_type)
+            self.n_ref * self.processed_frames + topology_frame.get_molecule_count(self.ref_type)
         ) / (self.processed_frames + 1)
         self.n_obs = (
-            self.n_obs * self.processed_frames + topology_frame.get_member_count(self.obs_type)
+            self.n_obs * self.processed_frames + topology_frame.get_molecule_count(self.obs_type)
         ) / (self.processed_frames + 1)
         return True
 
@@ -189,14 +181,15 @@ class ADF(BaseAnalysis):
         fname = build_output_filename(
             "adf",
             [
-                format_selection(self.ref_base_labels, self.ref_type.rep if self.ref_base_source == "r" else self.obs_type.rep),
-                format_selection(self.ref_tip_labels, self.ref_type.rep if self.ref_tip_source == "r" else self.obs_type.rep),
-                format_selection(self.obs_base_labels, self.obs_type.rep if self.obs_base_source == "o" else self.ref_type.rep),
-                format_selection(self.obs_tip_labels, self.obs_type.rep if self.obs_tip_source == "o" else self.ref_type.rep),
+                format_selection(self.ref_base_labels, self.ref_type.formula if self.ref_base_source == "r" else self.obs_type.formula),
+                format_selection(self.ref_tip_labels, self.ref_type.formula if self.ref_tip_source == "r" else self.obs_type.formula),
+                format_selection(self.obs_base_labels, self.obs_type.formula if self.obs_base_source == "o" else self.ref_type.formula),
+                format_selection(self.obs_tip_labels, self.obs_type.formula if self.obs_tip_source == "o" else self.ref_type.formula),
             ],
         )
-        write_histogram_1d(fname, self.hist)
+        write_histogram_1d(fname, self.hist, headers=["angle/deg", "ADF"])
         print(f"Saved ADF results to {fname}")
+
 
 def build_vector_lists(
     topology_frame,
@@ -212,8 +205,9 @@ def build_vector_lists(
     obs_tip_local_indices,
     enforce_shared_atom,
 ):
-    ref_members = topology_frame.get_member_atom_ids(ref_type)
-    obs_members = topology_frame.get_member_atom_ids(obs_type)
+    """Build global atom-id arrays for all valid ADF vector combinations."""
+    ref_molecule_atom_ids = topology_frame.get_molecule_atom_ids(ref_type)
+    obs_molecule_atom_ids = topology_frame.get_molecule_atom_ids(obs_type)
 
     ref_base_ids = []
     ref_tip_ids = []
@@ -222,9 +216,9 @@ def build_vector_lists(
 
     same_type = ref_type.key == obs_type.key
 
-    for ref_member_index, ref_atom_ids in enumerate(ref_members):
-        for obs_member_index, obs_atom_ids in enumerate(obs_members):
-            if same_type and ref_member_index == obs_member_index:
+    for ref_molecule_index, ref_atom_ids in enumerate(ref_molecule_atom_ids):
+        for obs_molecule_index, obs_atom_ids in enumerate(obs_molecule_atom_ids):
+            if same_type and ref_molecule_index == obs_molecule_index:
                 continue
 
             rb_source = ref_atom_ids if ref_base_source == "r" else obs_atom_ids

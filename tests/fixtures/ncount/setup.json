@@ -31,7 +31,6 @@
   },
   "compound_types": [
     {
-      "rep": "BF4",
       "formula": "BF4",
       "bond_types": [
         [
@@ -61,7 +60,6 @@
       ]
     },
     {
-      "rep": "C4H8O",
       "formula": "C4H8O",
       "bond_types": [
         [
@@ -135,7 +133,6 @@
       ]
     },
     {
-      "rep": "Ca",
       "formula": "Ca",
       "bond_types": [],
       "graph_hash": "9bee2327c963be5592e4b587b999796e",

@@ -15,7 +15,7 @@ from output_writer import build_output_filename, format_selection, write_histogr
 
 @dataclass(frozen=True)
 class RDFConfig:
-    """Configuration for RDF analysis setup."""
+    """Configuration for RDF analysis."""
 
     ref_compound_index: int
     obs_compound_index: int
@@ -40,6 +40,8 @@ class RDFConfig:
 
 
 class RDF(BaseAnalysis):
+    """Radial distribution function analysis."""
+
     CONFIG_CLASS = RDFConfig
     CONFIG_SCHEMA = [
         CompoundParam(name="ref_compound_index", role="reference"),
@@ -61,15 +63,11 @@ class RDF(BaseAnalysis):
     ]
 
     def configure(self, config: RDFConfig):
-        self.config = config
-        (self.ref_type, self.ref_key), = self.resolve_compound_types([config.ref_compound_index])
-        (self.obs_type, self.obs_key), = self.resolve_compound_types([config.obs_compound_index])
+        self.bind_config(config)
+        (self.ref_type, self.ref_key), = self.resolve_compound_types([self.ref_compound_index])
+        (self.obs_type, self.obs_key), = self.resolve_compound_types([self.obs_compound_index])
         topology_frame = self.traj.topology_frame
 
-        self.ref_labels = list(config.ref_labels)
-        self.obs_labels = list(config.obs_labels)
-        self.max_distance = config.max_distance
-        self.bin_count = config.bin_count
         self.ref_selection = topology_frame.resolve_selection(self.ref_type, self.ref_labels)
         self.obs_selection = topology_frame.resolve_selection(self.obs_type, self.obs_labels)
 
@@ -83,11 +81,11 @@ class RDF(BaseAnalysis):
 
     def rebuild_runtime_state(self):
         topology_frame = self.traj.topology_frame
-        self.ref_indices = topology_frame.get_atom_indices_for_local_indices(
+        self.ref_indices = topology_frame.get_atom_ids_for_local_indices(
             self.ref_type,
             self.ref_selection.local_indices,
         )
-        self.obs_indices = topology_frame.get_atom_indices_for_local_indices(
+        self.obs_indices = topology_frame.get_atom_ids_for_local_indices(
             self.obs_type,
             self.obs_selection.local_indices,
         )
@@ -141,8 +139,8 @@ class RDF(BaseAnalysis):
         fname = build_output_filename(
             "rdf",
             [
-                format_selection(self.ref_labels, self.ref_type.rep),
-                format_selection(self.obs_labels, self.obs_type.rep),
+                format_selection(self.ref_labels, self.ref_type.formula),
+                format_selection(self.obs_labels, self.obs_type.formula),
             ],
         )
         write_histogram_1d(fname, self.hist, headers=["r/Angstrom", "g(r)", "N(r)"], fields=["count", "number_integral"])

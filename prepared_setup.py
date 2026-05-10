@@ -10,11 +10,15 @@ from core.trajectory_loader import BOND_DISTANCE_SCALE, EXCLUDED_ELEMENTS, NEIGH
 
 
 class PreparedSetupValidationError(RuntimeError):
+    """Raised when a prepared setup does not match the current trajectory state."""
+
     pass
 
 
 @dataclass(frozen=True)
 class PreparedSetup:
+    """Saved topology-review state used to reconstruct compatible runs."""
+
     payload: dict
 
     @property
@@ -31,9 +35,10 @@ class PreparedSetup:
 
 
 def build_prepared_setup(traj, traj_file: str, traj_format: str, cell_vectors) -> PreparedSetup:
+    """Build a reusable prepared-setup payload from the current trajectory state."""
     observed_counts = Counter()
     for compound_type in traj.topology_registry:
-        observed_counts[compound_type.rep] += traj.topology_frame.get_member_count(compound_type)
+        observed_counts[compound_type.formula] += traj.topology_frame.get_molecule_count(compound_type)
 
     payload = {
         "format_version": 1,
@@ -56,18 +61,21 @@ def build_prepared_setup(traj, traj_file: str, traj_format: str, cell_vectors) -
 
 
 def save_prepared_setup(path: str | Path, prepared_setup: PreparedSetup):
+    """Write a prepared setup JSON file."""
     with open(path, "w", encoding="utf-8") as fout:
         json.dump(prepared_setup.payload, fout, indent=2, sort_keys=False)
         fout.write("\n")
 
 
 def load_prepared_setup(path: str | Path) -> PreparedSetup:
+    """Load a prepared setup JSON file."""
     with open(path, "r", encoding="utf-8") as fin:
         payload = json.load(fin)
     return PreparedSetup(payload)
 
 
-def apply_prepared_setup_recipe(traj, prepared_setup: PreparedSetup):
+def apply_prepared_setup(traj, prepared_setup: PreparedSetup):
+    """Apply the prepared-setup recipe to a trajectory before rebuilding topology."""
     recipe = prepared_setup.recipe
     traj.forbidden_bonds = {
         (min(int(a), int(b)), max(int(a), int(b)))
@@ -76,6 +84,7 @@ def apply_prepared_setup_recipe(traj, prepared_setup: PreparedSetup):
 
 
 def validate_prepared_setup(traj, prepared_setup: PreparedSetup):
+    """Validate that reconstructed topology matches the prepared setup."""
     recipe = prepared_setup.recipe
     _validate_recipe_compatibility(recipe)
 
@@ -99,7 +108,7 @@ def validate_prepared_setup(traj, prepared_setup: PreparedSetup):
         observed_entry = observed[signature]
         if expected_entry["labels"] != observed_entry["labels"]:
             raise PreparedSetupValidationError(
-                f"Prepared setup labels for compound {expected_entry['rep']} do not match reconstructed labels: "
+                f"Prepared setup labels for compound {expected_entry['formula']} do not match reconstructed labels: "
                 f"expected {expected_entry['labels']}, got {observed_entry['labels']}"
             )
 
@@ -123,11 +132,10 @@ def _validate_recipe_compatibility(recipe):
 def _compound_type_entries(traj):
     entries = []
     for compound_type in traj.topology_registry:
-        formula_str, bond_types, graph_hash = compound_type.key
+        formula, bond_types, graph_hash = compound_type.key
         entries.append(
             {
-                "rep": compound_type.rep,
-                "formula": formula_str,
+                "formula": formula,
                 "bond_types": [list(pair) for pair in bond_types],
                 "graph_hash": graph_hash,
                 "labels": list(compound_type.canonical_labels),

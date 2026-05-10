@@ -1,5 +1,3 @@
-# core/trajectory_loader.py
-
 from __future__ import annotations
 
 import json
@@ -14,13 +12,8 @@ from networkx.algorithms import isomorphism
 from scipy.spatial import cKDTree
 
 from atomic_properties import elem_covalent, elem_masses, elem_number, elem_vdW
-from core.topology import CompoundType, TopologyFrame, TypeRegistry
+from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from geometry import distance_squared
-
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
 
 config_file_path = os.path.join(os.path.dirname(__file__), "../config.json")
 with open(config_file_path, "r", encoding="utf-8") as config_file:
@@ -33,15 +26,19 @@ BOND_DISTANCE_SCALE = config.get("BOND_DISTANCE_SCALE", 1.4)
 
 @dataclass(frozen=True)
 class DetectedMolecule:
+    """Connectivity-only molecule record used while building topology."""
+
     atom_ids: tuple[int, ...]
-    symbols: tuple[str, ...]
-    bonds: tuple[tuple[int, int], ...]
+    elements: tuple[str, ...]
+    local_bonds: tuple[tuple[int, int], ...]
 
 
 @dataclass(frozen=True)
 class MoleculeGroup:
+    """Equivalent detected molecules grouped into one structural type."""
+
     key: tuple
-    rep: str
+    formula: str
     members: tuple[DetectedMolecule, ...]
 
 
@@ -50,7 +47,7 @@ class BaseTrajectory(ABC):
     Base class for trajectories (XYZ, LAMMPS, ...).
 
     Raw frame state:
-      - natoms
+      - n_atoms
       - symbols
       - coords
       - box_size
@@ -65,12 +62,12 @@ class BaseTrajectory(ABC):
         self.box_size = np.array(box_size, dtype=float)
         self.half_box_size = self.box_size / 2.0
 
-        self.dimx, self.dimy, self.dimz = self.box_size
-        self.natoms = 0
+        self.box_x, self.box_y, self.box_z = self.box_size
+        self.n_atoms = 0
         self.symbols: list[str] = []
         self.coords: np.ndarray | None = None
 
-        self.topology_registry: TypeRegistry | None = None
+        self.topology_registry: CompoundTypeRegistry | None = None
         self.topology_frame: TopologyFrame | None = None
 
         # Global forbidden bonds (pairs of global atom indices)
@@ -80,7 +77,7 @@ class BaseTrajectory(ABC):
     def read_frame(self):
         raise NotImplementedError
 
-    def reset_frame_idx(self):
+    def rewind_to_first_frame(self):
         self.fin.seek(0)
         self.read_frame()
 
@@ -95,28 +92,26 @@ class BaseTrajectory(ABC):
         threshold_sq = ((cov_radius_i + cov_radius_j) * BOND_DISTANCE_SCALE) ** 2
         return distance_sq if distance_sq < threshold_sq else False
 
-    def guess_molecules(self):
-        """
-        Build the authoritative runtime topology model for the current frame.
-        """
-        if self.natoms == 0:
-            self.topology_registry = TypeRegistry([])
+    def rebuild_topology(self):
+        """Build the authoritative runtime topology model for the current frame."""
+        if self.n_atoms == 0:
+            self.topology_registry = CompoundTypeRegistry([])
             self.topology_frame = TopologyFrame(
                 registry=self.topology_registry,
-                member_atom_ids_by_key={},
+                molecule_atom_ids_by_key={},
                 atom_to_type_id=np.empty(0, dtype=np.int32),
-                atom_to_member_index=np.empty(0, dtype=np.int32),
+                atom_to_molecule_index=np.empty(0, dtype=np.int32),
                 atom_to_local_index=np.empty(0, dtype=np.int32),
             )
             return
 
         if self.coords is None:
-            raise RuntimeError("coords are not set before calling guess_molecules().")
+            raise RuntimeError("coords are not set before calling rebuild_topology().")
 
         kdtree = cKDTree(self.coords, boxsize=self.box_size)
         molecules = self._identify_molecules(self.symbols, self.coords, kdtree)
         groups = self._group_molecules(molecules)
-        self.topology_registry, self.topology_frame = self._build_topology_state(groups)
+        self.topology_registry, self.topology_frame = self._build_registry_and_frame(groups)
 
     def _identify_molecules(
         self,
@@ -127,7 +122,7 @@ class BaseTrajectory(ABC):
         molecules: list[DetectedMolecule] = []
         visited_global_indices: set[int] = set()
 
-        for seed_index in range(self.natoms):
+        for seed_index in range(self.n_atoms):
             if seed_index in visited_global_indices:
                 continue
 
@@ -201,8 +196,8 @@ class BaseTrajectory(ABC):
             molecules.append(
                 DetectedMolecule(
                     atom_ids=tuple(molecule_atom_indices),
-                    symbols=tuple(frame_symbols[gidx] for gidx in molecule_atom_indices),
-                    bonds=tuple(local_bonds),
+                    elements=tuple(frame_symbols[gidx] for gidx in molecule_atom_indices),
+                    local_bonds=tuple(local_bonds),
                 )
             )
 
@@ -212,16 +207,16 @@ class BaseTrajectory(ABC):
         grouped: dict[tuple, list[DetectedMolecule]] = {}
 
         for molecule in molecules:
-            symbol_counts = Counter(molecule.symbols)
-            formula_str = "".join(
+            symbol_counts = Counter(molecule.elements)
+            formula = "".join(
                 f"{element}{count}" if count > 1 else element
                 for element, count in sorted(symbol_counts.items())
             )
 
             bond_types = []
-            for local_a, local_b in molecule.bonds:
-                elem_a = molecule.symbols[local_a]
-                elem_b = molecule.symbols[local_b]
+            for local_a, local_b in molecule.local_bonds:
+                elem_a = molecule.elements[local_a]
+                elem_b = molecule.elements[local_b]
                 if elem_a > elem_b:
                     elem_a, elem_b = elem_b, elem_a
                 bond_types.append((elem_a, elem_b))
@@ -229,28 +224,28 @@ class BaseTrajectory(ABC):
 
             graph = self._build_graph(molecule)
             graph_hash = nx.weisfeiler_lehman_graph_hash(graph, node_attr="element")
-            compound_key = (formula_str, tuple(bond_types), graph_hash)
+            compound_key = (formula, tuple(bond_types), graph_hash)
             grouped.setdefault(compound_key, []).append(molecule)
 
         sorted_keys = sorted(grouped, key=self._compound_sort_key)
         return [
-            MoleculeGroup(key=key, rep=key[0], members=tuple(grouped[key]))
+            MoleculeGroup(key=key, formula=key[0], members=tuple(grouped[key]))
             for key in sorted_keys
         ]
 
-    def _build_topology_state(self, groups: list[MoleculeGroup]) -> tuple[TypeRegistry, TopologyFrame]:
+    def _build_registry_and_frame(self, groups: list[MoleculeGroup]) -> tuple[CompoundTypeRegistry, TopologyFrame]:
         compound_types: list[CompoundType] = []
-        member_atom_ids_by_key: dict[tuple, np.ndarray] = {}
-        atom_to_type_id = np.full(self.natoms, -1, dtype=np.int32)
-        atom_to_member_index = np.full(self.natoms, -1, dtype=np.int32)
-        atom_to_local_index = np.full(self.natoms, -1, dtype=np.int32)
+        molecule_atom_ids_by_key: dict[tuple, np.ndarray] = {}
+        atom_to_type_id = np.full(self.n_atoms, -1, dtype=np.int32)
+        atom_to_molecule_index = np.full(self.n_atoms, -1, dtype=np.int32)
+        atom_to_local_index = np.full(self.n_atoms, -1, dtype=np.int32)
 
         for type_id, group in enumerate(groups):
             template = group.members[0]
             template_id_to_label, template_label_to_local = self._initialize_connectivity_labels(template)
             canonical_labels = tuple(sorted(template_label_to_local))
-            canonical_template_indices = [template_label_to_local[label] for label in canonical_labels]
-            local_elements = tuple(template.symbols[idx] for idx in canonical_template_indices)
+            canonical_local_indices = [template_label_to_local[label] for label in canonical_labels]
+            local_elements = tuple(template.elements[idx] for idx in canonical_local_indices)
             label_to_local_index = {
                 label: local_index
                 for local_index, label in enumerate(canonical_labels)
@@ -258,7 +253,7 @@ class BaseTrajectory(ABC):
             atomic_masses = tuple(elem_masses[element] for element in local_elements)
 
             local_bonds = []
-            for local_a, local_b in template.bonds:
+            for local_a, local_b in template.local_bonds:
                 label_a = template_id_to_label[local_a]
                 label_b = template_id_to_label[local_b]
                 local_bonds.append(
@@ -276,7 +271,7 @@ class BaseTrajectory(ABC):
             compound_type = CompoundType(
                 type_id=type_id,
                 key=group.key,
-                rep=group.rep,
+                formula=group.formula,
                 canonical_labels=canonical_labels,
                 label_to_local_index=label_to_local_index,
                 local_bonds=tuple(local_bonds),
@@ -285,7 +280,7 @@ class BaseTrajectory(ABC):
             )
             compound_types.append(compound_type)
 
-            member_atom_ids = np.zeros(
+            molecule_atom_ids = np.zeros(
                 (len(group.members), len(canonical_labels)),
                 dtype=np.int32,
             )
@@ -293,49 +288,51 @@ class BaseTrajectory(ABC):
             template_graph = self._build_graph(template)
             node_match = lambda attrs_t, attrs_m: attrs_t["element"] == attrs_m["element"]
 
-            for member_index, molecule in enumerate(group.members):
-                if member_index == 0:
+            for molecule_index, molecule in enumerate(group.members):
+                if molecule_index == 0:
                     template_to_molecule = {idx: idx for idx in range(len(template.atom_ids))}
                 else:
                     molecule_graph = self._build_graph(molecule)
                     matcher = isomorphism.GraphMatcher(template_graph, molecule_graph, node_match=node_match)
                     if not matcher.is_isomorphic():
                         raise RuntimeError(
-                            f"Detected molecule topology is not isomorphic to its template for compound {group.rep}."
+                            f"Detected molecule topology is not isomorphic to its template for compound {group.formula}."
                         )
                     template_to_molecule = next(matcher.isomorphisms_iter())
 
+                # Every member row uses template-local column order so selections can
+                # reuse canonical local indices across molecules and rebuilds.
                 ordered_atom_ids = np.array(
                     [
                         molecule.atom_ids[template_to_molecule[template_index]]
-                        for template_index in canonical_template_indices
+                        for template_index in canonical_local_indices
                     ],
                     dtype=np.int32,
                 )
-                member_atom_ids[member_index] = ordered_atom_ids
+                molecule_atom_ids[molecule_index] = ordered_atom_ids
 
                 for local_index, atom_index in enumerate(ordered_atom_ids):
                     atom_to_type_id[atom_index] = type_id
-                    atom_to_member_index[atom_index] = member_index
+                    atom_to_molecule_index[atom_index] = molecule_index
                     atom_to_local_index[atom_index] = local_index
 
-            member_atom_ids_by_key[group.key] = member_atom_ids
+            molecule_atom_ids_by_key[group.key] = molecule_atom_ids
 
-        registry = TypeRegistry(compound_types)
+        registry = CompoundTypeRegistry(compound_types)
         frame = TopologyFrame(
             registry=registry,
-            member_atom_ids_by_key=member_atom_ids_by_key,
+            molecule_atom_ids_by_key=molecule_atom_ids_by_key,
             atom_to_type_id=atom_to_type_id,
-            atom_to_member_index=atom_to_member_index,
+            atom_to_molecule_index=atom_to_molecule_index,
             atom_to_local_index=atom_to_local_index,
         )
         return registry, frame
 
     def _build_graph(self, molecule: DetectedMolecule) -> nx.Graph:
         graph = nx.Graph()
-        for local_idx, symbol in enumerate(molecule.symbols):
-            graph.add_node(local_idx, element=symbol)
-        for local_a, local_b in molecule.bonds:
+        for local_idx, element in enumerate(molecule.elements):
+            graph.add_node(local_idx, element=element)
+        for local_a, local_b in molecule.local_bonds:
             graph.add_edge(local_a, local_b)
         return graph
 
@@ -343,20 +340,22 @@ class BaseTrajectory(ABC):
         self,
         molecule: DetectedMolecule,
     ) -> tuple[dict[int, str], dict[str, int]]:
+        """Assign deterministic per-element labels within one detected molecule."""
         n_atoms = len(molecule.atom_ids)
         if n_atoms == 0:
             return {}, {}
 
         adjacency: list[list[int]] = [[] for _ in range(n_atoms)]
-        for local_a, local_b in molecule.bonds:
+        for local_a, local_b in molecule.local_bonds:
             adjacency[local_a].append(local_b)
             adjacency[local_b].append(local_a)
 
         ec_values = [
-            elem_number[molecule.symbols[i]] * 10 + len(adjacency[i])
+            elem_number[molecule.elements[i]] * 10 + len(adjacency[i])
             for i in range(n_atoms)
         ]
 
+        # Refine local ranks until topology stops separating equivalent positions.
         while True:
             unique_ec = set(ec_values)
             if len(unique_ec) == n_atoms:
@@ -377,21 +376,21 @@ class BaseTrajectory(ABC):
         label_to_id: dict[str, int] = {}
         symbol_groups: dict[str, list[tuple[int, int]]] = {}
         for local_idx, ec_val in enumerate(ec_values):
-            symbol = molecule.symbols[local_idx]
-            symbol_groups.setdefault(symbol, []).append((ec_val, local_idx))
+            element = molecule.elements[local_idx]
+            symbol_groups.setdefault(element, []).append((ec_val, local_idx))
 
-        for symbol, group in symbol_groups.items():
+        for element, group in symbol_groups.items():
             group.sort(reverse=True, key=lambda pair: pair[0])
             for label_index, (_, local_idx) in enumerate(group, start=1):
-                label = f"{symbol}{label_index}"
+                label = f"{element}{label_index}"
                 id_to_label[local_idx] = label
                 label_to_id[label] = local_idx
 
         return id_to_label, label_to_id
 
     def _compound_sort_key(self, compound_key: tuple) -> tuple:
-        formula_str, bond_types, graph_hash = compound_key
-        return (formula_str, bond_types, graph_hash)
+        formula, bond_types, graph_hash = compound_key
+        return (formula, bond_types, graph_hash)
 
 
 class XYZTrajectory(BaseTrajectory):
@@ -400,13 +399,13 @@ class XYZTrajectory(BaseTrajectory):
         if not natoms_line:
             raise ValueError("End of file reached while reading XYZ trajectory.")
 
-        self.natoms = int(natoms_line.strip())
+        self.n_atoms = int(natoms_line.strip())
         self.fin.readline()
 
         symbols: list[str] = []
         coords_list: list[list[float]] = []
 
-        for _ in range(self.natoms):
+        for _ in range(self.n_atoms):
             parts = self.fin.readline().split()
             if len(parts) < 4:
                 raise ValueError("Malformed XYZ line (expected at least 4 columns).")
@@ -414,9 +413,9 @@ class XYZTrajectory(BaseTrajectory):
             symbol_str, x_str, y_str, z_str = parts[:4]
             x_val, y_val, z_val = map(float, (x_str, y_str, z_str))
 
-            x_val = x_val % self.dimx if self.dimx else x_val
-            y_val = y_val % self.dimy if self.dimy else y_val
-            z_val = z_val % self.dimz if self.dimz else z_val
+            x_val = x_val % self.box_x if self.box_x else x_val
+            y_val = y_val % self.box_y if self.box_y else y_val
+            z_val = z_val % self.box_z if self.box_z else z_val
 
             symbols.append(symbol_str.capitalize())
             coords_list.append([x_val, y_val, z_val])
@@ -439,7 +438,7 @@ class LAMMPSTrajectory(BaseTrajectory):
             line = self.fin.readline().strip()
         if not line:
             raise ValueError("End of file reached before finding NUMBER OF ATOMS")
-        self.natoms = int(self.fin.readline().strip())
+        self.n_atoms = int(self.fin.readline().strip())
 
         line = self.fin.readline().strip()
         while line and not line.startswith("ITEM: BOX BOUNDS"):
@@ -457,7 +456,7 @@ class LAMMPSTrajectory(BaseTrajectory):
 
         self.box_size = np.array(box_lengths, dtype=float)
         self.half_box_size = self.box_size / 2.0
-        self.dimx, self.dimy, self.dimz = self.box_size
+        self.box_x, self.box_y, self.box_z = self.box_size
 
         line = self.fin.readline().strip()
         while line and not line.startswith("ITEM: ATOMS"):
@@ -475,7 +474,7 @@ class LAMMPSTrajectory(BaseTrajectory):
                 "Trajectory file missing required coordinate columns (xu,yu,zu) or (x,y,z)."
             )
 
-        atom_rows = [self.fin.readline().strip().split() for _ in range(self.natoms)]
+        atom_rows = [self.fin.readline().strip().split() for _ in range(self.n_atoms)]
         if "id" in column_indices:
             atom_rows.sort(key=lambda row: int(row[column_indices["id"]]))
 
@@ -494,9 +493,9 @@ class LAMMPSTrajectory(BaseTrajectory):
                 y_val = float(row[column_indices["y"]])
                 z_val = float(row[column_indices["z"]])
 
-            x_val = x_val % self.dimx if self.dimx else x_val
-            y_val = y_val % self.dimy if self.dimy else y_val
-            z_val = z_val % self.dimz if self.dimz else z_val
+            x_val = x_val % self.box_x if self.box_x else x_val
+            y_val = y_val % self.box_y if self.box_y else y_val
+            z_val = z_val % self.box_z if self.box_z else z_val
 
             symbols.append(element_symbol.capitalize())
             coords_list.append([x_val, y_val, z_val])

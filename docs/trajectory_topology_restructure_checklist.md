@@ -70,7 +70,7 @@ Status markers:
 
 - [x] Introduce a runtime topology frame/snapshot concept that analyses consume.
 - [x] Keep long-lived type/template information separate from per-frame topology realization.
-- [x] Make runtime topology state explicitly own:
+- [x] Make runtime topology state explicitly own or provide direct access to:
   - frame-level molecule membership
   - atom-to-molecule mappings
   - atom-to-compound-type mappings
@@ -113,9 +113,9 @@ Status markers:
 
 - [x] Represent per-frame molecule membership primarily as arrays rather than nested Python objects.
 - [x] For each compound type, store member/global-atom mappings in canonical local order.
-- [x] Introduce structures equivalent to:
-  - `member_atom_ids`
-  - `member_coms`
+- [x] Introduce structures and direct-access operations equivalent to:
+  - `molecule_atom_ids`
+  - per-molecule COM access
   - `atom_to_molecule`
   - `atom_to_compound_type`
   - `atom_to_local_index`
@@ -127,11 +127,13 @@ Status markers:
 - [x] Make canonical local ordering a hard invariant of the new topology model.
 - [x] Use graph-isomorphism/template mapping to place every molecule/member into template-local order.
 - [x] Ensure that equivalent molecules with different raw detected atom orderings still produce identical canonical local ordering.
-- [ ] Define deterministic behavior for symmetry-equivalent atoms rather than leaving tie-breaking implicit.
-- [ ] Decide explicitly whether symmetry-equivalent atoms should:
+- [x] Define deterministic behavior for symmetry-equivalent atoms.
+  - For truly equivalent atoms, Dyana uses a deterministic convention because chemistry does not provide a privileged distinction.
+  - The important invariants are reproducibility within one trajectory/build and consistent subgroup pairing within one compound type; direct tests now protect those invariants.
+- [x] Decide explicitly whether symmetry-equivalent atoms should:
   - receive a deterministic tie-broken order, or
   - be treated as stable equivalence classes where a unique label is not fundamentally meaningful
-- [ ] Treat canonical local order as the basis for:
+- [x] Treat canonical local order as the basis for:
   - label lookup
   - per-label selections
   - member-array column meaning
@@ -139,10 +141,11 @@ Status markers:
 
 ## 7. Static vs Dynamic Topology
 
-- [ ] Make the distinction between static-topology and dynamic-topology operation more explicit in the topology model.
-- [ ] In static-topology mode:
+- [x] Make the distinction between static-topology and dynamic-topology operation explicit.
+- [x] In static-topology mode:
   - build the template/type structure once
-  - refresh geometry and derived per-frame arrays cheaply
+  - keep that topology while coordinates change frame to frame
+  - avoid unnecessary topology rebuild work by not calling `rebuild_topology()` each frame
 - [x] In dynamic-topology mode:
   - rebuild the current topology frame/snapshot when requested
   - preserve the same analysis-facing access patterns
@@ -183,11 +186,11 @@ Status markers:
 ## 11. Relationship To Selection Handling
 
 - [x] Revisit analysis selection helpers after the new topology representation exists.
-- [~] Prefer selections expressed in terms of:
+- [x] Prefer selections expressed in terms of:
   - compound type
   - canonical local labels / local indices
-- [~] Resolve user label selections once into canonical template-local positions wherever possible, rather than repeatedly rematching labels during analysis execution.
-- [ ] Consider a small reusable `SelectionSpec`-like structure once the new topology access API is clear, so migrated analyses do not each reinvent selection bookkeeping.
+- [x] Resolve user label selections once into canonical template-local positions wherever possible, rather than repeatedly rematching labels during analysis execution.
+- [x] Add a small reusable `ResolvedSelection` structure so migrated analyses do not each reinvent selection bookkeeping.
 - [x] Reduce dependence on transient per-frame compound object identity where possible.
 - [x] Keep label-matching behavior compatible with Dyana's intended atom-label semantics, even if the internal representation changes substantially.
 
@@ -195,11 +198,11 @@ Status markers:
 
 - [x] Use unit tests to protect intended behavior, not accidental structure.
 - [x] When restructuring breaks a test, decide whether the old expectation is still correct before changing code just to satisfy it.
-- [ ] Add tests for canonical local ordering across equivalent molecules with different raw atom orderings.
+- [x] Add tests for canonical local ordering across equivalent molecules with different raw atom orderings.
 - [x] Add tests for direct label-to-global-index lookup in the new model.
 - [x] Add tests for atom-to-molecule / atom-to-type reverse lookup.
-- [ ] Add tests for static-topology refresh behavior.
-- [ ] Add tests for dynamic-topology rebuild behavior.
+- [x] Add tests for static-topology refresh behavior.
+- [x] Add tests for dynamic-topology rebuild behavior.
 - [x] Keep RDF as the first end-to-end correctness check during topology restructuring.
 
 ## 13. What Not To Optimize For
@@ -211,8 +214,6 @@ Status markers:
 
 ## 14. Immediate Next-Step Candidates
 
-1. Decide and document how symmetry-equivalent atoms are handled in canonical ordering.
-2. Extend the resolved-selection path consistently anywhere remaining target-path code still rematches label patterns during runtime.
-3. Decide whether a small reusable `SelectionSpec` needs to be surfaced more explicitly across the supported analyses, or whether the current topology-owned object is sufficient.
-4. Make static-topology refresh behavior more explicit and test it directly.
-5. Revisit whether the topology builder should move out of `trajectory_loader.py` now that the runtime model is authoritative, but only if that improves clarity rather than merely moving code around.
+1. Finish harmonizing the shared output writer and migrated-analysis table format.
+2. Reassess `CONFIG_SCHEMA` versus explicit config-dataclass duplication only after the output path settles.
+3. Revisit moving topology-builder code out of `trajectory_loader.py` only if a concrete readability or reuse problem appears.

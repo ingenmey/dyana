@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from config_schema import FrameLoopConfig
-from core.topology import CompoundType, TopologyFrame, TypeRegistry
+from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
@@ -31,7 +31,7 @@ class DummyTrajectory:
         water_type = CompoundType(
             type_id=0,
             key=("H2O", (), "water"),
-            rep="H2O",
+            formula="H2O",
             canonical_labels=("H1", "H2", "O1"),
             label_to_local_index={"H1": 0, "H2": 1, "O1": 2},
             local_bonds=((0, 2), (1, 2)),
@@ -41,22 +41,22 @@ class DummyTrajectory:
         na_type = CompoundType(
             type_id=1,
             key=("Na", (), "na"),
-            rep="Na",
+            formula="Na",
             canonical_labels=("Na1",),
             label_to_local_index={"Na1": 0},
             local_bonds=tuple(),
             local_elements=("Na",),
             atomic_masses=(23.0,),
         )
-        self.topology_registry = TypeRegistry([water_type, na_type])
+        self.topology_registry = CompoundTypeRegistry([water_type, na_type])
         self.topology_frame = TopologyFrame(
             registry=self.topology_registry,
-            member_atom_ids_by_key={
+            molecule_atom_ids_by_key={
                 ("H2O", (), "water"): np.array([[1, 2, 0]], dtype=np.int32),
                 ("Na", (), "na"): np.array([[3]], dtype=np.int32),
             },
             atom_to_type_id=np.array([0, 0, 0, 1], dtype=np.int32),
-            atom_to_member_index=np.array([0, 0, 0, 0], dtype=np.int32),
+            atom_to_molecule_index=np.array([0, 0, 0, 0], dtype=np.int32),
             atom_to_local_index=np.array([2, 0, 1, 0], dtype=np.int32),
         )
 

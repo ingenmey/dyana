@@ -1,12 +1,13 @@
-# base_analysis.py
-
 from abc import ABC, abstractmethod
 
 from config_builder import prompt_config_from_schema
 from config_schema import FrameLoopConfig
 from input_providers import InteractiveInputProvider
 
+
 class BaseAnalysis(ABC):
+    """Shared lifecycle and frame-loop base for migrated analyses."""
+
     CONFIG_CLASS = None
     CONFIG_SCHEMA = None
 
@@ -25,6 +26,30 @@ class BaseAnalysis(ABC):
 
     def get_input_provider(self, provider=None):
         return provider or self.input_provider
+
+    def bind_config(self, config, include=None, exclude=()):
+        self.config = config
+
+        if include is None:
+            names = vars(config).keys()
+        else:
+            names = include
+
+        for name in names:
+            if name in exclude:
+                continue
+
+            value = getattr(config, name)
+            if isinstance(value, list):
+                value = list(value)
+            elif isinstance(value, dict):
+                value = dict(value)
+            elif isinstance(value, set):
+                value = set(value)
+
+            setattr(self, name, value)
+
+        return self
 
     def get_compound_types(self):
         return self.traj.topology_frame.get_compound_types()
@@ -51,7 +76,7 @@ class BaseAnalysis(ABC):
         while self.nframes != 0:
             try:
                 if self.update_compounds:
-                    self.traj.guess_molecules()
+                    self.traj.rebuild_topology()
                     if not self.post_compound_update():
                         self.frame_idx += 1
                         self.nframes -= 1
@@ -70,12 +95,10 @@ class BaseAnalysis(ABC):
                     self.traj.read_frame()
 
             except ValueError:
-                # End of trajectory file
                 print("\nEnd of trajectory reached.")
                 break
 
             except KeyboardInterrupt:
-                # Graceful exit when user presses Ctrl+C
                 print("\nInterrupt received! Exiting main loop and post-processing data...")
                 break
 
@@ -169,8 +192,8 @@ class BaseAnalysis(ABC):
         compound_types = list(self.get_compound_types())
         print("\nAvailable Compounds:")
         for i, compound_type in enumerate(compound_types, start=1):
-            count = self.traj.topology_frame.get_member_count(compound_type)
-            print(f"{i}: {compound_type.rep} (Number: {count})")
+            count = self.traj.topology_frame.get_molecule_count(compound_type)
+            print(f"{i}: {compound_type.formula} (Number: {count})")
 
         if multi:
             prompt_str = prompt_text or f"Choose the {role} compounds (comma-separated numbers): "
@@ -182,20 +205,7 @@ class BaseAnalysis(ABC):
             idx = input_provider.ask_int(prompt_str, 1, minval=1) - 1
             return idx, compound_types[idx]
 
-
     def atom_selection(self, role="reference", compound=None, prompt_text=None, allow_empty=False, provider=None):
-        """
-        Select one or more atom labels from a compound.
-
-        Parameters
-        ----------
-        role : str
-            Role description for the prompt (default: "reference").
-        compound : Compound, optional
-            The compound to select atoms from.
-        prompt_text : str, optional
-            Custom prompt text. Can include {role}, {compound_num}, and {compound_name} placeholders.
-        """
         input_provider = self.get_input_provider(provider)
         if compound is not None:
             default_prompt = "Which atom(s) in {role} compound {compound_num} ({compound_name})? (comma-separated) "
@@ -205,17 +215,15 @@ class BaseAnalysis(ABC):
         prompt_str = (prompt_text or default_prompt).format(
             role=role,
             compound_num=compound.type_id + 1 if compound else "",
-            compound_name=compound.rep if compound else ""
+            compound_name=compound.formula if compound else ""
         )
 
         if compound is not None:
             print("Available labels:", ", ".join(compound.canonical_labels))
 
         if allow_empty:
-            # Accept Enter as empty selection
             answer = input_provider.ask_str(prompt_str, default="")
         else:
-            # Require at least one atom label
             answer = input_provider.ask_str(prompt_str)
 
         return [s.strip() for s in answer.split(',') if s.strip()]
