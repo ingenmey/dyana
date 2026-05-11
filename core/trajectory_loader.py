@@ -115,6 +115,45 @@ class BaseTrajectory(ABC):
         frame_coords: np.ndarray,
         kdtree: cKDTree,
     ) -> list[DetectedMolecule]:
+        # Detect all admissible bonds first, then extract connected components.
+        # This avoids the old order-dependent behavior where a bond could be
+        # missed just because one of its atoms had already been assigned to an
+        # earlier provisional molecule.
+        bond_graph: list[set[int]] = [set() for _ in range(self.n_atoms)]
+
+        for atom_index, atom_symbol in enumerate(frame_symbols):
+            if atom_symbol in EXCLUDED_ELEMENTS:
+                continue
+
+            cov_radius_atom = elem_covalent.get(atom_symbol, 0.0)
+            search_radius = elem_vdW.get(atom_symbol, 0.0) * NEIGHBOR_SEARCH_SCALE
+            neighbor_indices = sorted(kdtree.query_ball_point(frame_coords[atom_index], r=search_radius))
+
+            for neighbor_index in neighbor_indices:
+                if neighbor_index <= atom_index:
+                    continue
+
+                neighbor_symbol = frame_symbols[neighbor_index]
+                if neighbor_symbol in EXCLUDED_ELEMENTS:
+                    continue
+
+                bond_pair = (atom_index, neighbor_index)
+                if bond_pair in self.forbidden_bonds:
+                    continue
+
+                cov_radius_neighbor = elem_covalent.get(neighbor_symbol, 0.0)
+                distance_sq = self.are_connected(
+                    frame_coords[atom_index],
+                    frame_coords[neighbor_index],
+                    cov_radius_atom,
+                    cov_radius_neighbor,
+                )
+                if not distance_sq:
+                    continue
+
+                bond_graph[atom_index].add(neighbor_index)
+                bond_graph[neighbor_index].add(atom_index)
+
         molecules: list[DetectedMolecule] = []
         visited_global_indices: set[int] = set()
 
@@ -122,73 +161,33 @@ class BaseTrajectory(ABC):
             if seed_index in visited_global_indices:
                 continue
 
-            molecule_atom_indices: list[int] = [seed_index]
+            molecule_atom_indices: list[int] = []
             stack: list[int] = [seed_index]
             visited_global_indices.add(seed_index)
 
-            global_bonds: list[tuple[int, int]] = []
+            while stack:
+                current_global_idx = stack.pop()
+                molecule_atom_indices.append(current_global_idx)
 
-            if frame_symbols[seed_index] not in EXCLUDED_ELEMENTS:
-                while stack:
-                    current_global_idx = stack.pop()
-                    current_symbol = frame_symbols[current_global_idx]
-                    cov_radius_current = elem_covalent.get(current_symbol, 0.0)
-
-                    search_radius = elem_vdW.get(current_symbol, 0.0) * NEIGHBOR_SEARCH_SCALE
-                    neighbor_indices = sorted(
-                        kdtree.query_ball_point(frame_coords[current_global_idx], r=search_radius)
-                    )
-
-                    for neighbor_global_idx in neighbor_indices:
-                        neighbor_symbol = frame_symbols[neighbor_global_idx]
-                        if neighbor_symbol in EXCLUDED_ELEMENTS:
-                            continue
-
-                        bond_pair = (
-                            min(current_global_idx, neighbor_global_idx),
-                            max(current_global_idx, neighbor_global_idx),
-                        )
-                        if bond_pair in self.forbidden_bonds:
-                            continue
-
-                        cov_radius_neighbor = elem_covalent.get(neighbor_symbol, 0.0)
-                        neighbor_already_in_molecule = neighbor_global_idx in molecule_atom_indices
-                        bond_already_recorded = (
-                            (current_global_idx, neighbor_global_idx) in global_bonds
-                            or (neighbor_global_idx, current_global_idx) in global_bonds
-                        )
-                        should_consider_neighbor = (
-                            neighbor_global_idx not in visited_global_indices
-                            or (neighbor_already_in_molecule and not bond_already_recorded)
-                        )
-                        if not should_consider_neighbor:
-                            continue
-
-                        distance_sq = self.are_connected(
-                            frame_coords[current_global_idx],
-                            frame_coords[neighbor_global_idx],
-                            cov_radius_current,
-                            cov_radius_neighbor,
-                        )
-                        if not distance_sq:
-                            continue
-
-                        if neighbor_global_idx not in visited_global_indices:
-                            stack.append(neighbor_global_idx)
-                            molecule_atom_indices.append(neighbor_global_idx)
-                            visited_global_indices.add(neighbor_global_idx)
-
-                        if not bond_already_recorded:
-                            global_bonds.append((current_global_idx, neighbor_global_idx))
+                for neighbor_global_idx in sorted(bond_graph[current_global_idx], reverse=True):
+                    if neighbor_global_idx in visited_global_indices:
+                        continue
+                    visited_global_indices.add(neighbor_global_idx)
+                    stack.append(neighbor_global_idx)
 
             global_to_local = {
                 global_idx: local_idx
                 for local_idx, global_idx in enumerate(molecule_atom_indices)
             }
-            local_bonds = [
-                (global_to_local[a_global], global_to_local[b_global])
-                for (a_global, b_global) in global_bonds
-            ]
+            local_bonds: list[tuple[int, int]] = []
+            for global_idx in molecule_atom_indices:
+                for neighbor_global_idx in sorted(bond_graph[global_idx]):
+                    if neighbor_global_idx not in global_to_local or global_idx >= neighbor_global_idx:
+                        continue
+                    local_bonds.append(
+                        (global_to_local[global_idx], global_to_local[neighbor_global_idx])
+                    )
+
             molecules.append(
                 DetectedMolecule(
                     atom_ids=tuple(molecule_atom_indices),

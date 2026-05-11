@@ -12,6 +12,7 @@ else:
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+KOH_FIXTURE = FIXTURES / "koh_h2o.xyz"
 PAIRED_PEROXIDE = """8
 paired peroxide
 O 0.000 0.000 0.000
@@ -109,6 +110,35 @@ class TrajectoryFixtureTests(unittest.TestCase):
             self.assertLess(d_o2_h2, 1.2)
             self.assertGreater(d_o1_h2, 1.5)
             self.assertGreater(d_o2_h1, 1.5)
+
+    def test_forbidding_all_detected_oh_bonds_atomizes_koh_fixture(self):
+        with open(KOH_FIXTURE, "r", encoding="utf-8") as fin:
+            traj = load_trajectory(fin, "xyz", np.array([22.7274, 22.7274, 22.7274]))
+            traj.read_frame()
+            traj.rebuild_topology()
+
+        initial_counts = {
+            compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
+            for compound_type in traj.topology_frame.get_compound_types()
+        }
+        self.assertEqual(initial_counts, {"H2O": 123, "H3O2": 27, "HO": 123, "K": 150})
+
+        for compound_type in traj.topology_frame.get_compound_types():
+            if compound_type.formula not in {"H2O", "H3O2", "HO"}:
+                continue
+            molecule_atom_ids = traj.topology_frame.get_molecule_atom_ids(compound_type)
+            for atom_ids in molecule_atom_ids:
+                for local_a, local_b in compound_type.local_bonds:
+                    global_a = int(atom_ids[local_a])
+                    global_b = int(atom_ids[local_b])
+                    traj.forbidden_bonds.add((min(global_a, global_b), max(global_a, global_b)))
+
+        traj.rebuild_topology()
+        final_counts = {
+            compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
+            for compound_type in traj.topology_frame.get_compound_types()
+        }
+        self.assertEqual(final_counts, {"H": 450, "K": 150, "O": 300})
 def _periodic_distance(coord_a: np.ndarray, coord_b: np.ndarray, box_size: np.ndarray) -> float:
     delta = coord_a - coord_b
     delta -= np.round(delta / box_size) * box_size

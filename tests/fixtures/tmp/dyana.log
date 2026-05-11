@@ -1,6 +1,6 @@
 Dyana 0.1.0
 ===========
-Started: 2026-05-11 16:04:33 CEST
+Started: 2026-05-11 16:27:18 CEST
 Trajectory: /mnt/d/python/dyana/tests/fixtures/koh_h2o.xyz (xyz)
 Output dir: /mnt/d/python/dyana/tests/fixtures/tmp
 Console log: /mnt/d/python/dyana/tests/fixtures/tmp/dyana.log
@@ -16,29 +16,29 @@ Cell vectors: a=22.7274  b=22.7274  c=22.7274
 > Running compound recognition...
 
 Detected compound types:
-  1: H2O (Number: 131)
-  2: H3O2 (Number: 19)
-  3: HO (Number: 131)
+  1: H2O (Number: 141)
+  2: H3O2 (Number: 9)
+  3: HO (Number: 141)
   4: K (Number: 150)
 
 Compound 1 (H2O) bond length matrix:
            H1       H2       O1
-   H1      -        -     1.0265
-   H2      -        -     1.0266
-   O1   1.0265   1.0266      -  
+   H1      -        -     1.0284
+   H2      -        -     1.0326
+   O1   1.0284   1.0326      -  
 
 Compound 2 (H3O2) bond length matrix:
            H1       H2       H3       O1       O2
-   H1      -        -        -     1.2601   1.1896
-   H2      -        -        -     0.9762      -  
-   H3      -        -        -        -     0.9816
-   O1   1.2601   0.9762      -        -        -  
-   O2   1.1896      -     0.9816      -        -  
+   H1      -        -        -     1.2192   1.2111
+   H2      -        -        -     0.9716      -  
+   H3      -        -        -        -     0.9668
+   O1   1.2192   0.9716      -        -        -  
+   O2   1.2111      -     0.9668      -        -  
 
 Compound 3 (HO) bond length matrix:
            H1       O1
-   H1      -     0.9758
-   O1   0.9758      -  
+   H1      -     0.9757
+   O1   0.9757      -  
 
 Compound 4 (K) bond length matrix:
            K1
@@ -49,61 +49,55 @@ Accept these molecules (y) or change something (n) [Yes] n
 Break bonds (1) or repeat molecule recognition at specific frame (2)? [1] 
 
 Current compounds:
-  1: H2O (Number: 131)
-  2: H3O2 (Number: 19)
-  3: HO (Number: 131)
+  1: H2O (Number: 141)
+  2: H3O2 (Number: 9)
+  3: HO (Number: 141)
   4: K (Number: 150)
 Which compound to modify? [[done]] 1
 Break specific bonds (1) or all bonds (2) in compound 1 (H2O)? [1] 2
 + Added forbidden bonds for all bonds in compound 1 (H2O).
 
 Current compounds:
-  1: H2O (Number: 131)
-  2: H3O2 (Number: 19)
-  3: HO (Number: 131)
+  1: H2O (Number: 141)
+  2: H3O2 (Number: 9)
+  3: HO (Number: 141)
   4: K (Number: 150)
 Which compound to modify? [[done]] 2
 Break specific bonds (1) or all bonds (2) in compound 2 (H3O2)? [1] 2
 + Added forbidden bonds for all bonds in compound 2 (H3O2).
 
 Current compounds:
-  1: H2O (Number: 131)
-  2: H3O2 (Number: 19)
-  3: HO (Number: 131)
+  1: H2O (Number: 141)
+  2: H3O2 (Number: 9)
+  3: HO (Number: 141)
   4: K (Number: 150)
 Which compound to modify? [[done]] 3
 Break specific bonds (1) or all bonds (2) in compound 3 (HO)? [1] 2
 + Added forbidden bonds for all bonds in compound 3 (HO).
 
 Current compounds:
-  1: H2O (Number: 131)
-  2: H3O2 (Number: 19)
-  3: HO (Number: 131)
+  1: H2O (Number: 141)
+  2: H3O2 (Number: 9)
+  3: HO (Number: 141)
   4: K (Number: 150)
 Which compound to modify? [[done]] 
 
 > Running compound recognition...
 
 Detected compound types:
-  1: H (Number: 442)
-  2: HO (Number: 8)
-  3: K (Number: 150)
-  4: O (Number: 292)
+  1: H (Number: 450)
+  2: K (Number: 150)
+  3: O (Number: 300)
 
 Compound 1 (H) bond length matrix:
            H1
    H1      -  
 
-Compound 2 (HO) bond length matrix:
-           H1       O1
-   H1      -     1.3343
-   O1   1.3343      -  
-
-Compound 3 (K) bond length matrix:
+Compound 2 (K) bond length matrix:
            K1
    K1      -  
 
-Compound 4 (O) bond length matrix:
+Compound 3 (O) bond length matrix:
            O1
    O1      -  
 
