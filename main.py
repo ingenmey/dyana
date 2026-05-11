@@ -8,8 +8,10 @@ from pathlib import Path
 
 from core import constants
 from core.app_config import load_app_config
+from io_support.console import console
 from io_support.input_providers import FileInputProvider, InteractiveInputProvider
 from io_support.output_writer import configure_output, restore_output
+from io_support.run_header import build_run_header
 from workflow.workflow_prompts import WorkflowPrompts
 
 AVAILABLE_ANALYSES = {
@@ -40,9 +42,9 @@ def determine_traj_format(traj_file):
 
 def choose_analysis(input_provider):
     """Prompt for one of the currently supported analyses."""
-    print("\nAvailable analyses:")
+    console.section("Available Analyses")
     for key, (description, _, _) in AVAILABLE_ANALYSES.items():
-        print(f"{key}: {description}")
+        console.key_value(key, description, indent=2)
 
     while True:
         analysis_choice = input_provider.ask_str("\nChoose an analysis: ").strip()
@@ -50,7 +52,7 @@ def choose_analysis(input_provider):
             _, module_name, class_name = AVAILABLE_ANALYSES[analysis_choice]
             module = importlib.import_module(module_name)
             return getattr(module, class_name)
-        print("Invalid choice. Please choose an analysis from the above list.")
+        console.warn("Invalid choice. Please choose an analysis from the above list.")
 
 
 def _load_output_defaults(config_path: str | Path | None = None) -> dict[str, bool]:
@@ -60,12 +62,6 @@ def _load_output_defaults(config_path: str | Path | None = None) -> dict[str, bo
     }
 
 
-def _resolve_log_path(output_dir: str | Path, log_path: str | None) -> str:
-    if log_path is not None:
-        return log_path
-    return str(Path(output_dir) / "input.log")
-
-
 def main(
     traj_file,
     input_provider=None,
@@ -73,18 +69,39 @@ def main(
     save_prepared_setup_path=None,
     output_dir=".",
     force_overwrite=False,
+    console_log_path=None,
 ):
     """Run the interactive workflow for one trajectory file."""
     workflow_prompts = WorkflowPrompts(input_provider=input_provider)
     input_provider = workflow_prompts.input_provider
     traj = None
     previous_output_policy = configure_output(output_dir=output_dir, force_overwrite=force_overwrite)
+    previous_console_state = console.capture_state()
+    resolved_console_log_path = console_log_path or str(Path(output_dir) / "dyana.log")
+    console.configure(log_path=resolved_console_log_path)
+    if prepared_setup is None:
+        traj_format = determine_traj_format(traj_file)
+    else:
+        try:
+            traj_format = determine_traj_format(traj_file)
+        except ValueError:
+            traj_format = None
 
     try:
+        input_log_path = getattr(input_provider, "log_file", None)
+        header_title, header_lines = build_run_header(
+            traj_file,
+            traj_format=traj_format,
+            output_dir=output_dir,
+            console_log_path=resolved_console_log_path,
+            input_log_path=getattr(input_log_path, "name", None),
+            prepared_setup=prepared_setup,
+        )
+        console.header(header_title, lines=header_lines)
+
         if prepared_setup is not None:
             traj = workflow_prompts.prepare_trajectory_from_setup(traj_file, prepared_setup)
         else:
-            traj_format = determine_traj_format(traj_file)
             traj = workflow_prompts.prepare_trajectory(
                 traj_file,
                 traj_format,
@@ -99,6 +116,8 @@ def main(
         fin = getattr(traj, "fin", None)
         if fin is not None and not fin.closed:
             fin.close()
+        console.close()
+        console.restore_state(previous_console_state)
         restore_output(previous_output_policy)
 
 
@@ -125,7 +144,9 @@ def cli():
     parser.add_argument("--prepared-setup", type=str, help="Path to a prepared setup JSON file")
     parser.add_argument("--save-prepared-setup", type=str, help="Write the accepted prepared setup to this JSON file")
     args = parser.parse_args()
-    log_path = _resolve_log_path(args.output_dir, args.log)
+    output_dir = args.output_dir
+    log_path = args.log or str(Path(output_dir) / "input.log")
+    console_log_path = str(Path(output_dir) / "dyana.log")
 
     if args.input is not None:
         input_provider = FileInputProvider(
@@ -142,8 +163,9 @@ def cli():
             input_provider=input_provider,
             prepared_setup=args.prepared_setup,
             save_prepared_setup_path=args.save_prepared_setup,
-            output_dir=args.output_dir,
+            output_dir=output_dir,
             force_overwrite=args.force,
+            console_log_path=console_log_path,
         )
     finally:
         close = getattr(input_provider, "close", None)

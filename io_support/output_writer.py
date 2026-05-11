@@ -6,6 +6,8 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
+from io_support.console import console
+
 
 _SAFE_TOKEN_RE = re.compile(r"[^A-Za-z0-9+.-]+")
 _DEFAULT_DATA_COLUMN_WIDTH = 16
@@ -134,12 +136,12 @@ def _prepare_output_path(filename: str | Path) -> Path:
     if path.exists() and not _FORCE_OVERWRITE:
         rotated_path, shifted_count = _rotate_existing_output(path)
         if shifted_count > 1:
-            print(
+            console.warn(
                 f"Output file {path.name} already existed; moved the previous file to "
                 f"{rotated_path.name} and shifted {shifted_count - 1} older backup(s)."
             )
         else:
-            print(f"Output file {path.name} already existed; moved the previous file to {rotated_path.name}.")
+            console.warn(f"Output file {path.name} already existed; moved the previous file to {rotated_path.name}.")
 
     return path
 

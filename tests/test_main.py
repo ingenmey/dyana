@@ -24,18 +24,6 @@ class MainTests(unittest.TestCase):
 
         self.assertEqual(defaults, {"force_overwrite": False})
 
-    def test_resolve_log_path_defaults_to_output_directory(self):
-        self.assertEqual(
-            main._resolve_log_path("results", None),
-            str(Path("results") / "input.log"),
-        )
-
-    def test_resolve_log_path_keeps_explicit_log_argument(self):
-        self.assertEqual(
-            main._resolve_log_path("results", "custom.log"),
-            "custom.log",
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

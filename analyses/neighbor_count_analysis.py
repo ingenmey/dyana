@@ -8,6 +8,7 @@ from scipy.spatial import cKDTree
 
 from framework.analysis_params import AtomLabelsParam, BoolParam, CompoundParam, FloatParam, ForEach
 from analyses.common.base_analysis import BaseAnalysis
+from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, format_selection_group, write_table
 
 
@@ -182,7 +183,7 @@ class NeighborCountAnalysis(BaseAnalysis):
 
     def postprocess(self):
         if self.total_ref_atoms == 0:
-            print("No reference atoms found - nothing to write.")
+            console.warn("No reference atoms found - nothing to write.")
             return
 
         max_n = max(self.n_hist) if self.n_hist else 0
@@ -202,4 +203,4 @@ class NeighborCountAnalysis(BaseAnalysis):
             comment_lines=[f"P(n)   cutoff = {self.r_cut:.2f} Angstrom"],
         )
 
-        print(f"Saved neighbour-count results to {fname}")
+        console.success(f"Saved neighbour-count results to {fname}")

@@ -104,14 +104,19 @@ The high-level flow is:
 The interactive analysis path is:
 
 1. workflow prepares the trajectory/topology state
-2. user chooses an analysis
-3. `BaseAnalysis.prompt_config()` calls
+2. the shared interactive console prints run context and section headers
+3. user chooses an analysis
+4. `BaseAnalysis.prompt_config()` calls
    `prompt_config_from_schema(...)`
-4. the schema-driven prompt builder returns a config dataclass instance
-5. `configure(config)` binds that config to the live trajectory/topology
-6. the frame loop runs
+5. the schema-driven prompt builder returns a config dataclass instance
+6. `configure(config)` binds that config to the live trajectory/topology
+7. the frame loop runs
 
 This keeps prompting separate from analysis runtime logic.
+
+Interactive console output is mirrored into `dyana.log`, while prompt/answer
+replay remains in `input.log`. The supported console conventions are described
+in [interactive_console_output.md](D:/python/dyana/docs/interactive_console_output.md).
 
 ## 5. Programmatic Path
 

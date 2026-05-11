@@ -67,8 +67,25 @@ class Console:
             self._log_file.close()
             self._log_file = None
 
+    def capture_state(self) -> tuple[object, Path | None, bool, bool]:
+        """Capture the current console configuration for later restoration."""
+        return (self.stream, self.log_path, self.use_color, self.append_log)
+
+    def restore_state(self, state: tuple[object, Path | None, bool, bool]) -> None:
+        """Restore a previously captured console configuration."""
+        stream, log_path, use_color, append_log = state
+        self.close()
+        self.stream = stream
+        self.log_path = log_path
+        self.use_color = use_color
+        self.append_log = append_log
+
     def plain(self, message: str = "") -> None:
         self.emit(message)
+
+    def prompt(self, message: str) -> None:
+        """Write an interactive prompt without a trailing newline."""
+        self.emit(message, end=" ")
 
     def info(self, message: str) -> None:
         self.emit(message, prefix="> ", style="dim")
@@ -137,6 +154,10 @@ class Console:
         self._log_file.write(_strip_ansi(text))
         self._log_file.flush()
 
+    def log_reply(self, reply: str) -> None:
+        """Append one interactive reply to the mirrored console log."""
+        self._write_log(f"{reply}\n")
+
 def _apply_style(text: str, style: str | tuple[str, ...] | None, *, enabled: bool) -> str:
     if not enabled or style is None:
         return text
@@ -154,6 +175,11 @@ def _apply_style(text: str, style: str | tuple[str, ...] | None, *, enabled: boo
 
 def _strip_ansi(text: str) -> str:
     return _ANSI_RE.sub("", text)
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from console text."""
+    return _strip_ansi(text)
 
 
 def _supports_color(stream) -> bool:
@@ -196,4 +222,4 @@ def _enable_windows_ansi(stream) -> bool:
     return kernel32.SetConsoleMode(handle, mode.value | enable_vt) != 0
 
 
-console = Console()
+console = Console(log_path=None)

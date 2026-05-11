@@ -49,6 +49,19 @@ class ConsoleTests(unittest.TestCase):
             self.assertTrue(log_path.exists())
             self.assertEqual(log_path.read_text(encoding="utf-8"), "Hello\n")
 
+    def test_prompt_and_reply_are_mirrored_to_log(self):
+        stream = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "dyana.log"
+            console = Console(stream=stream, log_path=log_path, use_color=False)
+
+            console.prompt("Choose an analysis:")
+            console.log_reply("rdf")
+            console.close()
+
+            self.assertEqual(stream.getvalue(), "Choose an analysis: ")
+            self.assertEqual(log_path.read_text(encoding="utf-8"), "Choose an analysis: rdf\n")
+
 
 if __name__ == "__main__":
     unittest.main()

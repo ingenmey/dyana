@@ -4,6 +4,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
+from io_support.console import console
 from io_support.output_writer import configure_output, restore_output, write_table
 
 
@@ -34,8 +35,14 @@ class OutputWriterTests(unittest.TestCase):
             backup_1.write_text("old-backup\n", encoding="utf-8")
 
             stdout = io.StringIO()
-            with redirect_stdout(stdout):
-                write_table("sample.dat", headers=["x", "y"], data=[[1.0, 2.0]])
+            previous_console_state = console.capture_state()
+            console.configure(stream=stdout, log_path=None, use_color=False)
+            try:
+                with redirect_stdout(stdout):
+                    write_table("sample.dat", headers=["x", "y"], data=[[1.0, 2.0]])
+            finally:
+                console.close()
+                console.restore_state(previous_console_state)
 
             new_text = base.read_text(encoding="utf-8")
             self.assertIn("# x", new_text)

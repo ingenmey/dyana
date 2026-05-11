@@ -7,6 +7,7 @@ import numpy as np
 from framework.analysis_params import BoolParam, ChoiceParam, FloatParam
 from analyses.common.base_analysis import BaseAnalysis
 from analyses.common.histogram import HistogramND
+from io_support.console import console
 from io_support.output_writer import build_output_filename, write_histogram_1d
 
 
@@ -108,4 +109,4 @@ class DensityAnalysis(BaseAnalysis):
         headers = ["r/Angstrom"] + sorted_formulas
         fname = build_output_filename("density")
         write_histogram_1d(fname, self.hist, headers=headers, fields=sorted_formulas)
-        print(f"Saved density results to {fname}")
+        console.success(f"Saved density results to {fname}")

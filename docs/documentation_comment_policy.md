@@ -59,6 +59,7 @@ behavior of the codebase, for example:
 - supported trajectory formats
 - the runtime topology model
 - the analysis lifecycle
+- the interactive console-output conventions
 - output file conventions
 - atom-label and selection semantics
 - static vs dynamic topology behavior

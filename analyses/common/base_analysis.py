@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 from framework.config_builder import prompt_config_from_schema
 from framework.config_schema import FrameLoopConfig
+from io_support.console import console
 from io_support.input_providers import InteractiveInputProvider
 
 
@@ -67,7 +68,7 @@ class BaseAnalysis(ABC):
     def skip_to_start(self):
         self.frame_idx = 0
         if self.start_frame > 1:
-            print(f"Skipping forward to frame {self.start_frame}.")
+            console.info(f"Skipping forward to frame {self.start_frame}.")
             while self.frame_idx < self.start_frame - 1:
                 self.traj.read_frame()
                 self.frame_idx += 1
@@ -87,7 +88,7 @@ class BaseAnalysis(ABC):
                 self.processed_frames += 1
 
                 if self.processed_frames % 100 == 0:
-                    print(f"Processed {self.processed_frames} frames (current frame {self.frame_idx+1})")
+                    console.progress(f"Processed {self.processed_frames} frames (current frame {self.frame_idx+1})")
 
                 for _ in range(self.frame_stride):
                     self.frame_idx += 1
@@ -95,20 +96,27 @@ class BaseAnalysis(ABC):
                     self.traj.read_frame()
 
             except ValueError:
-                print("\nEnd of trajectory reached.")
+                console.info("End of trajectory reached.")
                 break
 
             except KeyboardInterrupt:
-                print("\nInterrupt received! Exiting main loop and post-processing data...")
+                console.warn("Interrupt received. Exiting the frame loop and post-processing collected data.")
                 break
 
     def run(self):
         if not self._analysis_configured:
+            console.section("Analysis Setup")
             self.setup()
         if not self._frame_loop_configured:
-            self.configure_frame_loop(self.prompt_frame_loop_config())
+            console.section("Frame Loop")
+            frame_loop = self.prompt_frame_loop_config()
+            self.configure_frame_loop(frame_loop)
         self.skip_to_start()
+        console.section("Run")
+        console.plain("Running analysis...")
         self._execute_frame_loop()
+        console.section("Results")
+        console.key_value("Processed frames", self.processed_frames)
         self.postprocess()
 
     def setup(self):
@@ -150,7 +158,7 @@ class BaseAnalysis(ABC):
             )
         else:
             update_compounds = False
-            print("\nPer-frame molecule recognition is disabled for this analysis.")
+            console.info("Per-frame molecule recognition is disabled for this analysis.")
 
         return FrameLoopConfig(
             update_compounds=update_compounds,
@@ -190,10 +198,11 @@ class BaseAnalysis(ABC):
     def compound_selection(self, role="reference", multi=False, prompt_text=None, provider=None):
         input_provider = self.get_input_provider(provider)
         compound_types = list(self.get_compound_types())
-        print("\nAvailable Compounds:")
+        console.plain("")
+        console.plain("Available compounds:")
         for i, compound_type in enumerate(compound_types, start=1):
             count = self.traj.topology_frame.get_molecule_count(compound_type)
-            print(f"{i}: {compound_type.formula} (Number: {count})")
+            console.key_value(str(i), f"{compound_type.formula} (Number: {count})", indent=2)
 
         if multi:
             prompt_str = prompt_text or f"Choose the {role} compounds (comma-separated numbers): "
@@ -219,7 +228,7 @@ class BaseAnalysis(ABC):
         )
 
         if compound is not None:
-            print("Available labels:", ", ".join(compound.canonical_labels))
+            console.plain(f"Available labels: {', '.join(compound.canonical_labels)}")
 
         if allow_empty:
             answer = input_provider.ask_str(prompt_str, default="")

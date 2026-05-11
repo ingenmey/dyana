@@ -10,6 +10,7 @@ from framework.analysis_params import AtomLabelsParam, CompoundParam, FloatParam
 from analyses.common.base_analysis import BaseAnalysis
 from analyses.common.histogram import HistogramND
 from analyses.common.metrics import DistanceMetric, Selector
+from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, write_histogram_1d
 
 
@@ -145,4 +146,4 @@ class RDF(BaseAnalysis):
         )
         write_histogram_1d(fname, self.hist, headers=["r/Angstrom", "g(r)", "N(r)"], fields=["count", "number_integral"])
 
-        print(f"Saved RDF results to {fname}")
+        console.success(f"Saved RDF results to {fname}")

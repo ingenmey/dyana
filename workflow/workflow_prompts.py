@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from core.trajectory_loader import load_trajectory
+from io_support.console import console
 from io_support.input_providers import InteractiveInputProvider
 from workflow.prepared_setup import (
     apply_prepared_setup,
@@ -72,19 +73,26 @@ class WorkflowPrompts:
 
     def prepare_trajectory(self, traj_file, traj_format, provider=None, save_prepared_setup_path=None):
         input_provider = provider or self.input_provider
+        console.section("Topology Setup")
         cell_vectors = self.prompt_cell_vectors(traj_format, provider=input_provider)
         traj = self._load_initial_trajectory(traj_file, traj_format, cell_vectors)
 
         box_size = traj.box_size
-        print(f"\n\nCell vectors: a = {box_size[0]}, b = {box_size[1]}, c = {box_size[2]}\n")
+        console.key_value(
+            "Cell vectors",
+            f"a={box_size[0]:.4f}  b={box_size[1]:.4f}  c={box_size[2]:.4f}",
+        )
 
         self.process_compounds(traj, provider=input_provider)
         if save_prepared_setup_path is not None:
             prepared_setup = build_prepared_setup(traj, traj_file, traj_format, cell_vectors)
             save_prepared_setup(save_prepared_setup_path, prepared_setup)
+            console.success(f"Saved prepared setup to {save_prepared_setup_path}")
         return traj
 
     def prepare_trajectory_from_setup(self, traj_file, prepared_setup_path):
+        console.section("Topology Setup")
+        console.info(f"Loading prepared setup from {prepared_setup_path}")
         prepared_setup = load_prepared_setup(prepared_setup_path)
         recipe = prepared_setup.recipe
         traj_format = recipe["trajectory_format"]
@@ -94,6 +102,11 @@ class WorkflowPrompts:
         apply_prepared_setup(traj, prepared_setup)
         traj.rebuild_topology()
         validate_prepared_setup(traj, prepared_setup)
+        console.key_value(
+            "Cell vectors",
+            f"a={traj.box_size[0]:.4f}  b={traj.box_size[1]:.4f}  c={traj.box_size[2]:.4f}",
+        )
+        console.success("Prepared setup matches the current trajectory topology.")
         return traj
 
     def process_compounds(self, traj, provider=None):
@@ -106,7 +119,8 @@ class WorkflowPrompts:
             self._print_compound_summary(traj, compound_types)
 
             for i, compound_type in enumerate(compound_types):
-                print(f"\nCompound {i + 1} Bond Length Matrix:")
+                console.plain("")
+                console.plain(f"Compound {i + 1} bond length matrix:")
                 self._print_bond_length_matrix(traj, compound_type)
 
             should_draw_compounds = input_provider.ask_bool("Draw compounds to PDF?", False)
@@ -118,6 +132,7 @@ class WorkflowPrompts:
             if is_keep_compounds:
                 if frame_idx > 0:
                     traj.rewind_to_first_frame()
+                console.success("Accepted compound list.")
                 break
 
             should_break = input_provider.ask_int(
@@ -134,10 +149,12 @@ class WorkflowPrompts:
     def break_bonds(self, traj, provider=None):
         input_provider = provider or self.input_provider
         while True:
-            print("\nCurrent Compounds:")
+            console.plain("")
+            console.plain("Current compounds:")
             compound_types = list(traj.topology_frame.get_compound_types())
             for i, compound_type in enumerate(compound_types, start=1):
-                print(f"{i}: {compound_type.formula}")
+                count = traj.topology_frame.get_molecule_count(compound_type)
+                console.key_value(str(i), f"{compound_type.formula} (Number: {count})", indent=2)
 
             comp_id = input_provider.ask_int("Which compound to modify?", -1, "[done]") - 1
             if comp_id < 0:
@@ -146,14 +163,14 @@ class WorkflowPrompts:
             try:
                 compound_type = compound_types[comp_id]
             except (ValueError, IndexError):
-                print("Invalid compound number.")
+                console.warn("Invalid compound number.")
                 continue
 
             atom1 = input_provider.ask_str("First atom label to break bond (e.g., O1): ").strip()
             atom2 = input_provider.ask_str("Second atom label to break bond (e.g., H2): ").strip()
 
             if atom1 not in compound_type.label_to_local_index or atom2 not in compound_type.label_to_local_index:
-                print("Invalid atom label(s). Try again.")
+                console.warn("Invalid atom label(s). Try again.")
                 continue
 
             local_idx1 = compound_type.label_to_local_index[atom1]
@@ -164,7 +181,7 @@ class WorkflowPrompts:
                 global_idx2 = int(atom_ids[local_idx2])
                 traj.forbidden_bonds.add((min(global_idx1, global_idx2), max(global_idx1, global_idx2)))
 
-            print(f"Added forbidden bond between {atom1} and {atom2}.")
+            console.success(f"Added forbidden bond between {atom1} and {atom2}.")
 
     def skip_to_frame(self, traj, frame_idx, provider=None):
         input_provider = provider or self.input_provider
@@ -190,9 +207,10 @@ class WorkflowPrompts:
         return traj
 
     def _print_compound_summary(self, traj, compound_types):
+        console.plain("Detected compound types:")
         for i, compound_type in enumerate(compound_types):
             count = traj.topology_frame.get_molecule_count(compound_type)
-            print(f"Compound {i + 1}: {compound_type.formula}, Number: {count}")
+            console.key_value(str(i + 1), f"{compound_type.formula} (Number: {count})", indent=2)
 
     def _print_bond_length_matrix(self, traj, compound_type):
         bond_lengths = traj.topology_frame.get_average_bond_lengths(
@@ -213,7 +231,7 @@ class WorkflowPrompts:
             matrix[idx2][idx1] = f"{length:.4f}"
 
         header = " ".join(f"{label:>8}" for label in labels)
-        print(f"     {header}")
+        console.plain(f"     {header}")
         for idx, label in enumerate(labels):
             row = " ".join(f"{val:>8}" for val in matrix[idx])
-            print(f"{label:>5} {row}")
+            console.plain(f"{label:>5} {row}")

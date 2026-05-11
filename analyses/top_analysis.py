@@ -9,6 +9,7 @@ from framework.analysis_params import AtomLabelsParam, BoolParam, CompoundParam,
 from analyses.common.base_analysis import BaseAnalysis
 from analyses.common.histogram import HistogramND
 from core.geometry import minimum_image
+from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, format_selection_group, write_histogram_1d
 
 
@@ -253,14 +254,14 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
             self.hist_q.normalize(field="count", method="total", total=100)
             q_filename = build_output_filename("top_q", filename_parts)
             write_histogram_1d(q_filename, self.hist_q, headers=["q", "P(q)"], comment_lines=comment_lines)
-            print(f"Saved tetrahedral orientational order results to {q_filename}")
+            console.success(f"Saved tetrahedral orientational order results to {q_filename}")
         else:
-            print("No valid tetrahedral orientational order values were accumulated.")
+            console.warn("No valid tetrahedral orientational order values were accumulated.")
 
         if self.hist_s.counts.sum() > 0:
             self.hist_s.normalize(field="count", method="total", total=100)
             s_filename = build_output_filename("top_s", filename_parts)
             write_histogram_1d(s_filename, self.hist_s, headers=["S", "P(S)"], comment_lines=comment_lines)
-            print(f"Saved tetrahedral translational order results to {s_filename}")
+            console.success(f"Saved tetrahedral translational order results to {s_filename}")
         else:
-            print("No valid tetrahedral translational order values were accumulated.")
+            console.warn("No valid tetrahedral translational order values were accumulated.")

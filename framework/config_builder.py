@@ -12,6 +12,7 @@ from framework.analysis_params import (
     IntParam,
     When,
 )
+from io_support.console import console
 
 
 @dataclass
@@ -206,14 +207,14 @@ def _prompt_optional_float(param, context):
         try:
             value = float(answer)
         except ValueError:
-            print("Please enter a valid number or leave blank.")
+            console.warn("Please enter a valid number or leave blank.")
             continue
         if (param.minval is not None and value < param.minval) or (param.maxval is not None and value > param.maxval):
             if param.minval is not None and param.maxval is not None:
-                print(f"Please enter a number between {param.minval} and {param.maxval}, or leave blank.")
+                console.warn(f"Please enter a number between {param.minval} and {param.maxval}, or leave blank.")
             elif param.minval is not None:
-                print(f"Please enter a number >= {param.minval}, or leave blank.")
+                console.warn(f"Please enter a number >= {param.minval}, or leave blank.")
             elif param.maxval is not None:
-                print(f"Please enter a number <= {param.maxval}, or leave blank.")
+                console.warn(f"Please enter a number <= {param.maxval}, or leave blank.")
             continue
         return value

@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from io_support.console import console, strip_ansi
+
 
 class InputProvider(ABC):
     """Abstract prompt/input provider."""
@@ -23,11 +25,11 @@ class InputProvider(ABC):
             try:
                 value = int(answer)
             except ValueError:
-                print("Please enter a valid integer.")
+                console.warn("Please enter a valid integer.")
                 continue
 
             if (minval is not None and value < minval) or (maxval is not None and value > maxval):
-                print(_range_error_message("integer", minval, maxval))
+                console.warn(_range_error_message("integer", minval, maxval))
             else:
                 return value
 
@@ -41,11 +43,11 @@ class InputProvider(ABC):
             try:
                 value = float(answer)
             except ValueError:
-                print("Please enter a valid number.")
+                console.warn("Please enter a valid number.")
                 continue
 
             if (minval is not None and value < minval) or (maxval is not None and value > maxval):
-                print(_range_error_message("number", minval, maxval))
+                console.warn(_range_error_message("number", minval, maxval))
             else:
                 return value
 
@@ -59,7 +61,7 @@ class InputProvider(ABC):
                 return True
             if answer in ["n", "no"]:
                 return False
-            print("Please answer with 'y' or 'n'.")
+            console.warn("Please answer with 'y' or 'n'.")
 
     def ask_choice(self, question: str, choices, default=None) -> str:
         choices_str = "/".join(choices)
@@ -69,7 +71,7 @@ class InputProvider(ABC):
             answer = self.ask_str(f"{question} ({choices_str})", default=default).strip().lower()
             if answer in choices_lower:
                 return answer
-            print(f"Please choose one of {choices_str}.")
+            console.warn(f"Please choose one of {choices_str}.")
 
 
 class InteractiveInputProvider(InputProvider):
@@ -95,9 +97,13 @@ class InteractiveInputProvider(InputProvider):
         question = _format_question(question, default, display_default)
         while True:
             try:
-                answer = input(question + " ").strip()
+                console.prompt(question)
+                answer = input().strip()
             except EOFError:
+                console.log_reply("")
                 raise SystemExit("\nInput interrupted. Exiting.")
+
+            console.log_reply(answer)
 
             if answer:
                 self._write_log(question, answer)
@@ -105,11 +111,11 @@ class InteractiveInputProvider(InputProvider):
             if default is not None:
                 self._write_log(question, "")
                 return default
-            print("Invalid input. Try again.")
+            console.warn("Invalid input. Try again.")
 
     def _write_log(self, question, answer):
         if self.log_file:
-            self.log_file.write(f"# {question.strip()}\n{answer}\n")
+            self.log_file.write(f"# {strip_ansi(question).strip()}\n{answer}\n")
             self.log_file.flush()
 
 
@@ -148,7 +154,7 @@ class FileInputProvider(InputProvider):
             self._write_log(question, "" if fallback_answer == default else fallback_answer)
             return fallback_answer
 
-        print(question, answer)
+        console.plain(f"{question} {answer}")
         self._write_log(question, answer)
         if answer:
             return answer
@@ -165,7 +171,7 @@ class FileInputProvider(InputProvider):
 
     def _write_log(self, question, answer):
         if self.log_file:
-            self.log_file.write(f"# {question.strip()}\n{answer}\n")
+            self.log_file.write(f"# {strip_ansi(question).strip()}\n{answer}\n")
             self.log_file.flush()
 
 

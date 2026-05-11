@@ -1,8 +1,10 @@
+import io
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from io_support.console import console
 from io_support.input_providers import FileInputProvider, InteractiveInputProvider, NullInputProvider
 
 
@@ -69,6 +71,24 @@ class InputProviderTests(unittest.TestCase):
             provider.close()
 
             self.assertTrue(log_path.exists())
+
+    def test_interactive_provider_mirrors_prompt_and_reply_to_console_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            input_log_path = Path(tmp) / "input.log"
+            console_log_path = Path(tmp) / "dyana.log"
+            provider = InteractiveInputProvider(log_path=input_log_path)
+            previous_console_state = console.capture_state()
+            console.configure(stream=io.StringIO(), log_path=console_log_path, use_color=False)
+
+            try:
+                with patch("builtins.input", return_value="answer"):
+                    self.assertEqual(provider.ask_str("Question?"), "answer")
+            finally:
+                provider.close()
+                console.close()
+                console.restore_state(previous_console_state)
+
+            self.assertEqual(console_log_path.read_text(encoding="utf-8"), "Question? answer\n")
 
     def test_file_provider_creates_log_parent_directories(self):
         with tempfile.TemporaryDirectory() as tmp:

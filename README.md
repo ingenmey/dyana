@@ -18,6 +18,13 @@ When installed as a package, the same entry point is exposed as:
 dyana trajectory.lammpstrj
 ```
 
+Interactive runs write:
+
+- `input.log`: prompt/answer replay log
+- `dyana.log`: full human-readable console transcript, including prompts and replies
+
+Both default to the selected output directory.
+
 ## Development
 
 Install the package in editable mode with development tools:
@@ -46,4 +53,5 @@ Current architecture/reference docs live in [docs](D:/python/dyana/docs):
 - [runtime_topology_model.md](D:/python/dyana/docs/runtime_topology_model.md)
 - [analysis_config_lifecycle.md](D:/python/dyana/docs/analysis_config_lifecycle.md)
 - [output_table_format.md](D:/python/dyana/docs/output_table_format.md)
+- [interactive_console_output.md](D:/python/dyana/docs/interactive_console_output.md)
 - [documentation_comment_policy.md](D:/python/dyana/docs/documentation_comment_policy.md)

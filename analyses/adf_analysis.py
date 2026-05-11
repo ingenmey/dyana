@@ -8,6 +8,7 @@ from framework.analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, C
 from analyses.common.base_analysis import BaseAnalysis
 from analyses.common.histogram import HistogramND
 from analyses.common.metrics import AngleMetric, Selector
+from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, write_histogram_1d
 
 
@@ -188,7 +189,7 @@ class ADF(BaseAnalysis):
             ],
         )
         write_histogram_1d(fname, self.hist, headers=["angle/deg", "ADF"])
-        print(f"Saved ADF results to {fname}")
+        console.success(f"Saved ADF results to {fname}")
 
 
 def build_vector_lists(

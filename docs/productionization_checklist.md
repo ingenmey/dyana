@@ -159,6 +159,7 @@ avoid carrying competing framework guidance.
 - [ ] Add consistent naming conventions for output files.
 - [x] Put analysis outputs into user-selected run directories.
 - [x] Do not add timestamped run directories on top of the current explicit `--output-dir` support.
+- [x] Mirror supported interactive console output into `<output-dir>/dyana.log`.
 - [~] Include units, frame range, stride, and normalization in headers/metadata.
   - Migrated analyses now share a common output direction and documented table format.
   - Some analysis-specific metadata is still not written consistently.
@@ -213,11 +214,15 @@ avoid carrying competing framework guidance.
 
 ## 14. Logging Instead Of Print
 
+- [~] Introduce a shared interactive console helper for supported user-facing output.
 - [ ] Introduce module loggers.
 - [ ] Add `--quiet` / `--verbose`.
 - [ ] Route diagnostics to log file when requested.
-- [ ] Keep interactive prompts/user-facing text separate from diagnostics.
-- [ ] Replace progress `print` calls in frame loops with logging/progress helpers.
+- [~] Keep interactive prompts/user-facing text separate from diagnostics.
+  - Supported interactive output now goes through a shared console helper and mirrored `dyana.log`.
+  - Prompt/answer replay remains separate in `input.log`.
+- [~] Replace progress `print` calls in frame loops with logging/progress helpers.
+  - Supported analyses now use shared console progress messages.
 
 ## 15. Error Handling
 
