@@ -1,63 +1,110 @@
 Dyana 0.1.0
 ===========
-Started: 2026-05-11 15:23:16 CEST
-Trajectory: /mnt/d/python/dyana/tests/fixtures/water128.xyz (xyz)
+Started: 2026-05-11 16:04:33 CEST
+Trajectory: /mnt/d/python/dyana/tests/fixtures/koh_h2o.xyz (xyz)
 Output dir: /mnt/d/python/dyana/tests/fixtures/tmp
 Console log: /mnt/d/python/dyana/tests/fixtures/tmp/dyana.log
 Input log: /mnt/d/python/dyana/tests/fixtures/tmp/input.log
 
 Topology Setup
-Enter cell vector length in X dimension (in Angstrom):  15.67
-Enter cell vector length in Y dimension (in Angstrom):  15.67
-Enter cell vector length in Z dimension (in Angstrom):  15.67
-Cell vectors: a=15.6700  b=15.6700  c=15.6700
+Enter cell vector length in X dimension (in Angstrom):  22.7274
+Enter cell vector length in Y dimension (in Angstrom):  22.7274
+Enter cell vector length in Z dimension (in Angstrom):  22.7274
+
+Cell vectors: a=22.7274  b=22.7274  c=22.7274
+
+> Running compound recognition...
+
 Detected compound types:
-  1: H2O (Number: 128)
+  1: H2O (Number: 131)
+  2: H3O2 (Number: 19)
+  3: HO (Number: 131)
+  4: K (Number: 150)
 
-Compound 1 bond length matrix:
+Compound 1 (H2O) bond length matrix:
            H1       H2       O1
-   H1      -        -     0.9967
-   H2      -        -     0.9971
-   O1   0.9967   0.9971      -  
+   H1      -        -     1.0265
+   H2      -        -     1.0266
+   O1   1.0265   1.0266      -  
+
+Compound 2 (H3O2) bond length matrix:
+           H1       H2       H3       O1       O2
+   H1      -        -        -     1.2601   1.1896
+   H2      -        -        -     0.9762      -  
+   H3      -        -        -        -     0.9816
+   O1   1.2601   0.9762      -        -        -  
+   O2   1.1896      -     0.9816      -        -  
+
+Compound 3 (HO) bond length matrix:
+           H1       O1
+   H1      -     0.9758
+   O1   0.9758      -  
+
+Compound 4 (K) bond length matrix:
+           K1
+   K1      -  
+
 Draw compounds to PDF? [No] 
-Accept these molecules (y) or change something (n) [Yes] 
-+ Accepted compound list.
+Accept these molecules (y) or change something (n) [Yes] n
+Break bonds (1) or repeat molecule recognition at specific frame (2)? [1] 
 
-Available Analyses
-  rdf: Radial distribution function analysis
-  adf: Angular distribution function analysis
-  dens: Particle density analysis
-  ncount: Neighbour-count probability
-  top: Tetrahedral order parameter analysis
+Current compounds:
+  1: H2O (Number: 131)
+  2: H3O2 (Number: 19)
+  3: HO (Number: 131)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 1
+Break specific bonds (1) or all bonds (2) in compound 1 (H2O)? [1] 2
++ Added forbidden bonds for all bonds in compound 1 (H2O).
 
-Choose an analysis:  rdf
+Current compounds:
+  1: H2O (Number: 131)
+  2: H3O2 (Number: 19)
+  3: HO (Number: 131)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 2
+Break specific bonds (1) or all bonds (2) in compound 2 (H3O2)? [1] 2
++ Added forbidden bonds for all bonds in compound 2 (H3O2).
 
-Analysis Setup
+Current compounds:
+  1: H2O (Number: 131)
+  2: H3O2 (Number: 19)
+  3: HO (Number: 131)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 3
+Break specific bonds (1) or all bonds (2) in compound 3 (HO)? [1] 2
++ Added forbidden bonds for all bonds in compound 3 (HO).
 
-Available compounds:
-  1: H2O (Number: 128)
-Choose the reference compound (number):  [1] 
+Current compounds:
+  1: H2O (Number: 131)
+  2: H3O2 (Number: 19)
+  3: HO (Number: 131)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 
 
-Available compounds:
-  1: H2O (Number: 128)
-Choose the observed compound (number):  [1] 
-Available labels: H1, H2, O1
-Which atom(s) in reference compound 1 (H2O)? (comma-separated)  O
-Available labels: H1, H2, O1
-Which atom(s) in observed compound 1 (H2O)? (comma-separated)  H
-Enter the maximum distance for RDF calculation (in Angstrom):  [10.0] 
-Enter the number of bins for RDF calculation:  [1000] 
+> Running compound recognition...
 
-Frame Loop
-Perform molecule recognition and update compound list in each frame? [No] 
-In which trajectory frame to start processing the trajectory? [1] 
-How many trajectory frames to read (from this position on)? [all] 
-Use every n-th read trajectory frame for the analysis: [1] 
+Detected compound types:
+  1: H (Number: 442)
+  2: HO (Number: 8)
+  3: K (Number: 150)
+  4: O (Number: 292)
 
-Run
-Running analysis...
-> End of trajectory reached.
+Compound 1 (H) bond length matrix:
+           H1
+   H1      -  
 
-Results
-Processed frames: 10
-+ Saved RDF results to rdf_O-H2O_H-H2O.dat
+Compound 2 (HO) bond length matrix:
+           H1       O1
+   H1      -     1.3343
+   O1   1.3343      -  
+
+Compound 3 (K) bond length matrix:
+           K1
+   K1      -  
+
+Compound 4 (O) bond length matrix:
+           O1
+   O1      -  
+
+Draw compounds to PDF? [No] 

@@ -78,10 +78,14 @@ class WorkflowPrompts:
         traj = self._load_initial_trajectory(traj_file, traj_format, cell_vectors)
 
         box_size = traj.box_size
+        console.plain("")
         console.key_value(
             "Cell vectors",
             f"a={box_size[0]:.4f}  b={box_size[1]:.4f}  c={box_size[2]:.4f}",
         )
+        console.plain("")
+        console.info("Running compound recognition...")
+        console.plain("")
 
         self.process_compounds(traj, provider=input_provider)
         if save_prepared_setup_path is not None:
@@ -120,9 +124,10 @@ class WorkflowPrompts:
 
             for i, compound_type in enumerate(compound_types):
                 console.plain("")
-                console.plain(f"Compound {i + 1} bond length matrix:")
+                console.plain(f"Compound {i + 1} ({compound_type.formula}) bond length matrix:")
                 self._print_bond_length_matrix(traj, compound_type)
 
+            console.plain("")
             should_draw_compounds = input_provider.ask_bool("Draw compounds to PDF?", False)
             if should_draw_compounds:
                 for compound_type in compound_types:
@@ -144,6 +149,9 @@ class WorkflowPrompts:
             else:
                 frame_idx = self.skip_to_frame(traj, frame_idx, provider=input_provider)
 
+            console.plain("")
+            console.info("Running compound recognition...")
+            console.plain("")
             traj.rebuild_topology()
 
     def break_bonds(self, traj, provider=None):
@@ -166,6 +174,17 @@ class WorkflowPrompts:
                 console.warn("Invalid compound number.")
                 continue
 
+            break_mode = input_provider.ask_int(
+                f"Break specific bonds (1) or all bonds (2) in compound {comp_id + 1} ({compound_type.formula})?",
+                1,
+                minval=1,
+                maxval=2,
+            )
+            if break_mode == 2:
+                self._add_forbidden_bonds_for_local_pairs(traj, compound_type, compound_type.local_bonds)
+                console.success(f"Added forbidden bonds for all bonds in compound {comp_id + 1} ({compound_type.formula}).")
+                continue
+
             atom1 = input_provider.ask_str("First atom label to break bond (e.g., O1): ").strip()
             atom2 = input_provider.ask_str("Second atom label to break bond (e.g., H2): ").strip()
 
@@ -175,11 +194,7 @@ class WorkflowPrompts:
 
             local_idx1 = compound_type.label_to_local_index[atom1]
             local_idx2 = compound_type.label_to_local_index[atom2]
-            molecule_atom_ids = traj.topology_frame.get_molecule_atom_ids(compound_type)
-            for atom_ids in molecule_atom_ids:
-                global_idx1 = int(atom_ids[local_idx1])
-                global_idx2 = int(atom_ids[local_idx2])
-                traj.forbidden_bonds.add((min(global_idx1, global_idx2), max(global_idx1, global_idx2)))
+            self._add_forbidden_bonds_for_local_pairs(traj, compound_type, [(local_idx1, local_idx2)])
 
             console.success(f"Added forbidden bond between {atom1} and {atom2}.")
 
@@ -205,6 +220,14 @@ class WorkflowPrompts:
         traj = load_trajectory(fin, traj_format, cell_vectors)
         traj.read_frame()
         return traj
+
+    def _add_forbidden_bonds_for_local_pairs(self, traj, compound_type, local_pairs):
+        molecule_atom_ids = traj.topology_frame.get_molecule_atom_ids(compound_type)
+        for atom_ids in molecule_atom_ids:
+            for local_idx1, local_idx2 in local_pairs:
+                global_idx1 = int(atom_ids[local_idx1])
+                global_idx2 = int(atom_ids[local_idx2])
+                traj.forbidden_bonds.add((min(global_idx1, global_idx2), max(global_idx1, global_idx2)))
 
     def _print_compound_summary(self, traj, compound_types):
         console.plain("Detected compound types:")

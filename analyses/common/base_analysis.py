@@ -203,6 +203,7 @@ class BaseAnalysis(ABC):
         for i, compound_type in enumerate(compound_types, start=1):
             count = self.traj.topology_frame.get_molecule_count(compound_type)
             console.key_value(str(i), f"{compound_type.formula} (Number: {count})", indent=2)
+        console.plain("")
 
         if multi:
             prompt_str = prompt_text or f"Choose the {role} compounds (comma-separated numbers): "

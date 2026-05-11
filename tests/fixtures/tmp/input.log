@@ -1,32 +1,26 @@
 # Enter cell vector length in X dimension (in Angstrom):
-15.67
+22.7274
 # Enter cell vector length in Y dimension (in Angstrom):
-15.67
+22.7274
 # Enter cell vector length in Z dimension (in Angstrom):
-15.67
+22.7274
 # Draw compounds to PDF? [No]
 
 # Accept these molecules (y) or change something (n) [Yes]
+n
+# Break bonds (1) or repeat molecule recognition at specific frame (2)? [1]
 
-# Choose an analysis:
-rdf
-# Choose the reference compound (number):  [1]
-
-# Choose the observed compound (number):  [1]
-
-# Which atom(s) in reference compound 1 (H2O)? (comma-separated)
-O
-# Which atom(s) in observed compound 1 (H2O)? (comma-separated)
-H
-# Enter the maximum distance for RDF calculation (in Angstrom):  [10.0]
-
-# Enter the number of bins for RDF calculation:  [1000]
-
-# Perform molecule recognition and update compound list in each frame? [No]
-
-# In which trajectory frame to start processing the trajectory? [1]
-
-# How many trajectory frames to read (from this position on)? [all]
-
-# Use every n-th read trajectory frame for the analysis: [1]
+# Which compound to modify? [[done]]
+1
+# Break specific bonds (1) or all bonds (2) in compound 1 (H2O)? [1]
+2
+# Which compound to modify? [[done]]
+2
+# Break specific bonds (1) or all bonds (2) in compound 2 (H3O2)? [1]
+2
+# Which compound to modify? [[done]]
+3
+# Break specific bonds (1) or all bonds (2) in compound 3 (HO)? [1]
+2
+# Which compound to modify? [[done]]
 
