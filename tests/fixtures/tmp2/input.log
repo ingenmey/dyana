@@ -1,8 +1,8 @@
-# Enter cell vector length in X dimension (in Angstrom):
+# Enter cell vector length in X dimension (in Å):
 15.67
-# Enter cell vector length in Y dimension (in Angstrom):
+# Enter cell vector length in Y dimension (in Å):
 15.67
-# Enter cell vector length in Z dimension (in Angstrom):
+# Enter cell vector length in Z dimension (in Å):
 15.67
 # Draw compounds to PDF? [No]
 
@@ -20,7 +20,7 @@ O
 O
 # Use a maximum distance cutoff for neighbor search? [No]
 y
-# Enter the maximum cutoff distance (Angstrom):  [5.0]
+# Enter the maximum cutoff distance (Å): [5.0]
 
 # Enter the number of bins for angular tetrahedral order distribution q:  [100]
 

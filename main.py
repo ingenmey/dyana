@@ -17,11 +17,11 @@ AVAILABLE_ANALYSES = {
     "adf": ("Angular distribution function analysis", "analyses.adf_analysis", "ADF"),
     "dens": ("Particle density analysis", "analyses.density_analysis", "DensityAnalysis"),
     "ncount": ("Neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
+    "top": ("Tetrahedral order parameter analysis", "analyses.top_analysis", "TetrahedralOrderAnalysis"),
     # "adf3b": ("Threebody Angular distribution function analysis", "analyses.adf3b_analysis", "ADFThreeBody"),
     # "percolation": ("Hydrogen bond percolation analysis", "analyses.percolation_analysis", "PercolationAnalysis"),
     # "cluster": ("Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
     # "dacf": ("Dimer existence auto-correlation function", "analyses.dacf_analysis", "DACFAnalysis"),
-    # "top": ("Tetrahedral order parameter", "analyses.top_analysis", "TetrahedralOrderAnalysis"),
     # "pccf": ("Proton coupling correlation function", "analyses.pccf_analysis", "PCCFAnalysis"),
     # "cmsd": ("Charge mean square displacement", "analyses.charge_msd_analysis", "ChargeMSDAnalysis"),
 }

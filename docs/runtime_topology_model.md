@@ -9,6 +9,7 @@ The supported analyses for this model are:
 - density
 - ADF
 - neighbor count
+- tetrahedral order
 
 Other analyses may still use older patterns and are not the reference path.
 
@@ -227,7 +228,7 @@ The current runtime topology model is the reference path for:
 - density
 - ADF
 - neighbor count
+- tetrahedral order
 
 Other analyses may still depend on older structures or helper paths and should
 not be treated as the reference for topology-model behavior.
-

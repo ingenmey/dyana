@@ -7,6 +7,7 @@ It focuses on the migrated analysis framework used by:
 - density
 - ADF
 - neighbor count
+- tetrahedral order
 
 It is a reference for the current path, not a migration plan.
 
@@ -30,6 +31,7 @@ Each migrated analysis defines a typed config dataclass, for example:
 
 - `RDFConfig`
 - `ADFConfig`
+- `TetrahedralOrderConfig`
 
 The config dataclass is responsible for:
 
@@ -205,6 +207,7 @@ analyses only:
 - density
 - ADF
 - neighbor count
+- tetrahedral order
 
 Older analyses that still use legacy patterns should not be treated as the
 reference design for future framework work.
