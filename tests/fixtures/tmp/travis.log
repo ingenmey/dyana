@@ -1,0 +1,365 @@
+Command line:
+"travis -p test.xyz"
+
+
+  ________                                 __
+ /        |                               /  |
+ ########/ ______    ______    __     __  ##/    _______
+    ## |  /      \  /      \  /  \   /  | /  |  /       |
+    ## | /######  | ######  | ##  \ /##/  ## | /#######/
+    ## | ## |  ##/  /    ## |  ##  /##/   ## | ##      \
+    ## | ## |      /####### |   ## ##/    ## |  ######  |
+    ## | ## |      ##    ## |    ###/     ## | /     ##/
+    ##/  ##/        #######/      #/      ##/  #######/
+
+    TRajectory Analyzer and VISualizer  -  Open-source free software under GNU GPL v3
+
+    Copyright (c) Martin Brehm      (2009-2023), University of Paderborn
+                  Barbara Kirchner  (2009-2023), University of Bonn
+                  Martin Thomas     (2012-2017)
+                  Sascha Gehrke     (2016-2020)
+
+    http://www.travis-analyzer.de
+
+    Please cite: J. Chem. Phys. 2020, 152 (16), 164105.         (DOI 10.1063/5.0005078 )
+                 J. Chem. Inf. Model. 2011, 51 (8), 2007-2023.  (DOI 10.1021/ci200217w )
+
+    There is absolutely no warranty on any results obtained from TRAVIS.
+
+ #  Beta features included
+ #  Running on k28 at Mon May 11 18:25:57 2026 (PID 22913)
+ #  Running in /mnt/d/python/dyana/tests/fixtures/tmp
+ #  Version: Oct 20 2023, built at Dec 18 2023, 17:06:48, compiler "7.5.0", GCC 7.5.0
+ #  Target platform: Linux, __cplusplus=201103L, Compile flags: DEBUG_ARRAYS 
+ #  Machine: x86_64, char=8bits, int=4b, long=8b, addr=8b, 0xA0B0C0D0=D0,C0,B0,A0.
+ #  Home: /home/ingenmey,  Executable: /home/ingenmey/bin/travis
+ #  Input from terminal,  Output to terminal
+
+    >>> Please use a color scheme with dark background or specify "-nocolor"! <<<
+
+    Loading configuration from /home/ingenmey/.travis.conf ...
+
+    Opening position trajectory test.xyz ...
+
+    Trajectory contains approximately 1 frames (just a *guess* from the file size of 19 Bytes).
+
+    2 atoms in the system: 2x K
+
+    System extent:  X = {   +100 ..   +100 pm }, dX = 0 pm
+      (in step 1)   Y = {   +100 ..   +100 pm }, dY = 0 pm
+                    Z = {   +100 ..   +500 pm }, dZ = 400 pm
+
+    The "advanced mode" offers seldomly required features, including support for non-orthorhombic
+    simulation cells, NPT ensemble, non-periodic systems, user-definded virtual atoms, pseudomolecules, ...
+
+    Use the advanced mode until the analysis selection menu (y/n)? [no] 
+
+    A cell vector of 506.38 pm would result in a density of 1.0 g/cm^3.
+
+    Are the 3 cell vectors of the same size (yes/no)? [yes] 
+    Enter length of cell vector in pm: 2000
+
+    The box size is 2000.00 x 2000.00 x 2000.00 pm.
+    The overall box density is 0.016231 g/cm^3.
+
+    Using the following element data:
+
+      Element | Ord. Number |  Mass / u | Cov. Radius / pm | VdW Radius / pm | Color
+    ----------|-------------|-----------|------------------|-----------------|----------
+      K       |          19 |  39.09831 |           196.00 |          275.00 | #00FFFF
+
+
+    The trajectory contains some metal atoms.
+    In many cases, these are ions, and should not form any covalent bonds.
+
+      Exclude K atoms from bond recognition (y/n)? [yes] 
+
+
+    Not using spatial domain engine (min. diameter = 0 pm).
+
+    Molecule recognition [##]
+
+    2 molecules found.
+
+    Molecule recognition took 0.0001 seconds.
+
+    Sorting atom types...
+    Setting up bond lists...
+    Building atom codes...
+    Creating refined topological atom order...
+      [##] Done.
+    Creating bond list...
+    Creating angle list...
+    Grouping together equivalent molecules...
+    Found 1 unique molecule types.
+    Sorting molecule types by molecular mass...
+    Found 0 rings.
+    Molecule recognition finished.
+
+Output of bond matrices:
+
+*** Molecule 1: K; Representant 1; Distances in pm ***
+[only 1 Atom]
+
+
+*** The following 1 kind of molecules has been recognized:
+    (ordered by molecular mass)
+
+  - Molecule 1:  K (2 pieces, 39.10 g/mol)
+      (1 noneq. atom, 0 noneq. bonds, 0 noneq. angles)
+      Concentration:   0.415135 mol/liter
+
+
+    If you switch on "USE_OPENBABEL" in config.h, TRAVIS can print SMILES strings of your molecules.
+
+    You can create images of the structural formulas with the atom labels for easier
+    identification of the atoms (requires installed GraphViz package - see www.graphviz.org).
+
+    Create images of the structural formulas (y/n)? [no] 
+
+    Accept these molecules (y) or change something (n)? [yes] 
+
+    Uniting molecules which have been broken by wrapping...
+
+    Determining maximum molecular diameters...
+
+    Found the following maximal molecular diameters:
+
+      (*) Molecule 1 (K):  (only one atom)
+
+
+    The atoms are currently ordered by topological priority.
+
+    Defining virtual atom #1 as molecular Center of Geometry:
+      - K...
+
+    Defining virtual atom #2 as molecular Center of Mass:
+      - K...
+
+    Defining molecular dipole vectors:
+
+      The last virtual atom of each molecule is defined as the tip of the dipole vector
+      starting in center of mass (#2). 1 Debye corresponds to 100 pm of vector length.
+      Only useful if dipole/charge data is provided. Otherwise vector has always length of zero.
+
+      - Dipole vector #2 --> #3 in K ...
+
+>>> 3 virtual atoms have been defined: >>>
+
+    #1 in K: Center of Geometry.
+    #2 in K: Center of Mass.
+
+    #3 in K - tip of molecular dipole vector starting in #2.
+
+<<< End of virtual atoms <<<
+
+
+>>> List of functions <<<
+
+ *** Static (time independent) Functions
+ cdf      - Combined Distribution Function
+ rdf      - Radial Distribution Function
+ adf      - Angular Distribution Function
+ ddf      - Dihedral Distribution Function
+ pldf     - Point-Plane Distance Distribution
+ lidf     - Point-Line Distance Distribution
+ plproj   - Plane Projection Distribution
+ dprof    - Fixed Plane Density Profile
+ fpp      - Fixed Plane Projection
+ dens     - Density Distribution Function
+ sdf      - Spatial Distribution Function
+ psdf     - Pseudo SDF (only 2 ref. atoms)
+ dip      - Dipole Distribution Function
+ cond     - Evaluate Structural Condition
+ sfac     - Compute Structure Factor
+ agtopo   - Aggregation Topology Analysis
+ sankey   - Sankey diagram plot
+ cmat     - Contact Matrix / Connection Matrix
+ geodens  - Particle Density inside Geometric Object
+
+ *** Dynamic (time dependent) Functions
+ vdf      - Velocity Distribution Function
+ fdf      - Force Distribution Function
+ msd      - Mean Square Displacement / Diffusion Coefficients
+ acf      - Velocity Autocorrelation Functions
+ rdyn     - Vector Reorientation Dynamics
+ vhcf     - Van Hove Correlation Function
+ aggr     - Aggregation Functions (DACF, DLDF, DDisp)
+ hbond    - Hydrogen Bond Dynamics
+ ionpair  - Diffusion Corrected Ion Pair Dynamics
+ tddf     - Time Dependent Distribution Functions
+
+ *** Spectroscopic Functions
+ spec     - New Spectroscopy Module (IR, Raman, VCD, ROA)
+ power    - Calculate Power Spectrum
+ nc       - Normal Coordinate Analysis
+ ir       - (old) Calculate IR Spectrum
+ raman    - (old) Calculate Raman Spectrum
+ vcd      - (old) Calculate VCD Spectrum
+ rera     - Calculate Resonance Raman Spectrum
+ drst     - Save Dipole Restart File
+ mrst     - Save Magnetic Moment Restart File
+ pol      - Set up Polarizability Calculation
+
+ *** Miscellaneous Functions
+ env      - Save Trajectory of RM Environment / TDO Plot
+ proc     - Save Processed Trajectory
+ cut      - Cut Clusters
+ reg      - Region-specific Analysis
+ chi      - Chirality Analysis
+ eck      - Transform to Eckart Frame
+ swan     - Sort Wannier Centers
+ voro     - Basic Voronoi Analysis
+ vori     - Voronoi Integration Functions
+ vorochg  - Voronoi Charge Optimization
+ doma     - Domain Analysis
+ order    - Order Parameters
+ hole     - Hole Theory based Analysis
+ cla      - Cluster Analysis
+
+   (You may specify multiple analyses at once, but
+    the safe way is to perform only one kind of analysis at a time.)
+
+    Which functions to compute (comma separated)? rdf
+
+ rdf     - Radial Distribution Function
+
+    The advanced mode includes some options which are quite powerful,
+    yet possibly weird or seldomly required.
+
+    Use the advanced mode for the main part (y/n)? [no] 
+
+
+    K is the reference molecule.
+
+
+>>> Observation 1 >>>
+
+    Perform this observation intramolecular (within the reference molecule) (0) or intermolecular (1)? [1] 
+
+    Only one molecule type, choosing K as observed molecule (OM).
+
+>>> Radial Distribution Function >>>
+
+    Take reference atom(s) from RM K (0) or from OM K (1)? [0] 
+    Take observed atom(s) from RM K (0) or from OM K (1)? [1] 
+
+    K is only one atom, there is no choice.
+    K is only one atom, there is no choice.
+    This yields in 1 combinations.
+
+    The smallest periodic cell half diameter is 1000.00 pm. You can compute meaningful RDFs up to this distance.
+
+    There is also a long-range RDF formula by Roehrig & Kuehne which works up to 1732.05 pm.
+    If you enter a max. radius of > 1000.00 pm, you will be asked to switch it on.
+
+    Using 0 pm as the minimal radius of the RDF.
+
+    Enter the maximal radius of this RDF (in pm): [1000.0] 
+
+    The default resolution is 300 bins per nm, corresponding to a bin width of 3.33 pm.
+
+    Enter the resolution (bin count) for this RDF: [300] 1000
+    Correct radial distribution for this RDF (y/n)? [yes] 
+
+<<< End of Radial Distribution Function <<<
+
+    Save temporal development for this observation (y/n)? [no] 
+    Add a condition to this observation (y/n)? [no] 
+
+<<< End of Observation 1 <<<
+
+    Add another observation (y/n)? [no] 
+
+>>> Observation List >>>
+
+  *** Observation 1
+    - RDF: K_K_[K1r_K1o]
+
+<<< End of Observation List <<<
+
+
+    Not wrapping molecules into the box.
+
+    Not removing center of mass movement of the box.
+
+    In which trajectory frame to start processing the trajectory? [1] 
+    How many trajectory frames to read (from this position on)? [all] 
+    Use every n-th read trajectory frame for the analysis: [1] 
+
+    Using 1 time steps: Every 1st within range 1 - approx. 1.
+
+########## All information collected ##########
+
+>>> Initialization >>>
+
+Initializing observation 1...
+  Creating RDF...
+
+<<< End of Initialization <<<
+
+
+##########   Starting Main Pass   ##########
+
+Hint: Press CTRL+C once to softly interrupt analysis and still write the results.
+      Creating an empty file named EXIT ("touch EXIT") has the same effect.
+
+Step      0 .
+End of trajectory file reached.
+
+
+##########   Main pass done   ##########
+
+1 time steps processed.
+
+
+
+    Finishing analyses:
+----------------------------------------------------------------------------------------------------------
+
+
+>>> Observation 1 >>>
+
+* Radial Distribution Function
+    2 bin entries, 0 out of bin range (0.00 percent).
+    Max. bin entry: 1.000000E+00  -->  EPS: 2.220446E-16
+    Mean value:        400 pm    Standard deviation:          0 pm
+    Min. value:        400 pm    Max.value:                 400 pm
+    Scaling RDF to uniform density ...
+    Correcting radial distribution...
+    Performing automatic peak detection...
+    >>> Peak Data >>>
+      1. maximum at  399.50 pm, height 997.2093
+    <<< Peak Data <<<
+    Saving RDF as "rdf_K_K_[K1r_K1o].csv"...
+      Note: The third column of the text file contains the number integral / coordination number.
+    Saving RDF AGR file as "rdf_K_K_[K1r_K1o].agr"...
+
+
+----------------------------------------------------------------------------------------------------------
+    Finished all analyses.
+
+
+    Note: To show a list of all persons who contributed to TRAVIS,
+          please add "-credits" to your command line arguments, or set the
+          variable "SHOWCREDITS" to "TRUE" in your travis.conf file.
+
+    Source code from other projects used in TRAVIS:
+      - lmfit     from Joachim Wuttke
+      - kiss_fft  from Mark Borgerding
+      - voro++    from Chris Rycroft
+
+    http://www.travis-analyzer.de
+
+    Please cite all of the following articles for the analyses you have used:
+
+  * For TRAVIS in general:
+
+    "TRAVIS - A Free Analyzer for Trajectories from Molecular Simulation",
+    M. Brehm, M. Thomas, S. Gehrke, B. Kirchner; J. Chem. Phys. 2020, 152 (16), 164105.   (DOI 10.1063/5.0005078 )
+
+    "TRAVIS - A Free Analyzer and Visualizer for Monte Carlo and Molecular Dynamics Trajectories",
+    M. Brehm, B. Kirchner; J. Chem. Inf. Model. 2011, 51 (8), pp 2007-2023.   (DOI 10.1021/ci200217w )
+
+*** The End ***
+

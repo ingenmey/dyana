@@ -11,7 +11,7 @@ from core.app_config import load_app_config
 from io_support.console import console
 from io_support.input_providers import FileInputProvider, InteractiveInputProvider
 from io_support.output_writer import configure_output, restore_output
-from io_support.run_header import build_run_header
+from io_support.run_header import build_run_header, render_run_header
 from workflow.workflow_prompts import WorkflowPrompts
 
 AVAILABLE_ANALYSES = {
@@ -89,7 +89,7 @@ def main(
 
     try:
         input_log_path = getattr(input_provider, "log_file", None)
-        header_title, header_lines = build_run_header(
+        header = build_run_header(
             traj_file,
             traj_format=traj_format,
             output_dir=output_dir,
@@ -97,7 +97,7 @@ def main(
             input_log_path=getattr(input_log_path, "name", None),
             prepared_setup=prepared_setup,
         )
-        console.header(header_title, lines=header_lines)
+        render_run_header(console, header)
 
         if prepared_setup is not None:
             traj = workflow_prompts.prepare_trajectory_from_setup(traj_file, prepared_setup)

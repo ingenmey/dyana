@@ -4,8 +4,18 @@ from __future__ import annotations
 
 import configparser
 import importlib.metadata
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class RunHeader:
+    """Structured interactive header content for one Dyana run."""
+
+    version: str
+    title: str
+    lines: list[str]
 
 
 def _resolve_absolute_path(path: str | Path) -> str:
@@ -39,9 +49,9 @@ def build_run_header(
     console_log_path: str | Path,
     input_log_path: str | Path | None = None,
     prepared_setup: str | Path | None = None,
-) -> tuple[str, list[str]]:
+) -> RunHeader:
     """Build the supported run-header title and lines."""
-    header_title = f"Dyana {resolve_dyana_version()}"
+    version = resolve_dyana_version()
     trajectory_path = _resolve_absolute_path(traj_file)
     header_lines = [
         f"Started: {format_started_at()}",
@@ -53,4 +63,46 @@ def build_run_header(
         header_lines.append(f"Input log: {_resolve_absolute_path(input_log_path)}")
     if prepared_setup is not None:
         header_lines.append(f"Prepared setup: {_resolve_absolute_path(prepared_setup)}")
-    return header_title, header_lines
+    return RunHeader(version=version, title=f"Dyana {version}", lines=header_lines)
+
+
+def build_run_header_art(version: str):
+    """Build the stylized Dyana banner for the interactive run header."""
+    return [
+        [],
+        [("  ╔═════════════════════════════════════╗", "cyan")],
+        [("  ║", "cyan"), ("                            ", "cyan"), ("(", "cyan"), ("        ", "cyan"), ("║", "cyan")],
+        [("  ║", "cyan"), ("                             ", "cyan"), ("\\", "cyan"), ("       ", "cyan"), ("║", "cyan")],
+        [("  ║", "cyan"), ("        ", "cyan"), ("Đ Y A N A", ("bold")), ("             ", "cyan"), (")", "cyan"), ("      ", "cyan"), ("║", "cyan")],
+        [("  ║", "cyan"), ("    ", "cyan"), ("Dynamics Analyzer", ("bold")), ("    ", "cyan"), ("»»------->", "cyan"), ("  ", "cyan"), ("║", "cyan")],
+        [("  ║", "cyan"), ("       ", "cyan"), (f"ver. {version}", ("bold")), ("             ", "cyan"), (")", "cyan"), ("      ", "cyan"), ("║", "cyan")],
+        [("  ║", "cyan"), ("                             ", "cyan"), ("/", "cyan"), ("       ", "cyan"), ("║", "cyan")],
+        [("  ║", "cyan"), ("                            ", "cyan"), ("(", "cyan"), ("        ", "cyan"), ("║", "cyan")],
+        [("  ╚═════════════════════════════════════╝", "cyan")],
+        [],
+    ]
+
+
+def render_run_header(console, header: RunHeader) -> None:
+    """Render the supported run header and fall back when the stream cannot encode the banner."""
+    art_lines = build_run_header_art(header.version)
+    plain_art_lines = ["".join(text for text, _ in segments) for segments in art_lines]
+    if not all(_can_encode_for_stream(console.stream, line) for line in plain_art_lines):
+        console.header(header.title, lines=header.lines)
+        return
+
+    for segments in art_lines:
+        console.emit_segments(segments)
+    for line in header.lines:
+        console.emit(line)
+
+
+def _can_encode_for_stream(stream, text: str) -> bool:
+    encoding = getattr(stream, "encoding", None)
+    if not encoding:
+        return True
+    try:
+        text.encode(encoding)
+    except UnicodeEncodeError:
+        return False
+    return True

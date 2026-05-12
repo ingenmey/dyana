@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from io_support.console import Console
+from io_support.run_header import RunHeader, render_run_header
 
 
 class ConsoleTests(unittest.TestCase):
@@ -61,6 +62,26 @@ class ConsoleTests(unittest.TestCase):
 
             self.assertEqual(stream.getvalue(), "Choose an analysis: ")
             self.assertEqual(log_path.read_text(encoding="utf-8"), "Choose an analysis: rdf\n")
+
+    def test_render_run_header_keeps_plain_banner_in_log(self):
+        stream = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "dyana.log"
+            console = Console(stream=stream, log_path=log_path, use_color=True)
+
+            render_run_header(
+                console,
+                RunHeader(version="0.1.0", title="Dyana 0.1.0", lines=["Started: now"]),
+            )
+            console.close()
+
+            self.assertIn("\x1b[34m", stream.getvalue())
+            self.assertIn("\x1b[36m", stream.getvalue())
+            log_text = log_path.read_text(encoding="utf-8")
+            self.assertIn("Đ Y A N A", log_text)
+            self.assertIn("Dynamics Analyzer", log_text)
+            self.assertIn("ver. 0.1.0", log_text)
+            self.assertIn("Started: now", log_text)
 
 
 if __name__ == "__main__":

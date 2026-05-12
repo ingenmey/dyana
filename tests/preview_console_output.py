@@ -8,21 +8,26 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from io_support.console import Console
+from io_support.run_header import RunHeader, render_run_header
 
 
 def render_dyana_console_preview(console: Console) -> None:
     """Emit a manual preview of the planned interactive console style."""
     demo_dir = (REPO_ROOT / "demo_output").resolve()
     traj_path = (REPO_ROOT / "tests" / "fixtures" / "koh_h2o.xyz").resolve()
-    console.header(
-        "Dyana 0.1.0",
-        lines=[
-            "Started: 2026-05-11 14:32:10 CEST",
-            f"Trajectory: {traj_path} (xyz)",
-            f"Output dir: {demo_dir}",
-            f"Console log: {demo_dir / 'dyana.log'}",
-            f"Input log: {demo_dir / 'input.log'}",
-        ],
+    render_run_header(
+        console,
+        RunHeader(
+            version="0.1.0",
+            title="Dyana 0.1.0",
+            lines=[
+                "Started: 2026-05-11 14:32:10 CEST",
+                f"Trajectory: {traj_path} (xyz)",
+                f"Output dir: {demo_dir}",
+                f"Console log: {demo_dir / 'dyana.log'}",
+                f"Input log: {demo_dir / 'input.log'}",
+            ],
+        ),
     )
 
     console.section("Topology Setup")

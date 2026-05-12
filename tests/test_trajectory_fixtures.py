@@ -7,7 +7,9 @@ import numpy as np
 
 if importlib.util.find_spec("networkx") is None:
     load_trajectory = None
+    trajectory_loader = None
 else:
+    import core.trajectory_loader as trajectory_loader
     from core.trajectory_loader import load_trajectory
 
 
@@ -23,6 +25,11 @@ H 7.410 0.000 0.000
 O 6.450 0.000 0.000
 H 4.040 0.000 0.000
 O 5.000 0.000 0.000
+"""
+STRETCHED_OH = """2
+stretched oh
+O 0.000 0.000 0.000
+H 1.330 0.000 0.000
 """
 
 
@@ -112,33 +119,82 @@ class TrajectoryFixtureTests(unittest.TestCase):
             self.assertGreater(d_o2_h1, 1.5)
 
     def test_forbidding_all_detected_oh_bonds_atomizes_koh_fixture(self):
-        with open(KOH_FIXTURE, "r", encoding="utf-8") as fin:
-            traj = load_trajectory(fin, "xyz", np.array([22.7274, 22.7274, 22.7274]))
-            traj.read_frame()
+        original_scale = trajectory_loader.BOND_DISTANCE_SCALE
+        original_overrides = dict(trajectory_loader.BOND_DISTANCE_OVERRIDES)
+        try:
+            trajectory_loader.BOND_DISTANCE_SCALE = 1.4
+            trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+
+            with open(KOH_FIXTURE, "r", encoding="utf-8") as fin:
+                traj = load_trajectory(fin, "xyz", np.array([22.7274, 22.7274, 22.7274]))
+                traj.read_frame()
+                traj.rebuild_topology()
+
+            initial_counts = {
+                compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
+                for compound_type in traj.topology_frame.get_compound_types()
+            }
+            self.assertEqual(initial_counts, {"H2O": 123, "H3O2": 27, "HO": 123, "K": 150})
+
+            for compound_type in traj.topology_frame.get_compound_types():
+                if compound_type.formula not in {"H2O", "H3O2", "HO"}:
+                    continue
+                molecule_atom_ids = traj.topology_frame.get_molecule_atom_ids(compound_type)
+                for atom_ids in molecule_atom_ids:
+                    for local_a, local_b in compound_type.local_bonds:
+                        global_a = int(atom_ids[local_a])
+                        global_b = int(atom_ids[local_b])
+                        traj.forbidden_bonds.add((min(global_a, global_b), max(global_a, global_b)))
+
             traj.rebuild_topology()
+            final_counts = {
+                compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
+                for compound_type in traj.topology_frame.get_compound_types()
+            }
+            self.assertEqual(final_counts, {"H": 450, "K": 150, "O": 300})
+        finally:
+            trajectory_loader.BOND_DISTANCE_SCALE = original_scale
+            trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+            trajectory_loader.BOND_DISTANCE_OVERRIDES.update(original_overrides)
 
-        initial_counts = {
-            compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
-            for compound_type in traj.topology_frame.get_compound_types()
-        }
-        self.assertEqual(initial_counts, {"H2O": 123, "H3O2": 27, "HO": 123, "K": 150})
+    def test_pair_specific_oh_cutoff_override_can_split_a_stretched_oh_pair(self):
+        original_overrides = dict(trajectory_loader.BOND_DISTANCE_OVERRIDES)
+        original_scale = trajectory_loader.BOND_DISTANCE_SCALE
+        try:
+            trajectory_loader.BOND_DISTANCE_SCALE = 1.4
+            trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+            with tempfile.TemporaryDirectory() as tmp:
+                traj_path = Path(tmp) / "stretched_oh.xyz"
+                traj_path.write_text(STRETCHED_OH, encoding="utf-8")
 
-        for compound_type in traj.topology_frame.get_compound_types():
-            if compound_type.formula not in {"H2O", "H3O2", "HO"}:
-                continue
-            molecule_atom_ids = traj.topology_frame.get_molecule_atom_ids(compound_type)
-            for atom_ids in molecule_atom_ids:
-                for local_a, local_b in compound_type.local_bonds:
-                    global_a = int(atom_ids[local_a])
-                    global_b = int(atom_ids[local_b])
-                    traj.forbidden_bonds.add((min(global_a, global_b), max(global_a, global_b)))
+                with open(traj_path, "r", encoding="utf-8") as fin:
+                    traj = load_trajectory(fin, "xyz", np.array([20.0, 20.0, 20.0]))
+                    traj.read_frame()
+                    traj.rebuild_topology()
 
-        traj.rebuild_topology()
-        final_counts = {
-            compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
-            for compound_type in traj.topology_frame.get_compound_types()
-        }
-        self.assertEqual(final_counts, {"H": 450, "K": 150, "O": 300})
+                initial_counts = {
+                    compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
+                    for compound_type in traj.topology_frame.get_compound_types()
+                }
+                self.assertEqual(initial_counts, {"HO": 1})
+
+                trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+                trajectory_loader.BOND_DISTANCE_OVERRIDES["H-O"] = 1.28
+
+                with open(traj_path, "r", encoding="utf-8") as fin:
+                    traj = load_trajectory(fin, "xyz", np.array([20.0, 20.0, 20.0]))
+                    traj.read_frame()
+                    traj.rebuild_topology()
+
+                override_counts = {
+                    compound_type.formula: traj.topology_frame.get_molecule_count(compound_type)
+                    for compound_type in traj.topology_frame.get_compound_types()
+                }
+                self.assertEqual(override_counts, {"H": 1, "O": 1})
+        finally:
+            trajectory_loader.BOND_DISTANCE_SCALE = original_scale
+            trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+            trajectory_loader.BOND_DISTANCE_OVERRIDES.update(original_overrides)
 def _periodic_distance(coord_a: np.ndarray, coord_b: np.ndarray, box_size: np.ndarray) -> float:
     delta = coord_a - coord_b
     delta -= np.round(delta / box_size) * box_size

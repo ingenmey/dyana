@@ -129,6 +129,15 @@ For the current frame:
 This runtime topology model is the authoritative supported path for the
 migrated analyses.
 
+Connectivity detection uses:
+
+- pair-specific absolute cutoffs from `BOND_DISTANCE_OVERRIDES` when present
+- otherwise the fallback heuristic
+  `(covalent_radius_A + covalent_radius_B) * BOND_DISTANCE_SCALE`
+
+Override keys use canonical sorted element-pair strings such as `H-O` or
+`Cl-H`, and override values are absolute distances in Angstrom.
+
 ## 4. Canonical Local Ordering
 
 Canonical local ordering is a hard invariant of the supported runtime model.

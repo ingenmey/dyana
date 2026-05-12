@@ -142,6 +142,30 @@ class Console:
             flush()
         self._write_log(plain_text + end)
 
+    def emit_segments(
+        self,
+        segments: list[tuple[str, str | tuple[str, ...] | None]] | tuple[tuple[str, str | tuple[str, ...] | None], ...],
+        *,
+        indent: int = 0,
+        end: str = "\n",
+    ) -> None:
+        """Write one line composed of individually styled text segments."""
+        plain_text = (" " * indent) + "".join(text for text, _ in segments)
+        rendered_parts = []
+        if indent:
+            rendered_parts.append(" " * indent)
+        rendered_parts.extend(
+            _apply_style(text, style, enabled=self.use_color)
+            for text, style in segments
+        )
+        rendered_text = "".join(rendered_parts)
+
+        self.stream.write(rendered_text + end)
+        flush = getattr(self.stream, "flush", None)
+        if callable(flush):
+            flush()
+        self._write_log(plain_text + end)
+
     def _write_log(self, text: str) -> None:
         if self.log_path is None:
             return

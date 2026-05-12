@@ -18,6 +18,7 @@ config = load_app_config()
 EXCLUDED_ELEMENTS = set(config["EXCLUDED_ELEMENTS"])
 NEIGHBOR_SEARCH_SCALE = config.get("NEIGHBOR_SEARCH_SCALE", 1.164)
 BOND_DISTANCE_SCALE = config.get("BOND_DISTANCE_SCALE", 1.4)
+BOND_DISTANCE_OVERRIDES = dict(config.get("BOND_DISTANCE_OVERRIDES", {}))
 
 
 @dataclass(frozen=True)
@@ -81,11 +82,17 @@ class BaseTrajectory(ABC):
         self,
         coord_i: np.ndarray,
         coord_j: np.ndarray,
-        cov_radius_i: float,
-        cov_radius_j: float,
+        symbol_i: str,
+        symbol_j: str,
     ) -> float | bool:
         distance_sq = distance_squared(coord_i, coord_j, self.box_size)
-        threshold_sq = ((cov_radius_i + cov_radius_j) * BOND_DISTANCE_SCALE) ** 2
+        pair_key = "-".join(sorted((symbol_i, symbol_j)))
+        cutoff = BOND_DISTANCE_OVERRIDES.get(pair_key)
+        if cutoff is None:
+            cov_radius_i = elem_covalent.get(symbol_i, 0.0)
+            cov_radius_j = elem_covalent.get(symbol_j, 0.0)
+            cutoff = (cov_radius_i + cov_radius_j) * BOND_DISTANCE_SCALE
+        threshold_sq = cutoff ** 2
         return distance_sq if distance_sq < threshold_sq else False
 
     def rebuild_topology(self):
@@ -125,7 +132,6 @@ class BaseTrajectory(ABC):
             if atom_symbol in EXCLUDED_ELEMENTS:
                 continue
 
-            cov_radius_atom = elem_covalent.get(atom_symbol, 0.0)
             search_radius = elem_vdW.get(atom_symbol, 0.0) * NEIGHBOR_SEARCH_SCALE
             neighbor_indices = sorted(kdtree.query_ball_point(frame_coords[atom_index], r=search_radius))
 
@@ -141,12 +147,11 @@ class BaseTrajectory(ABC):
                 if bond_pair in self.forbidden_bonds:
                     continue
 
-                cov_radius_neighbor = elem_covalent.get(neighbor_symbol, 0.0)
                 distance_sq = self.are_connected(
                     frame_coords[atom_index],
                     frame_coords[neighbor_index],
-                    cov_radius_atom,
-                    cov_radius_neighbor,
+                    atom_symbol,
+                    neighbor_symbol,
                 )
                 if not distance_sq:
                     continue

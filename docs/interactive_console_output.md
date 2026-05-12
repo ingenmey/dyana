@@ -28,8 +28,9 @@ This keeps the session readable without turning it into a long wizard.
 
 ## 2. Header
 
-The header is intentionally short. It should identify the run context without
-repeating details that will appear later.
+The header includes a compact Dyana banner plus a short run-context block. It
+should identify the run context without repeating details that will appear
+later.
 
 Current header lines include:
 
@@ -65,6 +66,8 @@ Colors are optional and should remain lightweight.
 
 Current usage is:
 
+- blue for the Dyana banner frame and bow
+- cyan for Dyana banner text
 - cyan for section headers and progress
 - green for success messages
 - yellow for warnings
@@ -105,7 +108,6 @@ Good console output in Dyana should:
 
 It should not:
 
-- print large decorative banners
 - narrate every small step
 - repeat prompt text again in later synthetic summaries
 - rely on color alone to communicate meaning
