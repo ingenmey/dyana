@@ -1,6 +1,6 @@
-# Dyana
+# ĐYANA
 
-Dyana is a molecular dynamics trajectory post-processing tool for interactive
+ĐYANA is a molecular dynamics trajectory post-processing tool for interactive
 analysis of molecular structure and local order in XYZ and LAMMPS trajectories.
 
 ## Implemented analyses
