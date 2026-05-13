@@ -96,6 +96,11 @@ class DensityAnalysis(BaseAnalysis):
                 self.compound_frame_counts[compound_type.key] = self.compound_frame_counts.get(compound_type.key, 0) + 1
 
     def postprocess(self):
+        has_data = any(np.sum(self.hist.data[formula]) > 0 for formula in self.all_compounds.values())
+        if not has_data:
+            console.warn("No density values were accumulated.")
+            return
+
         for comp_key, formula in self.all_compounds.items():
             if self.per_compound_normalization:
                 frames = self.compound_frame_counts.get(comp_key, 0)

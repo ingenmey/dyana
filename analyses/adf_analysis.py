@@ -168,15 +168,18 @@ class ADF(BaseAnalysis):
         self.hist.add(angles)
 
     def postprocess(self):
+        has_data = self.hist.counts.sum() > 0
+        if not has_data:
+            console.warn("No ADF values were accumulated.")
+            return
+
         bin_centers = 0.5 * (self.angle_edges[1:] + self.angle_edges[:-1])
         radians = np.deg2rad(bin_centers)
         sin_weights = 1.0 / np.sin(radians)
 
         self.hist.counts = self.hist.counts.astype(np.float64)
         self.hist.counts *= sin_weights
-
-        if self.processed_frames > 0:
-            self.hist.counts /= (self.processed_frames * self.n_ref * self.n_obs)
+        self.hist.counts /= (self.processed_frames * self.n_ref * self.n_obs)
 
         self.hist.normalize(method="total", total=self.bin_count * 100)
         fname = build_output_filename(

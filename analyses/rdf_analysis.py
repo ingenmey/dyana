@@ -124,14 +124,15 @@ class RDF(BaseAnalysis):
         self.hist.add(values)
 
     def postprocess(self):
+        has_data = self.hist.counts.sum() > 0
+        if not has_data:
+            console.warn("No RDF values were accumulated.")
+            return
+
         bin_edges = self.hist.bin_edges[0]
         shell_volumes = (4.0 / 3.0) * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
-
-        if self.processed_frames > 0 and self.n_ref > 0 and self.n_obs > 0:
-            norm_factor = self.n_ref * self.n_obs * self.processed_frames
-            self.hist.counts = self.hist.counts / (shell_volumes * norm_factor / self.box_volume)
-        else:
-            self.hist.counts = np.zeros_like(self.hist.counts)
+        norm_factor = self.n_ref * self.n_obs * self.processed_frames
+        self.hist.counts = self.hist.counts / (shell_volumes * norm_factor / self.box_volume)
 
         obs_density = self.n_obs / self.box_volume if self.box_volume else 0.0
         number_integral = obs_density * np.cumsum(self.hist.counts * shell_volumes)

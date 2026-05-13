@@ -120,6 +120,8 @@ Status markers:
 - [x] Migrate density after RDF.
 - [x] Migrate neighbor count after density.
 - [x] Migrate tetrahedral order after neighbor count.
+- [x] Migrate q6 / Q6 after tetrahedral order.
+- [x] Migrate LSI after q6 / Q6.
 
 ### Medium-Complex Analyses
 
@@ -176,13 +178,13 @@ Rule:
 - [x] Step 4: Add tests for schema-driven config building.
 - [x] Step 5: Migrate density.
 - [x] Step 6: Migrate the currently supported simple analyses.
-  - RDF, density, neighbor count, and tetrahedral order are on the canonical framework path.
+  - RDF, density, neighbor count, tetrahedral order, q6/Q6, and LSI are on the canonical framework path.
   - Other simple legacy analyses remain intentionally out of scope.
 - [ ] Step 7: Leave complex analyses custom until last.
 
 Notes:
 
-- [x] During framework work, RDF remains the reference analysis, but RDF, density, neighbor count, ADF, and tetrahedral order now define the supported migrated set that should remain functional.
+- [x] During framework work, RDF remains the reference analysis, but RDF, density, neighbor count, ADF, tetrahedral order, q6/Q6, and LSI now define the supported migrated set that should remain functional.
 - [x] Other analyses may break temporarily and be reintroduced after the framework is clean.
 - [x] Do not preserve legacy code paths solely for compatibility if they make the framework harder to read.
 - [x] Treat the workflow layer and the analysis layer as separate design problems.
@@ -207,7 +209,7 @@ Notes:
 
 ## Current Focus
 
-1. Keep RDF, density, neighbor count, ADF, and tetrahedral order as the clean migrated analyses and preserve the working Python programmatic RDF path.
+1. Keep RDF, density, neighbor count, ADF, tetrahedral order, q6/Q6, and LSI as the clean migrated analyses and preserve the working Python programmatic RDF path.
 2. Keep the workflow/session layer imperative and provider-driven.
 3. Use prepared setups as the practical bridge from interactive topology review to Python-driven analysis runs.
 4. Use the strengthened schema system, not ad hoc prompt flows, as the default path for further migrated analyses.

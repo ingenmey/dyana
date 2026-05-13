@@ -11,6 +11,9 @@ This format currently applies to the supported shared-output path used by:
 - density
 - ADF
 - neighbor count
+- tetrahedral order
+- q6 / Q6
+- LSI
 
 ## File Structure
 

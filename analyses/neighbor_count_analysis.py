@@ -200,7 +200,6 @@ class NeighborCountAnalysis(BaseAnalysis):
             fname,
             headers=["n", "P(n)"],
             data=[[n, probs.get(n, 0.0)] for n in range(max_n + 1)],
-            comment_lines=[f"P(n)   cutoff = {self.r_cut:.2f} Angstrom"],
         )
 
         console.success(f"Saved neighbour-count results to {fname}")

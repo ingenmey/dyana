@@ -80,8 +80,8 @@ class Console:
         self.use_color = use_color
         self.append_log = append_log
 
-    def plain(self, message: str = "") -> None:
-        self.emit(message)
+    def plain(self, message: str = "", style=None) -> None:
+        self.emit(message, style=style)
 
     def prompt(self, message: str) -> None:
         """Write an interactive prompt without a trailing newline."""

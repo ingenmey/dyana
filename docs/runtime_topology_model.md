@@ -10,6 +10,8 @@ The supported analyses for this model are:
 - ADF
 - neighbor count
 - tetrahedral order
+- q6 / Q6
+- LSI
 
 Other analyses may still use older patterns and are not the reference path.
 
@@ -238,6 +240,8 @@ The current runtime topology model is the reference path for:
 - ADF
 - neighbor count
 - tetrahedral order
+- q6 / Q6
+- LSI
 
 Other analyses may still depend on older structures or helper paths and should
 not be treated as the reference for topology-model behavior.

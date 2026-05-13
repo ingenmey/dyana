@@ -8,6 +8,8 @@ It focuses on the migrated analysis framework used by:
 - ADF
 - neighbor count
 - tetrahedral order
+- q6 / Q6
+- LSI
 
 It is a reference for the current path, not a migration plan.
 
@@ -32,6 +34,7 @@ Each migrated analysis defines a typed config dataclass, for example:
 - `RDFConfig`
 - `ADFConfig`
 - `TetrahedralOrderConfig`
+- `Q6Config`
 
 The config dataclass is responsible for:
 
@@ -213,6 +216,8 @@ analyses only:
 - ADF
 - neighbor count
 - tetrahedral order
+- q6 / Q6
+- LSI
 
 Older analyses that still use legacy patterns should not be treated as the
 reference design for future framework work.

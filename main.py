@@ -14,19 +14,28 @@ from io_support.output_writer import configure_output, restore_output
 from io_support.run_header import build_run_header, render_run_header
 from workflow.workflow_prompts import WorkflowPrompts
 
-AVAILABLE_ANALYSES = {
-    "rdf": ("Radial distribution function analysis", "analyses.rdf_analysis", "RDF"),
-    "adf": ("Angular distribution function analysis", "analyses.adf_analysis", "ADF"),
-    "dens": ("Particle density analysis", "analyses.density_analysis", "DensityAnalysis"),
-    "ncount": ("Neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
-    "top": ("Tetrahedral order parameter analysis", "analyses.top_analysis", "TetrahedralOrderAnalysis"),
-    # "adf3b": ("Threebody Angular distribution function analysis", "analyses.adf3b_analysis", "ADFThreeBody"),
-    # "percolation": ("Hydrogen bond percolation analysis", "analyses.percolation_analysis", "PercolationAnalysis"),
-    # "cluster": ("Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
-    # "dacf": ("Dimer existence auto-correlation function", "analyses.dacf_analysis", "DACFAnalysis"),
-    # "pccf": ("Proton coupling correlation function", "analyses.pccf_analysis", "PCCFAnalysis"),
-    # "cmsd": ("Charge mean square displacement", "analyses.charge_msd_analysis", "ChargeMSDAnalysis"),
-}
+AVAILABLE_ANALYSES = [
+    ("s", "Pair Correlation"),
+    ("a", "rdf", "Radial distribution function", "analyses.rdf_analysis", "RDF"),
+    ("a", "adf", "Angular distribution function", "analyses.adf_analysis", "ADF"),
+
+    ("s", "Density / Counting"),
+    ("a", "dens", "Particle density", "analyses.density_analysis", "DensityAnalysis"),
+    ("a", "ncount", "Neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
+
+    ("s", "Local Structure"),
+    ("a", "top", "Tetrahedral order parameter", "analyses.top_analysis", "TetrahedralOrderAnalysis"),
+    ("a", "lsi", "Local structure index", "analyses.lsi_analysis", "LSIAnalysis"),
+    ("a", "q6", "Steinhardt q6/Q6 order parameter", "analyses.q6_analysis", "Q6Analysis"),
+
+    # ("s", "Legacy"),
+    # ("a", "adf3b", "Threebody Angular distribution function", "analyses.adf3b_analysis", "ADFThreeBody"),
+    # ("a", "percolation", "Hydrogen bond percolation", "analyses.percolation_analysis", "PercolationAnalysis"),
+    # ("a", "cluster", "Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
+    # ("a", "dacf", "Dimer existence auto-correlation function", "analyses.dacf_analysis", "DACFAnalysis"),
+    # ("a", "pccf", "Proton coupling correlation function", "analyses.pccf_analysis", "PCCFAnalysis"),
+    # ("a", "cmsd", "Charge mean square displacement", "analyses.charge_msd_analysis", "ChargeMSDAnalysis"),
+]
 
 
 def determine_traj_format(traj_file):
@@ -43,13 +52,20 @@ def determine_traj_format(traj_file):
 def choose_analysis(input_provider):
     """Prompt for one of the currently supported analyses."""
     console.section("Available Analyses")
-    for key, (description, _, _) in AVAILABLE_ANALYSES.items():
+    analysis_lookup = {}
+    for entry in AVAILABLE_ANALYSES:
+        if entry[0] == "s":
+            console.plain(entry[1], style="cyan")
+            continue
+
+        _, key, description, module_name, class_name = entry
         console.key_value(key, description, indent=2)
+        analysis_lookup[key] = (module_name, class_name)
 
     while True:
         analysis_choice = input_provider.ask_str("\nChoose an analysis: ").strip()
-        if analysis_choice in AVAILABLE_ANALYSES:
-            _, module_name, class_name = AVAILABLE_ANALYSES[analysis_choice]
+        if analysis_choice in analysis_lookup:
+            module_name, class_name = analysis_lookup[analysis_choice]
             module = importlib.import_module(module_name)
             return getattr(module, class_name)
         console.warn("Invalid choice. Please choose an analysis from the above list.")

@@ -244,24 +244,21 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
             self.hist_s.add(np.array(s_values))
 
     def postprocess(self):
-        comment_lines = [f"cutoff = {self.cutoff:.6f} Angstrom"] if self.cutoff is not None else None
+        has_data = self.hist_q.counts.sum() > 0
+        if not has_data:
+            console.warn("No tetrahedral order values were accumulated.")
+            return
+
         filename_parts = [
             format_selection(self.ref_labels, self.ref_type.formula),
             format_selection_group(self.observed_selection_entries),
         ]
+        self.hist_q.normalize(field="count", method="total", total=100)
+        q_filename = build_output_filename("top_q", filename_parts)
+        write_histogram_1d(q_filename, self.hist_q, headers=["q", "P(q)"])
+        console.success(f"Saved tetrahedral orientational order results to {q_filename}")
 
-        if self.hist_q.counts.sum() > 0:
-            self.hist_q.normalize(field="count", method="total", total=100)
-            q_filename = build_output_filename("top_q", filename_parts)
-            write_histogram_1d(q_filename, self.hist_q, headers=["q", "P(q)"], comment_lines=comment_lines)
-            console.success(f"Saved tetrahedral orientational order results to {q_filename}")
-        else:
-            console.warn("No valid tetrahedral orientational order values were accumulated.")
-
-        if self.hist_s.counts.sum() > 0:
-            self.hist_s.normalize(field="count", method="total", total=100)
-            s_filename = build_output_filename("top_s", filename_parts)
-            write_histogram_1d(s_filename, self.hist_s, headers=["S", "P(S)"], comment_lines=comment_lines)
-            console.success(f"Saved tetrahedral translational order results to {s_filename}")
-        else:
-            console.warn("No valid tetrahedral translational order values were accumulated.")
+        self.hist_s.normalize(field="count", method="total", total=100)
+        s_filename = build_output_filename("top_s", filename_parts)
+        write_histogram_1d(s_filename, self.hist_s, headers=["S", "P(S)"])
+        console.success(f"Saved tetrahedral translational order results to {s_filename}")

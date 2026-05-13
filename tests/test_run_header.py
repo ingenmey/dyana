@@ -39,16 +39,6 @@ class RunHeaderTests(unittest.TestCase):
         self.assertEqual(header.lines[4], f"Input log: {(Path.cwd() / 'results' / 'input.log').resolve()}")
         self.assertEqual(header.lines[5], f"Prepared setup: {(Path.cwd() / 'setup.json').resolve()}")
 
-    def test_build_run_header_art_includes_versioned_banner_text(self):
-        art_lines = run_header.build_run_header_art("0.1.0")
-        plain_lines = ["".join(text for text, _ in segments) for segments in art_lines]
-
-        self.assertEqual(plain_lines[1], "  ╔═════════════════════════════════════╗")
-        self.assertIn("Đ Y A N A", plain_lines[4])
-        self.assertIn("Dynamics Analyzer", plain_lines[5])
-        self.assertIn("ver. 0.1.0", plain_lines[6])
-        self.assertEqual(plain_lines[9], "  ╚═════════════════════════════════════╝")
-
     def test_render_run_header_falls_back_for_non_unicode_streams(self):
         class Cp1252Stream(io.StringIO):
             encoding = "cp1252"

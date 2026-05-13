@@ -166,13 +166,13 @@ avoid carrying competing framework guidance.
 
 ## 11. Normalize Analysis APIs
 
-- [x] RDF, density, neighbor count, ADF, and tetrahedral order now validate the new `BaseAnalysis` design; the remaining analyses are intentionally out of scope for the current cleanup phase.
+- [x] RDF, density, neighbor count, ADF, tetrahedral order, q6/Q6, and LSI now validate the new `BaseAnalysis` design; the remaining analyses are intentionally out of scope for the current cleanup phase.
 - [x] Keep `BaseAnalysis` as the near-term canonical shared frame-loop/lifecycle base.
 - [x] Introduce config-driven setup independent of prompts, following the framework checklist.
 - [ ] Add `from_config` constructors only where they reduce boilerplate.
 - [ ] Add result dataclasses after a shared result/output pattern is agreed.
 - [~] Move file writing out of calculation classes once a central output layer exists.
-  - RDF, density, neighbor count, ADF, and tetrahedral order now write through a shared output module.
+  - RDF, density, neighbor count, ADF, tetrahedral order, q6/Q6, and LSI now write through a shared output module.
   - Remaining analyses are intentionally left untouched for now.
 - [x] Treat RDF as the reference analysis while the shared framework is rebuilt.
 - [x] Allow temporary breakage of legacy analyses during framework migration.
