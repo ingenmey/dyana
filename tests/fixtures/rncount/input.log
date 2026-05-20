@@ -1,0 +1,58 @@
+# Enter cell vector length in X dimension (in Angstrom):
+22.7274
+# Enter cell vector length in Y dimension (in Angstrom):
+22.7274
+# Enter cell vector length in Z dimension (in Angstrom):
+22.7274
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+
+# Choose an analysis:
+rncount
+# Choose the reference compound (number):  [1]
+3
+# Which atom defines reference site 1?
+O
+# Choose the observed compounds for observable 1 (comma-separated numbers):
+1,3
+# Which atom(s) in observed compound 1 (H2O) belong to observable 1? (comma-separated)
+H
+# Neighbour cutoff distance Angstrom:  [3.5]
+2.4
+# Exclude observed atoms that belong to the same molecule as the reference atom? [Yes]
+
+# Which atom(s) in observed compound 3 (HO) belong to observable 1? (comma-separated)
+H
+# Neighbour cutoff distance Angstrom:  [3.5]
+2.4
+# Exclude observed atoms that belong to the same molecule as the reference atom? [Yes]
+
+# Add another observable? [No]
+y
+# Which atom defines reference site 2?
+H
+# Choose the observed compounds for observable 2 (comma-separated numbers):
+1,3
+# Which atom(s) in observed compound 1 (H2O) belong to observable 2? (comma-separated)
+O
+# Neighbour cutoff distance Angstrom:  [3.5]
+2.4
+# Exclude observed atoms that belong to the same molecule as the reference atom? [Yes]
+
+# Which atom(s) in observed compound 3 (HO) belong to observable 2? (comma-separated)
+O
+# Neighbour cutoff distance Angstrom:  [3.5]
+2.4
+# Exclude observed atoms that belong to the same molecule as the reference atom? [Yes]
+
+# Add another observable? [No]
+
+# Perform molecule recognition and update compound list in each frame? [No]
+y
+# In which trajectory frame to start processing the trajectory? [1]
+
+# How many trajectory frames to read (from this position on)? [all]
+
+# Use every n-th read trajectory frame for the analysis: [1]
+

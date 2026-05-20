@@ -9,6 +9,7 @@ analysis of molecular structure and local order in XYZ and LAMMPS trajectories.
 - angular distribution function (`adf`)
 - one-dimensional density profile (`dens`)
 - neighbour-count probability (`ncount`)
+- resolved neighbour-count probability (`rncount`)
 - tetrahedral order parameters (`top`)
 - Steinhardt `q6`, Lechner-Dellago `qbar6`, and global `Q6` (`q6`)
 - local structure index (`lsi`)
