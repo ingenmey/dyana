@@ -9,7 +9,7 @@
   ║                            (        ║
   ╚═════════════════════════════════════╝
 
-Started: 2026-05-19 12:53:59 CEST
+Started: 2026-05-21 15:38:08 CEST
 Trajectory: /mnt/d/python/dyana/tests/fixtures/koh_h2o.xyz (xyz)
 Output dir: /mnt/d/python/dyana/tests/fixtures/rncount
 Console log: /mnt/d/python/dyana/tests/fixtures/rncount/dyana.log
@@ -63,14 +63,13 @@ Pair Correlation
   adf: Angular distribution function
 Density / Counting
   dens: Particle density
-  ncount: Neighbour-count probability
-  rncount: Resolved neighbour-count probability
+  ncount: Resolved neighbour-count probability
 Local Structure
   top: Tetrahedral order parameter
   lsi: Local structure index
   q6: Steinhardt q6/Q6 order parameter
 
-Choose an analysis:  rncount
+Choose an analysis:  ncount
 
 Analysis Setup
 
@@ -135,6 +134,9 @@ Running analysis...
 
 Results
 Processed frames: 14
+! Output file rncount_joint_O-HO_H-H2O+H-HO_H-HO_O-H2O+O-HO.dat already existed; moved the previous file to #1#rncount_joint_O-HO_H-H2O+H-HO_H-HO_O-H2O+O-HO.dat.
 + Saved resolved neighbour-count results to rncount_joint_O-HO_H-H2O+H-HO_H-HO_O-H2O+O-HO.dat
+! Output file rncount_obs1_O-HO_H-H2O+H-HO.dat already existed; moved the previous file to #1#rncount_obs1_O-HO_H-H2O+H-HO.dat.
 + Saved marginal neighbour-count results to rncount_obs1_O-HO_H-H2O+H-HO.dat
+! Output file rncount_obs2_H-HO_O-H2O+O-HO.dat already existed; moved the previous file to #1#rncount_obs2_H-HO_O-H2O+O-HO.dat.
 + Saved marginal neighbour-count results to rncount_obs2_H-HO_O-H2O+O-HO.dat

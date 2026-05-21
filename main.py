@@ -21,8 +21,8 @@ AVAILABLE_ANALYSES = [
 
     ("s", "Density / Counting"),
     ("a", "dens", "Particle density", "analyses.density_analysis", "DensityAnalysis"),
-    ("a", "ncount", "Neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
-    ("a", "rncount", "Resolved neighbour-count probability", "analyses.resolved_neighbor_count_analysis", "ResolvedNeighborCountAnalysis"),
+#    ("a", "ncount", "Neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
+    ("a", "ncount", "Resolved neighbour-count probability", "analyses.resolved_neighbor_count_analysis", "ResolvedNeighborCountAnalysis"),
 
     ("s", "Local Structure"),
     ("a", "top", "Tetrahedral order parameter", "analyses.top_analysis", "TetrahedralOrderAnalysis"),

@@ -9,7 +9,7 @@
 # Accept these molecules (y) or change something (n) [Yes]
 
 # Choose an analysis:
-rncount
+ncount
 # Choose the reference compound (number):  [1]
 3
 # Which atom defines reference site 1?
