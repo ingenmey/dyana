@@ -9,7 +9,10 @@ from framework.analysis_params import (
     CompoundParam,
     FloatParam,
     ForEach,
+    Group,
     IntParam,
+    Repeat,
+    Variant,
     When,
 )
 from io_support.console import console
@@ -42,8 +45,17 @@ def prompt_step(step, context):
     if isinstance(step, (CompoundParam, AtomLabelsParam, IntParam, FloatParam, BoolParam, ChoiceParam)):
         context.values[step.name] = prompt_param(step, context)
         return
+    if isinstance(step, Group):
+        context.values[step.name] = _run_group(step, context)
+        return
     if isinstance(step, ForEach):
         context.values[step.collect_as] = _run_for_each(step, context)
+        return
+    if isinstance(step, Repeat):
+        context.values[step.name] = _run_repeat(step, context)
+        return
+    if isinstance(step, Variant):
+        _run_variant(step, context)
         return
     if isinstance(step, When):
         _run_when(step, context)
@@ -105,18 +117,64 @@ def _run_for_each(step, context):
         for child_step in step.steps:
             prompt_step(child_step, child_context)
 
-        child_values = {
-            key: value
-            for key, value in child_context.values.items()
-            if key not in inherited_keys
-        }
-        collected_value = _collapse_collected_values(child_values)
+        collected_value = _build_child_result(
+            child_context,
+            inherited_keys,
+            config_class=step.config_class,
+            include_item_as=step.include_item_as,
+            item=item,
+        )
         if step.collect_mode == "dict":
             collected[item] = collected_value
         else:
             collected.append(collected_value)
 
     return collected
+
+
+def _run_group(step, context):
+    inherited_keys = set(context.values)
+    child_context = PromptContext(
+        owner=context.owner,
+        input_provider=context.input_provider,
+        values=dict(context.values),
+        scope=dict(context.scope),
+    )
+    for child_step in step.steps:
+        prompt_step(child_step, child_context)
+    return _build_child_result(child_context, inherited_keys, config_class=step.config_class)
+
+
+def _run_repeat(step, context):
+    collected = []
+    next_index = 1
+    while True:
+        inherited_keys = set(context.values)
+        child_context = PromptContext(
+            owner=context.owner,
+            input_provider=context.input_provider,
+            values=dict(context.values),
+            scope={**context.scope, step.item_name: next_index},
+        )
+        for child_step in step.steps:
+            prompt_step(child_step, child_context)
+        collected.append(_build_child_result(child_context, inherited_keys, config_class=step.config_class))
+        next_index += 1
+        if len(collected) < step.min_items:
+            continue
+        if not context.input_provider.ask_bool(step.add_prompt, default=False):
+            break
+    return collected
+
+
+def _run_variant(step, context):
+    selector = _resolve_name(step.selector, context)
+    try:
+        steps = step.cases[selector]
+    except KeyError as exc:
+        raise KeyError(f"Unsupported Variant case for {step.name}: {selector!r}") from exc
+    for child_step in steps:
+        prompt_step(child_step, context)
 
 
 def _run_when(step, context):
@@ -161,6 +219,19 @@ def _resolve_name(name, context):
     if name in context.values:
         return context.values[name]
     raise KeyError(f"Unknown schema value reference: {name}")
+
+
+def _build_child_result(child_context, inherited_keys, config_class=None, include_item_as=None, item=None):
+    child_values = {
+        key: value
+        for key, value in child_context.values.items()
+        if key not in inherited_keys
+    }
+    if include_item_as is not None:
+        child_values[include_item_as] = item
+    if config_class is not None:
+        return config_class(**child_values)
+    return _collapse_collected_values(child_values)
 
 
 def _collapse_collected_values(values):

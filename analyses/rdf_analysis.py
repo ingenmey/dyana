@@ -9,7 +9,7 @@ import numpy as np
 from framework.analysis_params import AtomLabelsParam, CompoundParam, FloatParam, IntParam
 from analyses.common.base_analysis import BaseAnalysis
 from analyses.common.histogram import HistogramND
-from analyses.common.metrics import DistanceMetric, Selector
+from analyses.common.reference_channels import DistanceChannel, radial_shell_volumes
 from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, write_histogram_1d
 
@@ -72,34 +72,27 @@ class RDF(BaseAnalysis):
         self.ref_selection = topology_frame.resolve_selection(self.ref_type, self.ref_labels)
         self.obs_selection = topology_frame.resolve_selection(self.obs_type, self.obs_labels)
 
+        edges = np.linspace(0.0, self.max_distance, self.bin_count + 1)
+        self.channel = DistanceChannel(
+            ref_key=self.ref_key,
+            obs_key=self.obs_key,
+            ref_local_indices=self.ref_selection.local_indices,
+            obs_local_indices=self.obs_selection.local_indices,
+            max_distance=self.max_distance,
+            bin_edges=edges,
+            output_name="r/Angstrom",
+        )
         self.rebuild_runtime_state()
         self.n_ref = int(self.ref_indices.size)
         self.n_obs = int(self.obs_indices.size)
-        edges = np.linspace(0.0, self.max_distance, self.bin_count + 1)
         self.hist = HistogramND([edges], "linear")
         self.box_volume = np.prod(self.traj.box_size)
         self.mark_configured()
 
     def rebuild_runtime_state(self):
-        topology_frame = self.traj.topology_frame
-        self.ref_indices = topology_frame.get_atom_ids_for_local_indices(
-            self.ref_type,
-            self.ref_selection.local_indices,
-        )
-        self.obs_indices = topology_frame.get_atom_ids_for_local_indices(
-            self.obs_type,
-            self.obs_selection.local_indices,
-        )
-
-        self.ref_sel = Selector(self.ref_indices)
-        self.obs_sel = Selector(self.obs_indices)
-
-        self.metric = DistanceMetric(
-            self.ref_sel,
-            self.obs_sel,
-            self.traj.box_size,
-            cutoff=self.max_distance,
-        )
+        self.channel.rebuild_runtime_state(self.traj)
+        self.ref_indices = self.channel.ref_atom_ids
+        self.obs_indices = self.channel.obs_atom_ids
 
     def post_compound_update(self):
         topology_frame = self.traj.topology_frame
@@ -120,8 +113,15 @@ class RDF(BaseAnalysis):
         return True
 
     def process_frame(self):
-        values = self.metric(self.traj.coords)
-        self.hist.add(values)
+        batch = self.channel.build_batch(self.traj)
+        self.channel.begin_batch(batch)
+        all_values = []
+        for ref_molecule_index in range(batch.n_references):
+            values = self.channel.samples_for_reference(batch, ref_molecule_index).values
+            if values.size:
+                all_values.append(values)
+        if all_values:
+            self.hist.add(np.concatenate(all_values))
 
     def postprocess(self):
         has_data = self.hist.counts.sum() > 0
@@ -130,7 +130,7 @@ class RDF(BaseAnalysis):
             return
 
         bin_edges = self.hist.bin_edges[0]
-        shell_volumes = (4.0 / 3.0) * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
+        shell_volumes = radial_shell_volumes(bin_edges)
         norm_factor = self.n_ref * self.n_obs * self.processed_frames
         self.hist.counts = self.hist.counts / (shell_volumes * norm_factor / self.box_volume)
 

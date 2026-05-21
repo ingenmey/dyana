@@ -65,6 +65,38 @@ class ForEach:
     steps: list[object]
     collect_as: str
     collect_mode: str = "dict"
+    config_class: type | None = None
+    include_item_as: str | None = None
+
+
+@dataclass(frozen=True)
+class Group:
+    """Collect a prompt sub-schema into one nested structured value."""
+
+    name: str
+    steps: list[object]
+    config_class: type | None = None
+
+
+@dataclass(frozen=True)
+class Repeat:
+    """Repeat a prompt sub-schema until the user declines another item."""
+
+    name: str
+    item_name: str
+    steps: list[object]
+    add_prompt: str
+    min_items: int = 1
+    config_class: type | None = None
+
+
+@dataclass(frozen=True)
+class Variant:
+    """Run one config branch selected by an earlier prompted value."""
+
+    name: str
+    selector: str
+    cases: dict[str, list[object]]
 
 
 @dataclass(frozen=True)

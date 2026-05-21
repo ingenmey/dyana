@@ -7,7 +7,7 @@ import numpy as np
 from framework.analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, IntParam, When
 from analyses.common.base_analysis import BaseAnalysis
 from analyses.common.histogram import HistogramND
-from analyses.common.metrics import AngleMetric, Selector
+from analyses.common.reference_channels import AngleChannel, angular_inverse_sin_weights
 from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, write_histogram_1d
 
@@ -105,6 +105,24 @@ class ADF(BaseAnalysis):
             self.obs_tip_labels,
         )
 
+        self.angle_edges = np.linspace(0, 180, self.bin_count + 1)
+        self.channel = AngleChannel(
+            ref_key=self.ref_key,
+            obs_key=self.obs_key,
+            ref_base_source=self.ref_base_source,
+            ref_tip_source=self.ref_tip_source,
+            obs_base_source=self.obs_base_source,
+            obs_tip_source=self.obs_tip_source,
+            ref_base_local_indices=self.ref_base_selection.local_indices,
+            ref_tip_local_indices=self.ref_tip_selection.local_indices,
+            obs_base_local_indices=self.obs_base_selection.local_indices,
+            obs_tip_local_indices=self.obs_tip_selection.local_indices,
+            bin_edges=self.angle_edges,
+            output_name="angle/deg",
+            enforce_shared_atom=self.enforce_shared_atom,
+            v1_cutoff=self.v1_cutoff,
+            v2_cutoff=self.v2_cutoff,
+        )
         self.rebuild_runtime_state()
         if any(arr.size == 0 for arr in (self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids)):
             raise ValueError("No angle vectors matched the given labels in the initial frame.")
@@ -112,37 +130,15 @@ class ADF(BaseAnalysis):
         topology_frame = self.traj.topology_frame
         self.n_ref = topology_frame.get_molecule_count(self.ref_type)
         self.n_obs = topology_frame.get_molecule_count(self.obs_type)
-        self.angle_edges = np.linspace(0, 180, self.bin_count + 1)
         self.hist = HistogramND([self.angle_edges])
         self.mark_configured()
 
     def rebuild_runtime_state(self):
-        topology_frame = self.traj.topology_frame
-        self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids = build_vector_lists(
-            topology_frame,
-            self.ref_type,
-            self.obs_type,
-            self.ref_base_source,
-            self.ref_tip_source,
-            self.obs_base_source,
-            self.obs_tip_source,
-            self.ref_base_selection.local_indices,
-            self.ref_tip_selection.local_indices,
-            self.obs_base_selection.local_indices,
-            self.obs_tip_selection.local_indices,
-            self.enforce_shared_atom,
-        )
-
-        self.metric = AngleMetric(
-            selector_ref_base=Selector(self.ref_base_ids),
-            selector_ref_tip=Selector(self.ref_tip_ids),
-            selector_obs_base=Selector(self.obs_base_ids),
-            selector_obs_tip=Selector(self.obs_tip_ids),
-            box=self.traj.box_size,
-            enforce_shared_atom=self.enforce_shared_atom,
-            v1_cutoff=self.v1_cutoff,
-            v2_cutoff=self.v2_cutoff,
-        )
+        self.channel.rebuild_runtime_state(self.traj)
+        self.ref_base_ids = self.channel.ref_base_ids
+        self.ref_tip_ids = self.channel.ref_tip_ids
+        self.obs_base_ids = self.channel.obs_base_ids
+        self.obs_tip_ids = self.channel.obs_tip_ids
 
     def post_compound_update(self):
         topology_frame = self.traj.topology_frame
@@ -164,8 +160,14 @@ class ADF(BaseAnalysis):
         return True
 
     def process_frame(self):
-        angles = self.metric(self.traj.coords)
-        self.hist.add(angles)
+        batch = self.channel.build_batch(self.traj)
+        all_angles = []
+        for ref_molecule_index in range(batch.n_references):
+            angles = self.channel.samples_for_reference(batch, ref_molecule_index).values
+            if angles.size:
+                all_angles.append(angles)
+        if all_angles:
+            self.hist.add(np.concatenate(all_angles))
 
     def postprocess(self):
         has_data = self.hist.counts.sum() > 0
@@ -173,9 +175,7 @@ class ADF(BaseAnalysis):
             console.warn("No ADF values were accumulated.")
             return
 
-        bin_centers = 0.5 * (self.angle_edges[1:] + self.angle_edges[:-1])
-        radians = np.deg2rad(bin_centers)
-        sin_weights = 1.0 / np.sin(radians)
+        sin_weights = angular_inverse_sin_weights(self.angle_edges)
 
         self.hist.counts = self.hist.counts.astype(np.float64)
         self.hist.counts *= sin_weights
@@ -193,62 +193,3 @@ class ADF(BaseAnalysis):
         )
         write_histogram_1d(fname, self.hist, headers=["angle/deg", "ADF"])
         console.success(f"Saved ADF results to {fname}")
-
-
-def build_vector_lists(
-    topology_frame,
-    ref_type,
-    obs_type,
-    ref_base_source,
-    ref_tip_source,
-    obs_base_source,
-    obs_tip_source,
-    ref_base_local_indices,
-    ref_tip_local_indices,
-    obs_base_local_indices,
-    obs_tip_local_indices,
-    enforce_shared_atom,
-):
-    """Build global atom-id arrays for all valid ADF vector combinations."""
-    ref_molecule_atom_ids = topology_frame.get_molecule_atom_ids(ref_type)
-    obs_molecule_atom_ids = topology_frame.get_molecule_atom_ids(obs_type)
-
-    ref_base_ids = []
-    ref_tip_ids = []
-    obs_base_ids = []
-    obs_tip_ids = []
-
-    same_type = ref_type.key == obs_type.key
-
-    for ref_molecule_index, ref_atom_ids in enumerate(ref_molecule_atom_ids):
-        for obs_molecule_index, obs_atom_ids in enumerate(obs_molecule_atom_ids):
-            if same_type and ref_molecule_index == obs_molecule_index:
-                continue
-
-            rb_source = ref_atom_ids if ref_base_source == "r" else obs_atom_ids
-            rt_source = ref_atom_ids if ref_tip_source == "r" else obs_atom_ids
-            ob_source = obs_atom_ids if obs_base_source == "o" else ref_atom_ids
-            ot_source = obs_atom_ids if obs_tip_source == "o" else ref_atom_ids
-
-            rb_ids = rb_source[list(ref_base_local_indices)]
-            rt_ids = rt_source[list(ref_tip_local_indices)]
-            ob_ids = ob_source[list(obs_base_local_indices)]
-            ot_ids = ot_source[list(obs_tip_local_indices)]
-
-            for rb in rb_ids:
-                for rt in rt_ids:
-                    for ob in ob_ids:
-                        if enforce_shared_atom and rt != ob:
-                            continue
-                        for ot in ot_ids:
-                            ref_base_ids.append(int(rb))
-                            ref_tip_ids.append(int(rt))
-                            obs_base_ids.append(int(ob))
-                            obs_tip_ids.append(int(ot))
-
-    return (
-        np.asarray(ref_base_ids, dtype=np.int32),
-        np.asarray(ref_tip_ids, dtype=np.int32),
-        np.asarray(obs_base_ids, dtype=np.int32),
-        np.asarray(obs_tip_ids, dtype=np.int32),
-    )
