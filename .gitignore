@@ -3,5 +3,5 @@ __pycache__/
 *.pyo
 *.pyd
 analyses/bu*.py
-docs/*.md
+docs/
 examples/
