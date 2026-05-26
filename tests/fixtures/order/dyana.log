@@ -1,0 +1,118 @@
+
+  ╔═════════════════════════════════════╗
+  ║                            (        ║
+  ║                             \       ║
+  ║        Đ Y A N A             )      ║
+  ║    Dynamics Analyzer    »»------->  ║
+  ║       ver. 0.1.0             )      ║
+  ║                             /       ║
+  ║                            (        ║
+  ╚═════════════════════════════════════╝
+
+Started: 2026-05-21 17:25:52 CEST
+Trajectory: /mnt/d/python/dyana/tests/fixtures/koh_h2o.xyz (xyz)
+Output dir: /mnt/d/python/dyana/tests/fixtures/order
+Console log: /mnt/d/python/dyana/tests/fixtures/order/dyana.log
+Input log: /mnt/d/python/dyana/tests/fixtures/order/input.log
+
+Topology Setup
+Enter cell vector length in X dimension (in Angstrom):  22.7274
+Enter cell vector length in Y dimension (in Angstrom):  22.7274
+Enter cell vector length in Z dimension (in Angstrom):  22.7274
+
+Cell vectors: a=22.7274  b=22.7274  c=22.7274
+
+> Running compound recognition...
+
+Detected compound types:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+
+Compound 1 (H2O) bond length matrix:
+           H1       H2       O1
+   H1      -        -     1.0272
+   H2      -        -     1.0314
+   O1   1.0272   1.0314      -  
+
+Compound 2 (H3O2) bond length matrix:
+           H1       H2       H3       O1       O2
+   H1      -        -        -     1.2189   1.2237
+   H2      -        -        -     0.9752      -  
+   H3      -        -        -        -     0.9667
+   O1   1.2189   0.9752      -        -        -  
+   O2   1.2237      -     0.9667      -        -  
+
+Compound 3 (HO) bond length matrix:
+           H1       O1
+   H1      -     0.9759
+   O1   0.9759      -  
+
+Compound 4 (K) bond length matrix:
+           K1
+   K1      -  
+
+Draw compounds to PDF? [No] 
+Accept these molecules (y) or change something (n) [Yes] 
++ Accepted compound list.
+
+Available Analyses
+Pair Correlation
+  rdf: Radial distribution function
+  adf: Angular distribution function
+Density / Counting
+  dens: Particle density
+  ncount: Neighbour-count probability
+  rncount: Resolved neighbour-count probability
+Local Structure
+  top: Tetrahedral order parameter
+  lsi: Local structure index
+  q6: Steinhardt q6/Q6 order parameter
+
+Choose an analysis:  top
+
+Analysis Setup
+
+Available compounds:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+
+Choose the reference compound (number):  [1] 1
+Available labels: H1, H2, O1
+Which atom(s) in reference compound 1 (H2O)? (comma-separated)  O
+
+Available compounds:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+
+Choose the observed compounds (comma-separated numbers):  1,3
+Available labels: H1, H2, O1
+Which atom(s) in observed compound 1 (H2O)? (comma-separated)  O
+Available labels: H1, O1
+Which atom(s) in observed compound 3 (HO)? (comma-separated)  O
+Use a maximum distance cutoff for neighbor search? [No] 4
+! Please answer with 'y' or 'n'.
+Use a maximum distance cutoff for neighbor search? [No] y
+Enter the maximum cutoff distance (Angstrom):  [5.0] 4
+Enter the number of bins for angular tetrahedral order distribution q:  [100] 
+Enter the number of bins for radial tetrahedral order distribution S:  [10000] 
+
+Frame Loop
+Perform molecule recognition and update compound list in each frame? [No] 
+In which trajectory frame to start processing the trajectory? [1] 
+How many trajectory frames to read (from this position on)? [all] 
+Use every n-th read trajectory frame for the analysis: [1] 
+
+Run
+Running analysis...
+> End of trajectory reached.
+
+Results
+Processed frames: 14
++ Saved tetrahedral orientational order results to top_q_O-H2O_O-H2O+O-HO.dat
++ Saved tetrahedral translational order results to top_s_O-H2O_O-H2O+O-HO.dat

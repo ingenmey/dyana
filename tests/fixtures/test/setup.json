@@ -1,0 +1,114 @@
+{
+  "format_version": 1,
+  "recipe": {
+    "trajectory_format": "xyz",
+    "cell_vectors": [
+      22.7274,
+      22.7274,
+      22.7274
+    ],
+    "excluded_elements": [
+      "Ag",
+      "Au",
+      "Ba",
+      "Ca",
+      "Co",
+      "Cs",
+      "Cu",
+      "Fe",
+      "K",
+      "Li",
+      "Mg",
+      "Na",
+      "Pt",
+      "Rb",
+      "Sr",
+      "Zn"
+    ],
+    "neighbor_search_scale": 1.164,
+    "bond_distance_scale": 1.4,
+    "forbidden_bonds": []
+  },
+  "compound_types": [
+    {
+      "formula": "H2O",
+      "bond_types": [
+        [
+          "H",
+          "O"
+        ],
+        [
+          "H",
+          "O"
+        ]
+      ],
+      "graph_hash": "2c96eb4288d63b2a9437ddd4172e67f3",
+      "labels": [
+        "H1",
+        "H2",
+        "O1"
+      ]
+    },
+    {
+      "formula": "H3O2",
+      "bond_types": [
+        [
+          "H",
+          "O"
+        ],
+        [
+          "H",
+          "O"
+        ],
+        [
+          "H",
+          "O"
+        ],
+        [
+          "H",
+          "O"
+        ]
+      ],
+      "graph_hash": "956eb7bb98114c1a7e34379f2ca42feb",
+      "labels": [
+        "H1",
+        "H2",
+        "H3",
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "formula": "HO",
+      "bond_types": [
+        [
+          "H",
+          "O"
+        ]
+      ],
+      "graph_hash": "8991adadca2e8cc23e62278399df44a1",
+      "labels": [
+        "H1",
+        "O1"
+      ]
+    },
+    {
+      "formula": "K",
+      "bond_types": [],
+      "graph_hash": "aada8e15cbd4ff55d97927975609f624",
+      "labels": [
+        "K1"
+      ]
+    }
+  ],
+  "metadata": {
+    "source_file": "../koh_h2o.xyz",
+    "observed_counts": {
+      "H2O": 139,
+      "H3O2": 11,
+      "HO": 139,
+      "K": 150
+    },
+    "saved_at": "2026-05-25T12:37:23.464936+00:00"
+  }
+}

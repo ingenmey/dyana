@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 
+from core.app_config import load_app_config
 import core.trajectory_loader as trajectory_loader
 
 from framework.config_schema import FrameLoopConfig
@@ -25,6 +26,13 @@ def _required_deps_available():
         and importlib.util.find_spec("networkx") is not None
         and importlib.util.find_spec("scipy") is not None
     )
+
+
+def _apply_runtime_bond_settings():
+    config = load_app_config()
+    trajectory_loader.BOND_DISTANCE_SCALE = config["BOND_DISTANCE_SCALE"]
+    trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+    trajectory_loader.BOND_DISTANCE_OVERRIDES.update(config["BOND_DISTANCE_OVERRIDES"])
 
 
 @unittest.skipUnless(_required_deps_available(), "networkx and scipy are required for RDF end-to-end tests")
@@ -88,8 +96,7 @@ class RDFEndToEndTests(unittest.TestCase):
         original_scale = trajectory_loader.BOND_DISTANCE_SCALE
         original_overrides = dict(trajectory_loader.BOND_DISTANCE_OVERRIDES)
         try:
-            trajectory_loader.BOND_DISTANCE_SCALE = 1.4
-            trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+            _apply_runtime_bond_settings()
             generated = self._run_main_workflow(
                 traj_path=KOH_FIXTURE,
                 input_log=RDF_DYNAMIC_FIXTURES / "input.log",
@@ -109,8 +116,7 @@ class RDFEndToEndTests(unittest.TestCase):
         original_scale = trajectory_loader.BOND_DISTANCE_SCALE
         original_overrides = dict(trajectory_loader.BOND_DISTANCE_OVERRIDES)
         try:
-            trajectory_loader.BOND_DISTANCE_SCALE = 1.4
-            trajectory_loader.BOND_DISTANCE_OVERRIDES.clear()
+            _apply_runtime_bond_settings()
 
             generated = None
             traj = None

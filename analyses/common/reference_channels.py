@@ -1,4 +1,4 @@
-"""Shared channel datatypes, helpers, and protocol for multichannel analyses."""
+"""Shared channel datatypes and helpers for supported reference analyses."""
 
 from __future__ import annotations
 
@@ -17,19 +17,10 @@ class ChannelSamples:
     """Zero or more scalar samples for one reference molecule."""
 
     values: np.ndarray
-    sample_ids: np.ndarray | None = None
 
     def __post_init__(self):
         values = np.asarray(self.values).reshape(-1)
         object.__setattr__(self, "values", values)
-
-        if self.sample_ids is None:
-            return
-
-        sample_ids = np.asarray(self.sample_ids).reshape(-1)
-        if len(sample_ids) != len(values):
-            raise ValueError("sample_ids must match the length of values.")
-        object.__setattr__(self, "sample_ids", sample_ids)
 
     @property
     def size(self) -> int:
@@ -42,7 +33,7 @@ class ChannelSamples:
 
 @runtime_checkable
 class ReferenceChannel(Protocol):
-    """One scalar-valued multichannel axis evaluated per reference molecule."""
+    """One scalar-valued shared channel evaluated per reference molecule."""
 
     output_name: str
     bin_edges: np.ndarray
@@ -92,7 +83,7 @@ class DistanceChannel:
         self.bin_edges = np.asarray(self.bin_edges, dtype=np.float64)
         self.ref_atom_ids = np.empty(0, dtype=np.int32)
         self.obs_atom_ids = np.empty(0, dtype=np.int32)
-        self.ref_molecule_atom_ids = np.empty((0, len(self.ref_local_indices)), dtype=np.int32)
+        self.ref_molecule_atom_ids = np.empty((0, 0), dtype=np.int32)
         self.ref_type = None
         self.obs_type = None
         self._cached_batch_token = None
@@ -115,7 +106,7 @@ class DistanceChannel:
         self.ref_type = topology_frame.get_compound_type_by_key(self.ref_key)
         self.obs_type = topology_frame.get_compound_type_by_key(self.obs_key)
         ref_molecule_atom_ids = topology_frame.get_molecule_atom_ids(self.ref_type)
-        self.ref_molecule_atom_ids = ref_molecule_atom_ids[:, list(self.ref_local_indices)] if len(ref_molecule_atom_ids) else np.empty((0, len(self.ref_local_indices)), dtype=np.int32)
+        self.ref_molecule_atom_ids = ref_molecule_atom_ids
         self.ref_atom_ids = topology_frame.get_atom_ids_for_local_indices(self.ref_type, self.ref_local_indices)
         self.obs_atom_ids = topology_frame.get_atom_ids_for_local_indices(self.obs_type, self.obs_local_indices)
         self._cached_batch_token = None
@@ -147,11 +138,11 @@ class DistanceChannel:
         self._obs_tree = cKDTree(self._obs_coords, boxsize=batch.box)
 
     def samples_for_reference(self, batch: ReferenceBatch, ref_molecule_index: int) -> ChannelSamples:
-        if self.ref_molecule_atom_ids.size == 0 or self.obs_atom_ids.size == 0:
+        if batch.n_references == 0 or self.obs_atom_ids.size == 0:
             return ChannelSamples(values=np.array([], dtype=np.float64))
 
         self.begin_batch(batch)
-        ref_atom_ids = np.asarray(batch.molecule_atom_ids[ref_molecule_index]).reshape(-1)
+        ref_atom_ids = np.asarray(batch.molecule_atom_ids[ref_molecule_index, list(self.ref_local_indices)]).reshape(-1)
         if ref_atom_ids.size == 0 or self._obs_tree is None:
             return ChannelSamples(values=np.array([], dtype=np.float64))
 
@@ -163,8 +154,10 @@ class DistanceChannel:
                 continue
             deltas = minimum_image(self._obs_coords[neighbor_ids] - ref_coords[ref_index], batch.box)
             distances = np.linalg.norm(deltas, axis=1)
-            values.extend(distances[distances > 1e-12])
-
+            for distance in distances:
+                if distance <= 1e-12:
+                    continue
+                values.append(float(distance))
         return ChannelSamples(values=np.asarray(values, dtype=np.float64))
 
     def axis_normalization_factors(self) -> np.ndarray | None:

@@ -1,0 +1,47 @@
+
+  ╔═════════════════════════════════════╗
+  ║                            (        ║
+  ║                             \       ║
+  ║        Đ Y A N A             )      ║
+  ║    Dynamics Analyzer    »»------->  ║
+  ║       ver. 0.1.0             )      ║
+  ║                             /       ║
+  ║                            (        ║
+  ╚═════════════════════════════════════╝
+
+Started: 2026-05-25 14:41:11 CEST
+Trajectory: /mnt/d/python/dyana/tests/fixtures/koh_h2o.xyz (xyz)
+Output dir: /mnt/d/python/dyana/tests/fixtures/test
+Console log: /mnt/d/python/dyana/tests/fixtures/test/dyana.log
+Input log: /mnt/d/python/dyana/tests/fixtures/test/input.log
+Prepared setup: /mnt/d/python/dyana/tests/fixtures/test/setup.json
+
+Topology Setup
+> Loading prepared setup from setup.json
+Cell vectors: a=22.7274  b=22.7274  c=22.7274
++ Prepared setup matches the current trajectory topology.
+
+Available Analyses
+Pair Correlation
+  rdf: Radial distribution function
+  adf: Angular distribution function
+Density / Counting
+  dens: Particle density
+  ncount: Neighbour-count probability
+  rncount: Resolved neighbour-count probability
+Local Structure
+  top: Tetrahedral order parameter
+  lsi: Local structure index
+  q6: Steinhardt q6/Q6 order parameter
+
+Choose an analysis:  rdf
+
+Analysis Setup
+
+Available compounds:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+
+Choose the reference compound (number):  [1] 

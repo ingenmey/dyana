@@ -70,7 +70,7 @@ def prompt_param(param, context):
         return _prompt_atom_labels(param, context)
     if isinstance(param, IntParam):
         return context.input_provider.ask_int(
-            param.prompt,
+            _format_prompt_text(param.prompt, context),
             default=param.default,
             display_default=param.display_default,
             minval=param.minval,
@@ -80,17 +80,17 @@ def prompt_param(param, context):
         if param.allow_none:
             return _prompt_optional_float(param, context)
         return context.input_provider.ask_float(
-            param.prompt,
+            _format_prompt_text(param.prompt, context),
             default=param.default,
             display_default=param.display_default,
             minval=param.minval,
             maxval=param.maxval,
         )
     if isinstance(param, BoolParam):
-        return context.input_provider.ask_bool(param.prompt, default=param.default)
+        return context.input_provider.ask_bool(_format_prompt_text(param.prompt, context), default=param.default)
     if isinstance(param, ChoiceParam):
         return context.input_provider.ask_choice(
-            param.prompt,
+            _format_prompt_text(param.prompt, context),
             param.choices,
             default=param.default,
         )
@@ -186,10 +186,11 @@ def _run_when(step, context):
 
 
 def _prompt_compound(param, context):
+    prompt_text = _format_prompt_text(param.prompt, context)
     selection = context.owner.compound_selection(
         role=param.role,
         multi=param.multi,
-        prompt_text=param.prompt,
+        prompt_text=prompt_text,
         provider=context.input_provider,
     )
     if param.multi:
@@ -204,10 +205,11 @@ def _prompt_atom_labels(param, context):
         compound_idx = _resolve_name(param.compound, context)
         compound = context.owner.traj.topology_frame.get_compound_type_by_index(compound_idx)
 
+    prompt_text = _format_prompt_text(param.prompt, context)
     return context.owner.atom_selection(
         role=param.role,
         compound=compound,
-        prompt_text=param.prompt,
+        prompt_text=prompt_text,
         allow_empty=param.allow_empty,
         provider=context.input_provider,
     )
@@ -269,7 +271,7 @@ def _compare_when_values(left, op, right):
 def _prompt_optional_float(param, context):
     while True:
         answer = context.input_provider.ask_str(
-            param.prompt,
+            _format_prompt_text(param.prompt, context),
             default="" if param.default is None else str(param.default),
             display_default=param.display_default,
         ).strip()
@@ -289,3 +291,12 @@ def _prompt_optional_float(param, context):
                 console.warn(f"Please enter a number <= {param.maxval}, or leave blank.")
             continue
         return value
+
+
+def _format_prompt_text(prompt, context):
+    if prompt is None:
+        return None
+    try:
+        return prompt.format(**context.values, **context.scope)
+    except (KeyError, IndexError, ValueError):
+        return prompt
