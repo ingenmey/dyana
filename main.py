@@ -18,6 +18,7 @@ AVAILABLE_ANALYSES = [
     ("s", "Pair Correlation"),
     ("a", "rdf", "Radial distribution function", "analyses.rdf_analysis", "RDF"),
     ("a", "adf", "Angular distribution function", "analyses.adf_analysis", "ADF"),
+    ("a", "cdf", "Combined distribution function", "analyses.cdf_analysis", "CDFAnalysis"),
 
     ("s", "Density / Counting"),
     ("a", "dens", "Particle density", "analyses.density_analysis", "DensityAnalysis"),

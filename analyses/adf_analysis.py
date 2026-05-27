@@ -4,10 +4,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from framework.analysis_params import AtomLabelsParam, BoolParam, ChoiceParam, CompoundParam, FloatParam, IntParam, When
 from analyses.common.base_analysis import BaseAnalysis
+from analyses.common.channel_specs import AngleSpec, angle_spec_schema, build_angle_channel
 from analyses.common.histogram import HistogramND
-from analyses.common.reference_channels import AngleChannel, angular_inverse_sin_weights
+from analyses.common.reference_channels import angular_inverse_sin_weights
+from framework.analysis_params import CompoundParam
 from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, write_histogram_1d
 
@@ -17,37 +18,11 @@ class ADFConfig:
     """Configuration for ADF analysis."""
 
     ref_compound_index: int
-    obs_compound_index: int
-    ref_base_source: str
-    ref_tip_source: str
-    ref_base_labels: list[str]
-    ref_tip_labels: list[str]
-    obs_base_source: str
-    obs_tip_source: str
-    obs_base_labels: list[str]
-    obs_tip_labels: list[str]
-    enforce_shared_atom: bool = False
-    bin_count: int = 180
-    v1_cutoff: float | None = None
-    v2_cutoff: float | None = None
+    axis: AngleSpec
 
     def __post_init__(self):
         if self.ref_compound_index < 0:
             raise ValueError("ref_compound_index must be >= 0.")
-        if self.obs_compound_index < 0:
-            raise ValueError("obs_compound_index must be >= 0.")
-        for field_name in ("ref_base_source", "ref_tip_source", "obs_base_source", "obs_tip_source"):
-            if getattr(self, field_name) not in {"r", "o"}:
-                raise ValueError(f"{field_name} must be 'r' or 'o'.")
-        for field_name in ("ref_base_labels", "ref_tip_labels", "obs_base_labels", "obs_tip_labels"):
-            if not getattr(self, field_name):
-                raise ValueError(f"{field_name} must not be empty.")
-        if self.bin_count < 1:
-            raise ValueError("bin_count must be >= 1.")
-        if self.v1_cutoff is not None and self.v1_cutoff < 0:
-            raise ValueError("v1_cutoff must be >= 0 or None.")
-        if self.v2_cutoff is not None and self.v2_cutoff < 0:
-            raise ValueError("v2_cutoff must be >= 0 or None.")
 
 
 class ADF(BaseAnalysis):
@@ -56,73 +31,22 @@ class ADF(BaseAnalysis):
     CONFIG_CLASS = ADFConfig
     CONFIG_SCHEMA = [
         CompoundParam(name="ref_compound_index", role="reference"),
-        CompoundParam(name="obs_compound_index", role="observed"),
-        ChoiceParam(name="ref_base_source", prompt="Base atom of first vector?", choices=["r", "o"], default="r"),
-        ChoiceParam(name="ref_tip_source", prompt="Tip atom of first vector?", choices=["r", "o"], default="r"),
-        AtomLabelsParam(name="ref_base_labels", prompt="Which atom(s) are at the base of the first vector? "),
-        AtomLabelsParam(name="ref_tip_labels", prompt="Which atom(s) are at the tip of the first vector? "),
-        ChoiceParam(name="obs_base_source", prompt="Base atom of second vector?", choices=["r", "o"], default="o"),
-        ChoiceParam(name="obs_tip_source", prompt="Tip atom of second vector?", choices=["r", "o"], default="o"),
-        AtomLabelsParam(name="obs_base_labels", prompt="Which atom(s) are at the base of the second vector? "),
-        AtomLabelsParam(name="obs_tip_labels", prompt="Which atom(s) are at the tip of the second vector? "),
-        When(
-            source="ref_tip_labels",
-            op="unordered==",
-            value_source="obs_base_labels",
-            steps=[
-                BoolParam(
-                    name="enforce_shared_atom",
-                    prompt="Should the tip atom of the reference vector and the base atom of the observed vector be the same atom?",
-                    default=True,
-                ),
-            ],
-        ),
-        IntParam(name="bin_count", prompt="Enter the number of bins for ADF calculation: ", default=180, minval=1),
-        FloatParam(name="v1_cutoff", prompt="Enter maximum length for the first vector: ", default=None, display_default="None", minval=0.0, allow_none=True),
-        FloatParam(name="v2_cutoff", prompt="Enter maximum length for the second vector: ", default=None, display_default="None", minval=0.0, allow_none=True),
+        angle_spec_schema(name="axis", label="the ADF angle channel"),
     ]
 
     def configure(self, config: ADFConfig):
         self.bind_config(config)
         (self.ref_type, self.ref_key), = self.resolve_compound_types([self.ref_compound_index])
-        (self.obs_type, self.obs_key), = self.resolve_compound_types([self.obs_compound_index])
-        topology_frame = self.traj.topology_frame
-
-        self.ref_base_selection = topology_frame.resolve_selection(
-            self.ref_type if self.ref_base_source == "r" else self.obs_type,
-            self.ref_base_labels,
-        )
-        self.ref_tip_selection = topology_frame.resolve_selection(
-            self.ref_type if self.ref_tip_source == "r" else self.obs_type,
-            self.ref_tip_labels,
-        )
-        self.obs_base_selection = topology_frame.resolve_selection(
-            self.obs_type if self.obs_base_source == "o" else self.ref_type,
-            self.obs_base_labels,
-        )
-        self.obs_tip_selection = topology_frame.resolve_selection(
-            self.obs_type if self.obs_tip_source == "o" else self.ref_type,
-            self.obs_tip_labels,
-        )
-
-        self.angle_edges = np.linspace(0, 180, self.bin_count + 1)
-        self.channel = AngleChannel(
-            ref_key=self.ref_key,
-            obs_key=self.obs_key,
-            ref_base_source=self.ref_base_source,
-            ref_tip_source=self.ref_tip_source,
-            obs_base_source=self.obs_base_source,
-            obs_tip_source=self.obs_tip_source,
-            ref_base_local_indices=self.ref_base_selection.local_indices,
-            ref_tip_local_indices=self.ref_tip_selection.local_indices,
-            obs_base_local_indices=self.obs_base_selection.local_indices,
-            obs_tip_local_indices=self.obs_tip_selection.local_indices,
-            bin_edges=self.angle_edges,
-            output_name="angle/deg",
-            enforce_shared_atom=self.enforce_shared_atom,
-            v1_cutoff=self.v1_cutoff,
-            v2_cutoff=self.v2_cutoff,
-        )
+        (
+            self.obs_type,
+            self.obs_key,
+            self.ref_base_selection,
+            self.ref_tip_selection,
+            self.obs_base_selection,
+            self.obs_tip_selection,
+            self.channel,
+        ) = build_angle_channel(self, self.ref_type, self.ref_key, self.axis, output_name="angle/deg")
+        self.angle_edges = self.channel.bin_edges
         self.rebuild_runtime_state()
         if any(arr.size == 0 for arr in (self.ref_base_ids, self.ref_tip_ids, self.obs_base_ids, self.obs_tip_ids)):
             raise ValueError("No angle vectors matched the given labels in the initial frame.")
@@ -163,7 +87,7 @@ class ADF(BaseAnalysis):
         batch = self.channel.build_batch(self.traj)
         all_angles = []
         for ref_molecule_index in range(batch.n_references):
-            angles = self.channel.samples_for_reference(batch, ref_molecule_index).values
+            angles = self.channel.values_for_reference(batch, ref_molecule_index)
             if angles.size:
                 all_angles.append(angles)
         if all_angles:
@@ -181,14 +105,14 @@ class ADF(BaseAnalysis):
         self.hist.counts *= sin_weights
         self.hist.counts /= (self.processed_frames * self.n_ref * self.n_obs)
 
-        self.hist.normalize(method="total", total=self.bin_count * 100)
+        self.hist.normalize(method="total", total=self.axis.bin_count * 100)
         fname = build_output_filename(
             "adf",
             [
-                format_selection(self.ref_base_labels, self.ref_type.formula if self.ref_base_source == "r" else self.obs_type.formula),
-                format_selection(self.ref_tip_labels, self.ref_type.formula if self.ref_tip_source == "r" else self.obs_type.formula),
-                format_selection(self.obs_base_labels, self.obs_type.formula if self.obs_base_source == "o" else self.ref_type.formula),
-                format_selection(self.obs_tip_labels, self.obs_type.formula if self.obs_tip_source == "o" else self.ref_type.formula),
+                format_selection(self.axis.ref_base_labels, self.ref_type.formula if self.axis.ref_base_source == "r" else self.obs_type.formula),
+                format_selection(self.axis.ref_tip_labels, self.ref_type.formula if self.axis.ref_tip_source == "r" else self.obs_type.formula),
+                format_selection(self.axis.obs_base_labels, self.obs_type.formula if self.axis.obs_base_source == "o" else self.ref_type.formula),
+                format_selection(self.axis.obs_tip_labels, self.obs_type.formula if self.axis.obs_tip_source == "o" else self.ref_type.formula),
             ],
         )
         write_histogram_1d(fname, self.hist, headers=["angle/deg", "ADF"])

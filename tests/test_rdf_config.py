@@ -13,6 +13,7 @@ from io_support.input_providers import FileInputProvider, NullInputProvider
 if importlib.util.find_spec("scipy") is None:
     RDFConfig = None
 else:
+    from analyses.common.channel_specs import DistanceSpec
     from analyses.rdf_analysis import RDF, RDFConfig
 
 class DummyTrajectory:
@@ -49,28 +50,30 @@ class RDFConfigTests(unittest.TestCase):
     def test_rdf_config_validates_inputs(self):
         RDFConfig(
             ref_compound_index=0,
-            obs_compound_index=0,
-            ref_labels=["O"],
-            obs_labels=["H"],
+            axis=DistanceSpec(
+                obs_compound_index=0,
+                ref_labels=["O"],
+                obs_labels=["H"],
+            ),
         )
 
         with self.assertRaises(ValueError):
             RDFConfig(
                 ref_compound_index=-1,
-                obs_compound_index=0,
-                ref_labels=["O"],
-                obs_labels=["H"],
+                axis=DistanceSpec(
+                    obs_compound_index=0,
+                    ref_labels=["O"],
+                    obs_labels=["H"],
+                ),
             )
         with self.assertRaises(ValueError):
-            RDFConfig(
-                ref_compound_index=0,
+            DistanceSpec(
                 obs_compound_index=0,
                 ref_labels=[],
                 obs_labels=["H"],
             )
         with self.assertRaises(ValueError):
-            RDFConfig(
-                ref_compound_index=0,
+            DistanceSpec(
                 obs_compound_index=0,
                 ref_labels=["O"],
                 obs_labels=["H"],
@@ -83,11 +86,13 @@ class RDFConfigTests(unittest.TestCase):
         rdf.configure(
             RDFConfig(
                 ref_compound_index=0,
-                obs_compound_index=0,
-                ref_labels=["O"],
-                obs_labels=["H"],
-                max_distance=2.0,
-                bin_count=2,
+                axis=DistanceSpec(
+                    obs_compound_index=0,
+                    ref_labels=["O"],
+                    obs_labels=["H"],
+                    max_distance=2.0,
+                    bin_count=2,
+                ),
             )
         )
 
@@ -109,11 +114,13 @@ class RDFConfigTests(unittest.TestCase):
             config,
             RDFConfig(
                 ref_compound_index=0,
-                obs_compound_index=0,
-                ref_labels=["O"],
-                obs_labels=["H"],
-                max_distance=2.5,
-                bin_count=4,
+                axis=DistanceSpec(
+                    obs_compound_index=0,
+                    ref_labels=["O"],
+                    obs_labels=["H"],
+                    max_distance=2.5,
+                    bin_count=4,
+                ),
             ),
         )
 
@@ -140,11 +147,13 @@ class RDFConfigTests(unittest.TestCase):
         rdf.configure(
             RDFConfig(
                 ref_compound_index=0,
-                obs_compound_index=0,
-                ref_labels=["O"],
-                obs_labels=["H"],
-                max_distance=2.0,
-                bin_count=2,
+                axis=DistanceSpec(
+                    obs_compound_index=0,
+                    ref_labels=["O"],
+                    obs_labels=["H"],
+                    max_distance=2.0,
+                    bin_count=2,
+                ),
             )
         )
 
@@ -170,11 +179,13 @@ class RDFConfigTests(unittest.TestCase):
         rdf.configure(
             RDFConfig(
                 ref_compound_index=0,
-                obs_compound_index=0,
-                ref_labels=["O"],
-                obs_labels=["H"],
-                max_distance=2.0,
-                bin_count=2,
+                axis=DistanceSpec(
+                    obs_compound_index=0,
+                    ref_labels=["O"],
+                    obs_labels=["H"],
+                    max_distance=2.0,
+                    bin_count=2,
+                ),
             )
         )
         rdf.configure_frame_loop(FrameLoopConfig(start_frame=1, nframes=1, frame_stride=1, update_compounds=False))

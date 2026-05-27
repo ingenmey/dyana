@@ -47,6 +47,7 @@ class RDFEndToEndTests(unittest.TestCase):
         np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
 
     def test_programmatic_prepared_setup_path_reproduces_reference_rdf(self):
+        from analyses.common.channel_specs import DistanceSpec
         from analyses.rdf_analysis import RDF, RDFConfig
         from workflow.workflow_prompts import WorkflowPrompts
 
@@ -63,11 +64,13 @@ class RDFEndToEndTests(unittest.TestCase):
                 analysis.configure(
                     RDFConfig(
                         ref_compound_index=0,
-                        obs_compound_index=0,
-                        ref_labels=["O"],
-                        obs_labels=["H"],
-                        max_distance=10.0,
-                        bin_count=1000,
+                        axis=DistanceSpec(
+                            obs_compound_index=0,
+                            ref_labels=["O"],
+                            obs_labels=["H"],
+                            max_distance=10.0,
+                            bin_count=1000,
+                        ),
                     )
                 )
                 analysis.configure_frame_loop(
@@ -110,6 +113,7 @@ class RDFEndToEndTests(unittest.TestCase):
             trajectory_loader.BOND_DISTANCE_OVERRIDES.update(original_overrides)
 
     def test_static_topology_h3o2_rdf_differs_from_dynamic_reference(self):
+        from analyses.common.channel_specs import DistanceSpec
         from analyses.rdf_analysis import RDF, RDFConfig
         from core.trajectory_loader import load_trajectory
 
@@ -133,11 +137,13 @@ class RDFEndToEndTests(unittest.TestCase):
                         analysis.configure(
                             RDFConfig(
                                 ref_compound_index=1,
-                                obs_compound_index=1,
-                                ref_labels=["O"],
-                                obs_labels=["H1"],
-                                max_distance=10.0,
-                                bin_count=1000,
+                                axis=DistanceSpec(
+                                    obs_compound_index=1,
+                                    ref_labels=["O"],
+                                    obs_labels=["H1"],
+                                    max_distance=10.0,
+                                    bin_count=1000,
+                                ),
                             )
                         )
                         analysis.configure_frame_loop(

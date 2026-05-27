@@ -9,11 +9,11 @@
   ║                            (        ║
   ╚═════════════════════════════════════╝
 
-Started: 2026-05-26 14:48:09 CEST
+Started: 2026-05-26 15:03:18 CEST
 Trajectory: /mnt/d/python/dyana/tests/fixtures/koh_h2o.xyz (xyz)
-Output dir: /mnt/d/python/dyana/tests/fixtures/test
-Console log: /mnt/d/python/dyana/tests/fixtures/test/dyana.log
-Input log: /mnt/d/python/dyana/tests/fixtures/test/input.log
+Output dir: /mnt/d/python/dyana/tests/fixtures/test2
+Console log: /mnt/d/python/dyana/tests/fixtures/test2/dyana.log
+Input log: /mnt/d/python/dyana/tests/fixtures/test2/input.log
 
 Topology Setup
 Enter cell vector length in X dimension (in Angstrom):  22.7274
@@ -55,7 +55,7 @@ Compound 4 (K) bond length matrix:
 
 Draw compounds to PDF? [No] 
 Accept these molecules (y) or change something (n) [Yes] n
-Break bonds (1) or repeat molecule recognition at specific frame (2)? [1] 1
+Break bonds (1) or repeat molecule recognition at specific frame (2)? [1] 
 
 Current compounds:
   1: H2O (Number: 139)
@@ -128,7 +128,7 @@ Local Structure
   lsi: Local structure index
   q6: Steinhardt q6/Q6 order parameter
 
-Choose an analysis:  cdf
+Choose an analysis:  rdf
 
 Analysis Setup
 
@@ -137,40 +137,20 @@ Available compounds:
   2: K (Number: 150)
   3: O (Number: 300)
 
-Choose the reference compound (number):  [1] 1
-
-Configure the X axis.
-X-axis channel kind? (distance/angle) [distance] 
+Choose the reference compound (number):  [1] 
 
 Available compounds:
   1: H (Number: 450)
   2: K (Number: 150)
   3: O (Number: 300)
 
-Choose the observed compound for the X axis (number):  [1] 3
+Choose the observed compound (number):  [1] 3
 Available labels: H1
-Which reference atom(s) define the X distance axis? (comma-separated)  H
+Which atom(s) in reference compound 1 (H)? (comma-separated)  H
 Available labels: O1
-Which observed atom(s) define the X distance axis? (comma-separated)  O
-Enter the maximum distance for the X axis (in Angstrom):  [10.0] 5
-Enter the number of bins for the X axis:  [1000] 500
-
-Configure the Y axis.
-Y-axis channel kind? (distance/angle) [distance] 
-
-Available compounds:
-  1: H (Number: 450)
-  2: K (Number: 150)
-  3: O (Number: 300)
-
-Choose the observed compound for the Y axis (number):  [1] 3
-Available labels: H1
-Which reference atom(s) define the Y distance axis? (comma-separated)  H
-Available labels: O1
-Which observed atom(s) define the Y distance axis? (comma-separated)  O
-Enter the maximum distance for the Y axis (in Angstrom):  [10.0] 5
-Enter the number of bins for the Y axis:  [1000] 500
-How should both axes be combined? (same_context/second_context) [same_context] 
+Which atom(s) in observed compound 3 (O)? (comma-separated)  O
+Enter the maximum distance for RDF calculation (in Angstrom):  [10.0] 5
+Enter the number of bins for RDF calculation:  [1000] 500
 
 Frame Loop
 Perform molecule recognition and update compound list in each frame? [No] 
@@ -184,6 +164,5 @@ Running analysis...
 
 Results
 Processed frames: 14
-+ Saved joint CDF results to cdf_joint_x_dist_H-H_O-O_y_dist_H-H_O-O.dat
-+ Saved X-axis CDF marginal to cdf_x_x_dist_H-H_O-O.dat
-+ Saved Y-axis CDF marginal to cdf_y_y_dist_H-H_O-O.dat
+! Output file rdf_H-H_O-O.dat already existed; moved the previous file to #1#rdf_H-H_O-O.dat and shifted 2 older backup(s).
++ Saved RDF results to rdf_H-H_O-O.dat

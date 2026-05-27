@@ -1,0 +1,96 @@
+# Enter cell vector length in X dimension (in Å):
+22.7274
+# Enter cell vector length in Y dimension (in Å):
+22.7274
+# Enter cell vector length in Z dimension (in Å):
+22.7274
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+n
+# Break bonds (1) or repeat molecule recognition at specific frame (2)? [1]
+1
+# Which compound to modify? [[done]]
+1
+# First atom label to break bond (e.g., O1):
+O1
+# Second atom label to break bond (e.g., H2):
+H1
+# Which compound to modify? [[done]]
+1
+# First atom label to break bond (e.g., O1):
+O1
+# Second atom label to break bond (e.g., H2):
+H2
+# Which compound to modify? [[done]]
+2
+# First atom label to break bond (e.g., O1):
+O1
+# Second atom label to break bond (e.g., H2):
+H1
+# Which compound to modify? [[done]]
+2
+# First atom label to break bond (e.g., O1):
+O1
+# Second atom label to break bond (e.g., H2):
+H2
+# Which compound to modify? [[done]]
+2
+# First atom label to break bond (e.g., O1):
+O2
+# Second atom label to break bond (e.g., H2):
+H1
+# Which compound to modify? [[done]]
+2
+# First atom label to break bond (e.g., O1):
+O2
+# Second atom label to break bond (e.g., H2):
+H3
+# Which compound to modify? [[done]]
+3
+# First atom label to break bond (e.g., O1):
+O1
+# Second atom label to break bond (e.g., H2):
+H1
+# Which compound to modify? [[done]]
+
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+n
+# Break bonds (1) or repeat molecule recognition at specific frame (2)? [1]
+
+# Which compound to modify? [[done]]
+2
+# First atom label to break bond (e.g., O1):
+O1
+# Second atom label to break bond (e.g., H2):
+H1
+# Which compound to modify? [[done]]
+
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+
+# Choose an analysis:
+rdf
+# Choose the reference compound (number):  [1]
+1
+# Choose the observed compound (number):  [1]
+3
+# Which atom(s) in reference compound? (comma-separated)
+H
+# Which atom(s) in observed compound? (comma-separated)
+O
+# Enter the maximum distance for RDF calculation (in Å):  [10.0]
+5
+# Enter the number of bins for RDF calculation:  [500]
+500
+# Perform molecule recognition and update compound list in each frame? [No]
+
+# In which trajectory frame to start processing the trajectory? [1]
+
+# How many trajectory frames to read (from this position on)? [all]
+
+# Use every n-th read trajectory frame for the analysis: [1]
+

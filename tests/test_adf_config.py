@@ -14,6 +14,7 @@ if importlib.util.find_spec("scipy") is None:
     ADF = None
     ADFConfig = None
 else:
+    from analyses.common.channel_specs import AngleSpec
     from analyses.adf_analysis import ADF, ADFConfig
 
 class DummyTrajectory:
@@ -69,20 +70,7 @@ class ADFConfigTests(unittest.TestCase):
     def test_adf_config_validates_inputs(self):
         ADFConfig(
             ref_compound_index=0,
-            obs_compound_index=1,
-            ref_base_source="r",
-            ref_tip_source="r",
-            ref_base_labels=["O"],
-            ref_tip_labels=["H"],
-            obs_base_source="o",
-            obs_tip_source="o",
-            obs_base_labels=["O"],
-            obs_tip_labels=["H"],
-        )
-
-        with self.assertRaises(ValueError):
-            ADFConfig(
-                ref_compound_index=-1,
+            axis=AngleSpec(
                 obs_compound_index=1,
                 ref_base_source="r",
                 ref_tip_source="r",
@@ -92,10 +80,26 @@ class ADFConfigTests(unittest.TestCase):
                 obs_tip_source="o",
                 obs_base_labels=["O"],
                 obs_tip_labels=["H"],
-            )
+            ),
+        )
+
         with self.assertRaises(ValueError):
             ADFConfig(
-                ref_compound_index=0,
+                ref_compound_index=-1,
+                axis=AngleSpec(
+                    obs_compound_index=1,
+                    ref_base_source="r",
+                    ref_tip_source="r",
+                    ref_base_labels=["O"],
+                    ref_tip_labels=["H"],
+                    obs_base_source="o",
+                    obs_tip_source="o",
+                    obs_base_labels=["O"],
+                    obs_tip_labels=["H"],
+                ),
+            )
+        with self.assertRaises(ValueError):
+            AngleSpec(
                 obs_compound_index=1,
                 ref_base_source="x",
                 ref_tip_source="r",
@@ -120,19 +124,21 @@ class ADFConfigTests(unittest.TestCase):
             config,
             ADFConfig(
                 ref_compound_index=0,
-                obs_compound_index=1,
-                ref_base_source="r",
-                ref_tip_source="r",
-                ref_base_labels=["O", "C"],
-                ref_tip_labels=["H"],
-                obs_base_source="o",
-                obs_tip_source="o",
-                obs_base_labels=["H"],
-                obs_tip_labels=["H", "O"],
-                enforce_shared_atom=True,
-                bin_count=12,
-                v1_cutoff=None,
-                v2_cutoff=3.0,
+                axis=AngleSpec(
+                    obs_compound_index=1,
+                    ref_base_source="r",
+                    ref_tip_source="r",
+                    ref_base_labels=["O", "C"],
+                    ref_tip_labels=["H"],
+                    obs_base_source="o",
+                    obs_tip_source="o",
+                    obs_base_labels=["H"],
+                    obs_tip_labels=["H", "O"],
+                    enforce_shared_atom=True,
+                    bin_count=12,
+                    v1_cutoff=None,
+                    v2_cutoff=3.0,
+                ),
             ),
         )
 
@@ -141,16 +147,18 @@ class ADFConfigTests(unittest.TestCase):
         analysis.configure(
             ADFConfig(
                 ref_compound_index=0,
-                obs_compound_index=1,
-                ref_base_source="r",
-                ref_tip_source="r",
-                ref_base_labels=["O"],
-                ref_tip_labels=["H"],
-                obs_base_source="o",
-                obs_tip_source="o",
-                obs_base_labels=["O"],
-                obs_tip_labels=["H"],
-                bin_count=18,
+                axis=AngleSpec(
+                    obs_compound_index=1,
+                    ref_base_source="r",
+                    ref_tip_source="r",
+                    ref_base_labels=["O"],
+                    ref_tip_labels=["H"],
+                    obs_base_source="o",
+                    obs_tip_source="o",
+                    obs_base_labels=["O"],
+                    obs_tip_labels=["H"],
+                    bin_count=18,
+                ),
             )
         )
 
@@ -166,16 +174,18 @@ class ADFConfigTests(unittest.TestCase):
         analysis.configure(
             ADFConfig(
                 ref_compound_index=0,
-                obs_compound_index=1,
-                ref_base_source="r",
-                ref_tip_source="r",
-                ref_base_labels=["O"],
-                ref_tip_labels=["H"],
-                obs_base_source="o",
-                obs_tip_source="o",
-                obs_base_labels=["O"],
-                obs_tip_labels=["H"],
-                bin_count=18,
+                axis=AngleSpec(
+                    obs_compound_index=1,
+                    ref_base_source="r",
+                    ref_tip_source="r",
+                    ref_base_labels=["O"],
+                    ref_tip_labels=["H"],
+                    obs_base_source="o",
+                    obs_tip_source="o",
+                    obs_base_labels=["O"],
+                    obs_tip_labels=["H"],
+                    bin_count=18,
+                ),
             )
         )
         analysis.configure_frame_loop(FrameLoopConfig(start_frame=1, nframes=1, frame_stride=1, update_compounds=False))
