@@ -22,8 +22,10 @@ AVAILABLE_ANALYSES = [
 
     ("s", "Density / Counting"),
     ("a", "dens", "Particle density", "analyses.density_analysis", "DensityAnalysis"),
-    ("a", "ncount", "Neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
-    ("a", "rncount", "Resolved neighbour-count probability", "analyses.resolved_neighbor_count_analysis", "ResolvedNeighborCountAnalysis"),
+    ("a", "ncount", "Resolved neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
+
+    ("s", "Clustering"),
+    ("a", "cluster", "Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
 
     ("s", "Local Structure"),
     ("a", "top", "Tetrahedral order parameter", "analyses.top_analysis", "TetrahedralOrderAnalysis"),
@@ -33,7 +35,6 @@ AVAILABLE_ANALYSES = [
     # ("s", "Legacy"),
     # ("a", "adf3b", "Threebody Angular distribution function", "analyses.adf3b_analysis", "ADFThreeBody"),
     # ("a", "percolation", "Hydrogen bond percolation", "analyses.percolation_analysis", "PercolationAnalysis"),
-    # ("a", "cluster", "Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
     # ("a", "dacf", "Dimer existence auto-correlation function", "analyses.dacf_analysis", "DACFAnalysis"),
     # ("a", "pccf", "Proton coupling correlation function", "analyses.pccf_analysis", "PCCFAnalysis"),
     # ("a", "cmsd", "Charge mean square displacement", "analyses.charge_msd_analysis", "ChargeMSDAnalysis"),

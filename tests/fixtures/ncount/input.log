@@ -12,10 +12,10 @@ O
 2
 # Which atom(s) in observed compound 2 (C4H8O)? (comma-separated)
 O
-# Exclude observed atoms that belong to the same molecule as the reference atom? [Yes]
-
 # Neighbour cutoff distance Angstrom:  [3.5]
 4.0
+# Add another observable? [No]
+
 # Perform molecule recognition and update compound list in each frame? [No]
 
 # In which trajectory frame to start processing the trajectory? [1]
@@ -23,4 +23,3 @@ O
 # How many trajectory frames to read (from this position on)? [all]
 
 # Use every n-th read trajectory frame for the analysis: [1]
-

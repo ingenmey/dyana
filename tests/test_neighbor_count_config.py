@@ -6,15 +6,23 @@ from pathlib import Path
 
 import numpy as np
 
-from framework.config_schema import FrameLoopConfig
 from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
+from framework.config_schema import FrameLoopConfig
 from io_support.input_providers import FileInputProvider, NullInputProvider
 
 if importlib.util.find_spec("scipy") is None:
     NeighborCountAnalysis = None
     NeighborCountConfig = None
+    ObservableConfig = None
+    ObservedSiteConfig = None
 else:
-    from analyses.neighbor_count_analysis import NeighborCountAnalysis, NeighborCountConfig
+    from analyses.neighbor_count_analysis import (
+        NeighborCountAnalysis,
+        NeighborCountConfig,
+        ObservableConfig,
+        ObservedSiteConfig,
+    )
+
 
 class DummyTrajectory:
     def __init__(self):
@@ -69,36 +77,27 @@ class NeighborCountConfigTests(unittest.TestCase):
     def test_neighbor_count_config_validates_inputs(self):
         NeighborCountConfig(
             ref_compound_index=0,
-            ref_labels=["O"],
-            obs_compound_indices=[0, 1],
-            obs_labels_per_compound={0: ["H"], 1: ["Na"]},
+            observables=[
+                ObservableConfig(
+                    ref_labels=["O"],
+                    observed_sites=[
+                        ObservedSiteConfig(compound_index=0, labels=["H"], cutoff=3.0),
+                        ObservedSiteConfig(compound_index=1, labels=["Na"], cutoff=3.0),
+                    ],
+                ),
+            ],
         )
 
         with self.assertRaises(ValueError):
-            NeighborCountConfig(
-                ref_compound_index=-1,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={0: ["H"]},
-            )
+            NeighborCountConfig(ref_compound_index=-1, observables=[])
         with self.assertRaises(ValueError):
-            NeighborCountConfig(
-                ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[],
-                obs_labels_per_compound={},
-            )
+            ObservableConfig(ref_labels=["O", "H"], observed_sites=[ObservedSiteConfig(compound_index=0, labels=["H"], cutoff=3.0)])
         with self.assertRaises(ValueError):
-            NeighborCountConfig(
-                ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={},
-            )
+            ObservedSiteConfig(compound_index=0, labels=[], cutoff=3.0)
 
-    def test_prompt_config_builds_custom_dynamic_config(self):
+    def test_prompt_config_builds_nested_configuration(self):
         provider = FileInputProvider(
-            lines=["1", "O", "1,2", "H", "Na", "y", "3.0"],
+            lines=["1", "O", "1,2", "H", "3.0", "Na", "3.0", "n"],
             fallback=NullInputProvider(),
         )
         analysis = NeighborCountAnalysis(DummyTrajectory(), input_provider=provider)
@@ -109,48 +108,54 @@ class NeighborCountConfigTests(unittest.TestCase):
             config,
             NeighborCountConfig(
                 ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0, 1],
-                obs_labels_per_compound={0: ["H"], 1: ["Na"]},
-                exclude_same_molecule=True,
-                r_cut=3.0,
+                observables=[
+                    ObservableConfig(
+                        ref_labels=["O"],
+                        observed_sites=[
+                            ObservedSiteConfig(compound_index=0, labels=["H"], cutoff=3.0),
+                            ObservedSiteConfig(compound_index=1, labels=["Na"], cutoff=3.0),
+                        ],
+                    ),
+                ],
             ),
         )
 
-    def test_configure_sets_up_indices(self):
+    def test_configure_sets_up_observables(self):
         analysis = NeighborCountAnalysis(DummyTrajectory())
         analysis.configure(
             NeighborCountConfig(
                 ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0, 1],
-                obs_labels_per_compound={0: ["H"], 1: ["Na"]},
-                exclude_same_molecule=True,
-                r_cut=3.0,
+                observables=[
+                    ObservableConfig(
+                        ref_labels=["O"],
+                        observed_sites=[
+                            ObservedSiteConfig(compound_index=0, labels=["H"], cutoff=3.0),
+                            ObservedSiteConfig(compound_index=1, labels=["Na"], cutoff=3.0),
+                        ],
+                    ),
+                ],
             )
         )
 
-        self.assertEqual(analysis.ref_indices.tolist(), [0])
-        self.assertEqual(sorted(analysis.obs_indices.tolist()), [1, 2, 3])
-        self.assertEqual(analysis.ref_selection.local_indices, (2,))
-        self.assertEqual(analysis.obs_selections_by_key[("H2O", (), "water")].local_indices, (0, 1))
-        self.assertEqual(tuple(analysis.ref_type.canonical_labels[i] for i in analysis.ref_selection.local_indices), ("O1",))
-        water_type = analysis.obs_types[0]
-        self.assertEqual(
-            tuple(water_type.canonical_labels[i] for i in analysis.obs_selections_by_key[("H2O", (), "water")].local_indices),
-            ("H1", "H2"),
-        )
+        self.assertEqual(analysis.observables[0].ref_labels, ["O"])
+        self.assertEqual(analysis.observables[0].ref_atom_ids.tolist(), [0])
+        self.assertEqual(analysis.observables[0].observed_sites[0].atom_ids.tolist(), [1, 2])
+        self.assertEqual(analysis.observables[0].observed_sites[1].atom_ids.tolist(), [3])
 
     def test_run_uses_programmatic_configuration_without_prompting(self):
         analysis = NeighborCountAnalysis(DummyTrajectory(), input_provider=NullInputProvider())
         analysis.configure(
             NeighborCountConfig(
                 ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0, 1],
-                obs_labels_per_compound={0: ["H"], 1: ["Na"]},
-                exclude_same_molecule=True,
-                r_cut=3.0,
+                observables=[
+                    ObservableConfig(
+                        ref_labels=["O"],
+                        observed_sites=[
+                            ObservedSiteConfig(compound_index=0, labels=["H"], cutoff=3.0),
+                            ObservedSiteConfig(compound_index=1, labels=["Na"], cutoff=3.0),
+                        ],
+                    ),
+                ],
             )
         )
         analysis.configure_frame_loop(FrameLoopConfig(start_frame=1, nframes=1, frame_stride=1, update_compounds=False))
@@ -160,9 +165,11 @@ class NeighborCountConfigTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 analysis.run()
-                output = Path("ncount_O-H2O_H-H2O+Na-Na.dat")
-                self.assertTrue(output.exists())
-                text = output.read_text(encoding="utf-8")
+                joint_output = Path("ncount_joint_O-H2O_H-H2O+Na-Na.dat")
+                marginal_output = Path("ncount_obs1_O-H2O_H-H2O+Na-Na.dat")
+                self.assertTrue(joint_output.exists())
+                self.assertTrue(marginal_output.exists())
+                text = marginal_output.read_text(encoding="utf-8")
             finally:
                 os.chdir(cwd)
 
@@ -173,7 +180,7 @@ class NeighborCountConfigTests(unittest.TestCase):
                 continue
             rows.append([float(value) for value in stripped.split()])
 
-        self.assertIn("P(n)", text)
+        self.assertIn("P(N1)", text)
         self.assertEqual(rows, [[0.0, 0.0], [1.0, 1.0]])
 
 

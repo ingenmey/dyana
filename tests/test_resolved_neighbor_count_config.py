@@ -13,14 +13,14 @@ from io_support.input_providers import FileInputProvider, NullInputProvider
 if importlib.util.find_spec("scipy") is None:
     ObservableConfig = None
     ObservedSiteConfig = None
-    ResolvedNeighborCountAnalysis = None
-    ResolvedNeighborCountConfig = None
+    NeighborCountAnalysis = None
+    NeighborCountConfig = None
 else:
-    from analyses.resolved_neighbor_count_analysis import (
+    from analyses.neighbor_count_analysis import (
+        NeighborCountAnalysis,
+        NeighborCountConfig,
         ObservableConfig,
         ObservedSiteConfig,
-        ResolvedNeighborCountAnalysis,
-        ResolvedNeighborCountConfig,
     )
 
 
@@ -102,10 +102,50 @@ class DummyTrajectory:
         raise ValueError("End of trajectory")
 
 
-@unittest.skipIf(ResolvedNeighborCountConfig is None, "scipy is not installed")
+class SameCompoundTrajectory:
+    def __init__(self):
+        self.box_size = np.array([20.0, 20.0, 20.0], dtype=float)
+        self.coords = np.array(
+            [
+                [0.0, 0.0, 0.0],   # O1 water 1
+                [1.0, 0.0, 0.0],   # H1 water 1
+                [19.0, 0.0, 0.0],  # H2 water 1
+                [3.0, 0.0, 0.0],   # O2 water 2
+                [4.0, 0.0, 0.0],   # H3 water 2
+                [2.0, 0.0, 0.0],   # H4 water 2
+            ],
+            dtype=float,
+        )
+
+        water_type = CompoundType(
+            type_id=0,
+            key=("H2O", (), "water"),
+            formula="H2O",
+            canonical_labels=("H1", "H2", "O1"),
+            label_to_local_index={"H1": 0, "H2": 1, "O1": 2},
+            local_bonds=((0, 2), (1, 2)),
+            local_elements=("H", "H", "O"),
+            atomic_masses=(1.0, 1.0, 16.0),
+        )
+        self.topology_registry = CompoundTypeRegistry([water_type])
+        self.topology_frame = TopologyFrame(
+            registry=self.topology_registry,
+            molecule_atom_ids_by_key={
+                ("H2O", (), "water"): np.array([[1, 2, 0], [4, 5, 3]], dtype=np.int32),
+            },
+            atom_to_type_id=np.array([0, 0, 0, 0, 0, 0], dtype=np.int32),
+            atom_to_molecule_index=np.array([0, 0, 0, 1, 1, 1], dtype=np.int32),
+            atom_to_local_index=np.array([2, 0, 1, 2, 0, 1], dtype=np.int32),
+        )
+
+    def read_frame(self):
+        raise ValueError("End of trajectory")
+
+
+@unittest.skipIf(NeighborCountConfig is None, "scipy is not installed")
 class ResolvedNeighborCountConfigTests(unittest.TestCase):
     def test_config_validates_nested_inputs(self):
-        ResolvedNeighborCountConfig(
+        NeighborCountConfig(
             ref_compound_index=0,
             observables=[
                 ObservableConfig(
@@ -118,7 +158,7 @@ class ResolvedNeighborCountConfigTests(unittest.TestCase):
         )
 
         with self.assertRaises(ValueError):
-            ResolvedNeighborCountConfig(ref_compound_index=-1, observables=[])
+            NeighborCountConfig(ref_compound_index=-1, observables=[])
         with self.assertRaises(ValueError):
             ObservableConfig(ref_labels=["K1", "K2"], observed_sites=[ObservedSiteConfig(1, ["O"], 1.5)])
         with self.assertRaises(ValueError):
@@ -132,40 +172,37 @@ class ResolvedNeighborCountConfigTests(unittest.TestCase):
                 "2,3",
                 "O",
                 "1.5",
-                "",
                 "O",
                 "2.0",
-                "",
                 "y",
                 "K1",
                 "4",
                 "Cl",
                 "1.5",
-                "",
                 "n",
             ],
             fallback=NullInputProvider(),
         )
-        analysis = ResolvedNeighborCountAnalysis(DummyTrajectory(), input_provider=provider)
+        analysis = NeighborCountAnalysis(DummyTrajectory(), input_provider=provider)
 
         config = analysis.prompt_config()
 
         self.assertEqual(
             config,
-            ResolvedNeighborCountConfig(
+            NeighborCountConfig(
                 ref_compound_index=0,
                 observables=[
                     ObservableConfig(
                         ref_labels=["K1"],
                         observed_sites=[
-                            ObservedSiteConfig(compound_index=1, labels=["O"], cutoff=1.5, exclude_same_molecule=True),
-                            ObservedSiteConfig(compound_index=2, labels=["O"], cutoff=2.0, exclude_same_molecule=True),
+                            ObservedSiteConfig(compound_index=1, labels=["O"], cutoff=1.5),
+                            ObservedSiteConfig(compound_index=2, labels=["O"], cutoff=2.0),
                         ],
                     ),
                     ObservableConfig(
                         ref_labels=["K1"],
                         observed_sites=[
-                            ObservedSiteConfig(compound_index=3, labels=["Cl"], cutoff=1.5, exclude_same_molecule=True),
+                            ObservedSiteConfig(compound_index=3, labels=["Cl"], cutoff=1.5),
                         ],
                     ),
                 ],
@@ -173,9 +210,9 @@ class ResolvedNeighborCountConfigTests(unittest.TestCase):
         )
 
     def test_run_writes_joint_and_marginal_outputs(self):
-        analysis = ResolvedNeighborCountAnalysis(DummyTrajectory(), input_provider=NullInputProvider())
+        analysis = NeighborCountAnalysis(DummyTrajectory(), input_provider=NullInputProvider())
         analysis.configure(
-            ResolvedNeighborCountConfig(
+            NeighborCountConfig(
                 ref_compound_index=0,
                 observables=[
                     ObservableConfig(
@@ -201,9 +238,9 @@ class ResolvedNeighborCountConfigTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 analysis.run()
-                joint_output = Path("rncount_joint_K1-K_O-H2O+O-HO_K1-K_Cl-Cl.dat")
-                marginal_1 = Path("rncount_obs1_K1-K_O-H2O+O-HO.dat")
-                marginal_2 = Path("rncount_obs2_K1-K_Cl-Cl.dat")
+                joint_output = Path("ncount_joint_K1-K_O-H2O+O-HO_K1-K_Cl-Cl.dat")
+                marginal_1 = Path("ncount_obs1_K1-K_O-H2O+O-HO.dat")
+                marginal_2 = Path("ncount_obs2_K1-K_Cl-Cl.dat")
                 self.assertTrue(joint_output.exists())
                 self.assertTrue(marginal_1.exists())
                 self.assertTrue(marginal_2.exists())
@@ -226,6 +263,27 @@ class ResolvedNeighborCountConfigTests(unittest.TestCase):
         np.testing.assert_allclose(joint_rows, np.array([[1.0, 0.0, 0.5], [2.0, 1.0, 0.5]]))
         np.testing.assert_allclose(marginal_1_rows, np.array([[0.0, 0.0], [1.0, 0.5], [2.0, 0.5]]))
         np.testing.assert_allclose(marginal_2_rows, np.array([[0.0, 0.5], [1.0, 0.5]]))
+
+    def test_same_compound_neighbors_always_ignore_intramolecular_atoms(self):
+        analysis = NeighborCountAnalysis(SameCompoundTrajectory(), input_provider=NullInputProvider())
+        analysis.configure(
+            NeighborCountConfig(
+                ref_compound_index=0,
+                observables=[
+                    ObservableConfig(
+                        ref_labels=["O1"],
+                        observed_sites=[
+                            ObservedSiteConfig(compound_index=0, labels=["H"], cutoff=2.5),
+                        ],
+                    ),
+                ],
+            )
+        )
+
+        analysis.process_frame()
+
+        self.assertEqual(analysis.total_reference_sites, 2)
+        self.assertEqual(analysis.joint_hist[(1,)], 2)
 
 
 def _parse_numeric_table(text: str) -> np.ndarray:

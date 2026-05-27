@@ -33,7 +33,7 @@ class NeighborCountEndToEndTests(unittest.TestCase):
         np.testing.assert_allclose(_parse_numeric_table(generated), _parse_numeric_table(reference))
 
     def test_programmatic_prepared_setup_path_reproduces_reference_ncount(self):
-        from analyses.neighbor_count_analysis import NeighborCountAnalysis, NeighborCountConfig
+        from analyses.neighbor_count_analysis import NeighborCountAnalysis, NeighborCountConfig, ObservableConfig, ObservedSiteConfig
         from workflow.workflow_prompts import WorkflowPrompts
 
         setup = json.loads((NCOUNT_FIXTURES / "setup.json").read_text(encoding="utf-8"))
@@ -49,11 +49,14 @@ class NeighborCountEndToEndTests(unittest.TestCase):
                 analysis.configure(
                     NeighborCountConfig(
                         ref_compound_index=1,
-                        ref_labels=["O"],
-                        obs_compound_indices=[1],
-                        obs_labels_per_compound={1: ["O"]},
-                        exclude_same_molecule=True,
-                        r_cut=4.0,
+                        observables=[
+                            ObservableConfig(
+                                ref_labels=["O"],
+                                observed_sites=[
+                                    ObservedSiteConfig(compound_index=1, labels=["O"], cutoff=4.0),
+                                ],
+                            ),
+                        ],
                     )
                 )
                 analysis.configure_frame_loop(
@@ -65,9 +68,9 @@ class NeighborCountEndToEndTests(unittest.TestCase):
                     )
                 )
                 analysis.run()
-                output = Path("ncount_O-C4H8O_O-C4H8O.dat")
-                self.assertTrue(output.exists())
-                generated = output.read_text(encoding="utf-8")
+                marginal_output = Path("ncount_obs1_O-C4H8O_O-C4H8O.dat")
+                self.assertTrue(marginal_output.exists())
+                generated = marginal_output.read_text(encoding="utf-8")
             finally:
                 if traj is not None and getattr(traj, "fin", None) is not None and not traj.fin.closed:
                     traj.fin.close()
@@ -89,9 +92,9 @@ class NeighborCountEndToEndTests(unittest.TestCase):
                     str(LAMMPS_FIXTURE),
                     input_provider=provider,
                 )
-                output = Path("ncount_O-C4H8O_O-C4H8O.dat")
-                self.assertTrue(output.exists())
-                return output.read_text(encoding="utf-8")
+                marginal_output = Path("ncount_obs1_O-C4H8O_O-C4H8O.dat")
+                self.assertTrue(marginal_output.exists())
+                return marginal_output.read_text(encoding="utf-8")
             finally:
                 os.chdir(cwd)
                 provider.close()

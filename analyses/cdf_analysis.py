@@ -209,7 +209,7 @@ class CDFAnalysis(BaseAnalysis):
         total = corrected.sum()
         if total > 0:
             corrected /= total
-        self.hist.counts = corrected * 10000
+        self.hist.counts = corrected
 
         x_centers = 0.5 * (self.hist.bin_edges[0][1:] + self.hist.bin_edges[0][:-1])
         y_centers = 0.5 * (self.hist.bin_edges[1][1:] + self.hist.bin_edges[1][:-1])

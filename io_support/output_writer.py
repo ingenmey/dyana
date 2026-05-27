@@ -100,7 +100,7 @@ def write_table(
         for idx, value in enumerate(row):
             widths[idx] = max(widths[idx], len(value))
 
-    output_path = _prepare_output_path(filename)
+    output_path = resolve_output_path(filename, rotate=True)
 
     with open(output_path, "w", encoding="utf-8") as f:
         for line in comment_lines or []:
@@ -126,14 +126,15 @@ def _sanitize_token(value: str) -> str:
     return cleaned
 
 
-def _prepare_output_path(filename: str | Path) -> Path:
+def resolve_output_path(filename: str | Path, rotate: bool = False) -> Path:
+    """Resolve a path inside the managed output directory and optionally rotate existing files."""
     path = Path(filename)
     if not path.is_absolute():
         path = _OUTPUT_DIR / path
 
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    if path.exists() and not _FORCE_OVERWRITE:
+    if rotate and path.exists() and not _FORCE_OVERWRITE:
         rotated_path, shifted_count = _rotate_existing_output(path)
         if shifted_count > 1:
             console.warn(
@@ -144,6 +145,10 @@ def _prepare_output_path(filename: str | Path) -> Path:
             console.warn(f"Output file {path.name} already existed; moved the previous file to {rotated_path.name}.")
 
     return path
+
+
+def _prepare_output_path(filename: str | Path) -> Path:
+    return resolve_output_path(filename, rotate=True)
 
 
 def _rotate_existing_output(path: Path) -> tuple[Path, int]:
