@@ -3,12 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.spatial import cKDTree
 
-from framework.analysis_params import AtomLabelsParam, BoolParam, CompoundParam, FloatParam, ForEach, IntParam, When
 from analyses.common.base_analysis import BaseAnalysis
 from analyses.common.histogram import HistogramND
-from core.geometry import minimum_image
+from analyses.common.pair_selectors import PairSelector, PairSelectorSpec, pair_selector_schema
+from framework.analysis_params import CompoundParam, IntParam
 from io_support.console import console
 from io_support.output_writer import build_output_filename, format_selection, format_selection_group, write_histogram_1d
 
@@ -18,38 +17,13 @@ class TetrahedralOrderConfig:
     """Configuration for tetrahedral orientational/translational order analysis."""
 
     ref_compound_index: int
-    ref_labels: list[str]
-    obs_compound_indices: list[int]
-    obs_labels_per_compound: dict[int, list[str]]
-    use_cutoff: bool = False
-    cutoff: float | None = None
+    selector: PairSelectorSpec
     bin_count_q: int = 100
     bin_count_s: int = 10000
 
     def __post_init__(self):
         if self.ref_compound_index < 0:
             raise ValueError("ref_compound_index must be >= 0.")
-        if not self.ref_labels:
-            raise ValueError("ref_labels must not be empty.")
-        if not self.obs_compound_indices:
-            raise ValueError("obs_compound_indices must not be empty.")
-        if any(idx < 0 for idx in self.obs_compound_indices):
-            raise ValueError("obs_compound_indices must contain only values >= 0.")
-        missing = [idx for idx in self.obs_compound_indices if idx not in self.obs_labels_per_compound]
-        if missing:
-            raise ValueError(f"obs_labels_per_compound is missing labels for observed compound indices: {missing}")
-        for idx, labels in self.obs_labels_per_compound.items():
-            if idx < 0:
-                raise ValueError("obs_labels_per_compound keys must be >= 0.")
-            if not labels:
-                raise ValueError(f"obs_labels_per_compound[{idx}] must not be empty.")
-        if self.use_cutoff:
-            if self.cutoff is None:
-                raise ValueError("cutoff must be provided when use_cutoff is True.")
-            if self.cutoff < 0:
-                raise ValueError("cutoff must be >= 0.")
-        elif self.cutoff is not None and self.cutoff < 0:
-            raise ValueError("cutoff must be >= 0 or None.")
         if self.bin_count_q < 1:
             raise ValueError("bin_count_q must be >= 1.")
         if self.bin_count_s < 1:
@@ -62,37 +36,14 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
     CONFIG_CLASS = TetrahedralOrderConfig
     CONFIG_SCHEMA = [
         CompoundParam(name="ref_compound_index", role="reference"),
-        AtomLabelsParam(name="ref_labels", role="reference", compound="ref_compound_index"),
-        CompoundParam(name="obs_compound_indices", role="observed", multi=True),
-        ForEach(
-            source="obs_compound_indices",
-            item_name="obs_compound_index",
-            steps=[
-                AtomLabelsParam(
-                    name="obs_labels",
-                    role="observed",
-                    compound="obs_compound_index",
-                ),
-            ],
-            collect_as="obs_labels_per_compound",
-            collect_mode="dict",
-        ),
-        BoolParam(
-            name="use_cutoff",
-            prompt="Use a maximum distance cutoff for neighbor search?",
-            default=False,
-        ),
-        When(
-            source="use_cutoff",
-            value=True,
-            steps=[
-                FloatParam(
-                    name="cutoff",
-                    prompt="Enter the maximum cutoff distance (Angstrom): ",
-                    default=5.0,
-                    minval=0.0,
-                ),
-            ],
+        pair_selector_schema(
+            name="selector",
+            label="the tetrahedral neighbour definition",
+            ref_compound_field="ref_compound_index",
+            default_use_distance=False,
+            default_use_rank=True,
+            default_min_rank=1,
+            default_max_rank=4,
         ),
         IntParam(
             name="bin_count_q",
@@ -109,29 +60,12 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
     ]
 
     def configure(self, config: TetrahedralOrderConfig):
-        self.bind_config(config)
+        self.bind_config(config, exclude=("selector",))
+        self.selector_spec = config.selector
         (self.ref_type, self.ref_key), = self.resolve_compound_types([self.ref_compound_index])
-        resolved_obs = self.resolve_compound_types(self.obs_compound_indices)
-        self.obs_types = [compound_type for compound_type, _ in resolved_obs]
-        self.obs_keys = [key for _, key in resolved_obs]
-        self.cutoff = self.cutoff if self.use_cutoff else None
-
-        topology_frame = self.traj.topology_frame
-        self.ref_selection = topology_frame.resolve_selection(self.ref_type, self.ref_labels)
-        self.obs_labels_per_compound = {
-            key: list(self.obs_labels_per_compound[idx])
-            for idx, key in zip(self.obs_compound_indices, self.obs_keys)
-        }
-        self.obs_selections_by_key = {
-            key: topology_frame.resolve_selection(compound_type, self.obs_labels_per_compound[key])
-            for compound_type, key in zip(self.obs_types, self.obs_keys)
-        }
-        self.observed_selection_entries = [
-            (self.obs_labels_per_compound[key], compound_type.formula)
-            for compound_type, key in zip(self.obs_types, self.obs_keys)
-        ]
-
+        self.tetra_selector = PairSelector(self, self.ref_type, self.ref_key, self.selector_spec)
         self.rebuild_runtime_state()
+
         if self.ref_indices.size == 0:
             raise ValueError("No reference atoms matched the given labels in the initial frame.")
         if self.obs_indices.size < 4:
@@ -142,88 +76,34 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
         self.mark_configured()
 
     def rebuild_runtime_state(self):
-        topology_frame = self.traj.topology_frame
-        self.ref_indices = topology_frame.get_atom_ids_for_local_indices(
-            self.ref_type,
-            self.ref_selection.local_indices,
-        )
-        obs_parts = [
-            topology_frame.get_atom_ids_for_local_indices(
-                compound_type,
-                self.obs_selections_by_key[key].local_indices,
-            )
-            for compound_type, key in zip(self.obs_types, self.obs_keys)
-        ]
-        self.obs_indices = (
-            np.concatenate([part for part in obs_parts if part.size > 0])
-            if any(part.size > 0 for part in obs_parts)
-            else np.empty(0, dtype=np.int32)
-        )
+        self.tetra_selector.rebuild_runtime_state()
+        self.ref_type = self.tetra_selector.ref_type
+        self.ref_indices = self.tetra_selector.ref_indices
+        self.obs_indices = self.tetra_selector.obs_indices
 
     def post_compound_update(self):
-        topology_frame = self.traj.topology_frame
-        if not topology_frame.has_compound_type_key(self.ref_key):
-            return False
-        if any(not topology_frame.has_compound_type_key(key) for key in self.obs_keys):
+        if not self.tetra_selector.reattach_and_rebuild():
             return False
 
-        self.ref_type = topology_frame.get_compound_type_by_key(self.ref_key)
-        self.obs_types = [topology_frame.get_compound_type_by_key(key) for key in self.obs_keys]
-        self.observed_selection_entries = [
-            (self.obs_labels_per_compound[key], compound_type.formula)
-            for compound_type, key in zip(self.obs_types, self.obs_keys)
-        ]
-        self.rebuild_runtime_state()
-        if self.ref_indices.size == 0 or self.obs_indices.size < 4:
-            return False
-        return True
+        self.ref_type = self.tetra_selector.ref_type
+        self.ref_indices = self.tetra_selector.ref_indices
+        self.obs_indices = self.tetra_selector.obs_indices
+        return self.ref_indices.size > 0 and self.obs_indices.size >= 4
 
     def process_frame(self):
         if self.ref_indices.size == 0 or self.obs_indices.size < 4:
             return
 
-        coords = self.traj.coords
-        box = self.traj.box_size
-        obs_coords = coords[self.obs_indices]
-        tree = cKDTree(obs_coords, boxsize=box)
         q_values = []
         s_values = []
+        _, deltas_by_ref, distances_by_ref = self.tetra_selector.select_frame(include_deltas=True)
 
-        for ref_idx in self.ref_indices:
-            ref_coord = coords[ref_idx]
+        for deltas, distances in zip(deltas_by_ref, distances_by_ref):
+            if len(distances) < 4:
+                continue
 
-            if self.cutoff is not None:
-                candidate_positions = [
-                    int(position)
-                    for position in tree.query_ball_point(ref_coord, self.cutoff)
-                    if self.obs_indices[int(position)] != ref_idx
-                ]
-                if len(candidate_positions) < 4:
-                    continue
-
-                candidate_deltas = minimum_image(obs_coords[candidate_positions] - ref_coord, box)
-                candidate_distances = np.linalg.norm(candidate_deltas, axis=1)
-                nearest = np.argsort(candidate_distances)[:4]
-                four_deltas = candidate_deltas[nearest]
-                four_distances = candidate_distances[nearest]
-            else:
-                max_neighbors = min(5, len(obs_coords))
-                distances, positions = tree.query(ref_coord, k=max_neighbors)
-                distances = np.atleast_1d(distances)
-                positions = np.atleast_1d(positions)
-                filtered = [
-                    (float(distance), int(position))
-                    for distance, position in zip(distances, positions)
-                    if np.isfinite(distance) and self.obs_indices[int(position)] != ref_idx
-                ]
-                if len(filtered) < 4:
-                    continue
-
-                filtered = filtered[:4]
-                selected_positions = np.array([position for _, position in filtered], dtype=np.intp)
-                four_deltas = minimum_image(obs_coords[selected_positions] - ref_coord, box)
-                four_distances = np.array([distance for distance, _ in filtered], dtype=float)
-
+            four_deltas = deltas[:4]
+            four_distances = distances[:4]
             unit_vectors = four_deltas / np.linalg.norm(four_deltas, axis=1)[:, None]
             cosines = []
             for first in range(3):
@@ -244,14 +124,13 @@ class TetrahedralOrderAnalysis(BaseAnalysis):
             self.hist_s.add(np.array(s_values))
 
     def postprocess(self):
-        has_data = self.hist_q.counts.sum() > 0
-        if not has_data:
+        if self.hist_q.counts.sum() <= 0:
             console.warn("No tetrahedral order values were accumulated.")
             return
 
         filename_parts = [
-            format_selection(self.ref_labels, self.ref_type.formula),
-            format_selection_group(self.observed_selection_entries),
+            format_selection(self.selector_spec.ref_labels, self.ref_type.formula),
+            format_selection_group(self.tetra_selector.observed_selection_entries),
         ]
         self.hist_q.normalize(field="count", method="total", total=100)
         q_filename = build_output_filename("top_q", filename_parts)

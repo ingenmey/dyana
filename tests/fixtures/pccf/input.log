@@ -1,0 +1,56 @@
+# Enter cell vector length in X dimension (in Angstrom):
+22.7274
+# Enter cell vector length in Y dimension (in Angstrom):
+22.7274
+# Enter cell vector length in Z dimension (in Angstrom):
+22.7274
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+n
+# Break bonds (1) or repeat molecule recognition at specific frame (2)? [1]
+
+# Which compound to modify? [[done]]
+1
+# Break specific bonds (1) or all bonds (2) in compound 1 (H2O)? [1]
+2
+# Which compound to modify? [[done]]
+2
+# Break specific bonds (1) or all bonds (2) in compound 2 (H3O2)? [1]
+2
+# Which compound to modify? [[done]]
+3
+# Break specific bonds (1) or all bonds (2) in compound 3 (HO)? [1]
+2
+# Which compound to modify? [[done]]
+
+# Draw compounds to PDF? [No]
+
+# Accept these molecules (y) or change something (n) [Yes]
+
+# Choose an analysis:
+pccf
+# Choose the compounds with transferable protons (comma-separated numbers):
+1
+# Which atom(s) in proton compound 1 (H)? (comma-separated)
+H
+# Choose the compounds that may accept protons (comma-separated numbers):
+3
+# Which atom(s) in acceptor compound 3 (O)? (comma-separated)
+O
+# Track acceptor contexts by molecule or by individual site? (molecule/site) [molecule]
+
+# Enter maximum proton-acceptor bond distance (in Angstrom):  [1.2]
+1.28
+# Enter minimum dwell time on an acceptor (in assigned frames):  [2]
+
+# Enter the maximum number of unassigned frames to bridge between stable residences:  [2]
+
+# Enter one or more maximum chain gaps (in frames, comma-separated):  [100]
+
+# In which trajectory frame to start processing the trajectory? [1]
+
+# How many trajectory frames to read (from this position on)? [all]
+
+# Use every n-th read trajectory frame for the analysis: [1]
+

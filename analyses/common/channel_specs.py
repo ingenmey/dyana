@@ -15,6 +15,7 @@ class DistanceSpec:
     obs_compound_index: int
     ref_labels: list[str]
     obs_labels: list[str]
+    include_intramolecular: bool = False
     max_distance: float = 10.0
     bin_count: int = 1000
 
@@ -114,6 +115,7 @@ def build_distance_channel(owner, ref_type, ref_key, spec: DistanceSpec, output_
         obs_key=obs_key,
         ref_local_indices=ref_selection.local_indices,
         obs_local_indices=obs_selection.local_indices,
+        include_intramolecular=spec.include_intramolecular,
         max_distance=spec.max_distance,
         bin_edges=np.linspace(0.0, spec.max_distance, spec.bin_count + 1),
         output_name=output_name,
@@ -193,6 +195,17 @@ def _distance_spec_steps(label: str) -> list[object]:
             role="observed",
             compound="obs_compound_index",
             prompt=f"Which observed atom(s) define {label}? (comma-separated) ",
+        ),
+        When(
+            source="obs_compound_index",
+            value_source="ref_compound_index",
+            steps=[
+                BoolParam(
+                    name="include_intramolecular",
+                    prompt=f"Include intramolecular distances in {label}?",
+                    default=False,
+                ),
+            ],
         ),
         FloatParam(
             name="max_distance",

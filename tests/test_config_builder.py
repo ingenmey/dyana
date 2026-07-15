@@ -9,6 +9,7 @@ from framework.analysis_params import (
     FloatParam,
     ForEach,
     Group,
+    IntListParam,
     IntParam,
     Repeat,
     Variant,
@@ -71,6 +72,11 @@ class ChannelConfig:
 @dataclass(frozen=True)
 class RepeatedConfig:
     channels: list[ChannelConfig]
+
+
+@dataclass(frozen=True)
+class IntListConfig:
+    gaps: list[int]
 
 
 class DummyCompoundType:
@@ -299,6 +305,26 @@ class ConfigBuilderTests(unittest.TestCase):
                 ],
             ),
         )
+
+    def test_prompt_config_from_schema_supports_int_list_param(self):
+        provider = FileInputProvider(
+            lines=["1, 3, 5"],
+            fallback=NullInputProvider(),
+        )
+        analysis = DummyAnalysis(provider=provider)
+        schema = [
+            IntListParam(
+                name="gaps",
+                prompt="Gaps?",
+                default=[100],
+                minval=0,
+                min_items=1,
+            ),
+        ]
+
+        config = prompt_config_from_schema(analysis, schema, IntListConfig, provider=provider)
+
+        self.assertEqual(config, IntListConfig(gaps=[1, 3, 5]))
 
 
 if __name__ == "__main__":

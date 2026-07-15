@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from analyses.common.pair_selectors import ObservedAtomGroupSpec, PairSelectorSpec
 from framework.config_schema import FrameLoopConfig
 from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from io_support.input_providers import FileInputProvider, NullInputProvider
@@ -55,41 +56,34 @@ class DummyTrajectory:
 
 @unittest.skipIf(TetrahedralOrderConfig is None, "scipy is not installed")
 class TetrahedralOrderConfigTests(unittest.TestCase):
-    def test_top_config_validates_inputs(self):
-        TetrahedralOrderConfig(
+    def build_config(self, **overrides):
+        config = dict(
             ref_compound_index=0,
-            ref_labels=["O"],
-            obs_compound_indices=[0],
-            obs_labels_per_compound={0: ["H"]},
+            selector=PairSelectorSpec(
+                ref_labels=["O"],
+                observed_groups=[ObservedAtomGroupSpec(compound_index=0, labels=["H"])],
+                min_rank=1,
+                max_rank=4,
+            ),
+            bin_count_q=100,
+            bin_count_s=10000,
         )
+        config.update(overrides)
+        return TetrahedralOrderConfig(**config)
+
+    def test_top_config_validates_inputs(self):
+        self.build_config()
 
         with self.assertRaises(ValueError):
-            TetrahedralOrderConfig(
-                ref_compound_index=-1,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={0: ["H"]},
-            )
+            self.build_config(ref_compound_index=-1)
         with self.assertRaises(ValueError):
-            TetrahedralOrderConfig(
-                ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={},
-            )
+            self.build_config(bin_count_q=0)
         with self.assertRaises(ValueError):
-            TetrahedralOrderConfig(
-                ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={0: ["H"]},
-                use_cutoff=True,
-                cutoff=None,
-            )
+            self.build_config(bin_count_s=0)
 
     def test_prompt_config_builds_custom_config(self):
         provider = FileInputProvider(
-            lines=["1", "O", "1", "H", "y", "4.5", "12", "20"],
+            lines=["1", "O", "1", "H", "y", "0.0", "4.5", "y", "1", "4", "12", "20"],
             fallback=NullInputProvider(),
         )
         analysis = TetrahedralOrderAnalysis(DummyTrajectory(), input_provider=provider)
@@ -100,11 +94,14 @@ class TetrahedralOrderConfigTests(unittest.TestCase):
             config,
             TetrahedralOrderConfig(
                 ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={0: ["H"]},
-                use_cutoff=True,
-                cutoff=4.5,
+                selector=PairSelectorSpec(
+                    ref_labels=["O"],
+                    observed_groups=[ObservedAtomGroupSpec(compound_index=0, labels=["H"])],
+                    min_distance=0.0,
+                    max_distance=4.5,
+                    min_rank=1,
+                    max_rank=4,
+                ),
                 bin_count_q=12,
                 bin_count_s=20,
             ),
@@ -112,37 +109,17 @@ class TetrahedralOrderConfigTests(unittest.TestCase):
 
     def test_configure_sets_up_runtime_selections(self):
         analysis = TetrahedralOrderAnalysis(DummyTrajectory())
-        analysis.configure(
-            TetrahedralOrderConfig(
-                ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={0: ["H"]},
-                use_cutoff=False,
-                bin_count_q=8,
-                bin_count_s=10,
-            )
-        )
+        analysis.configure(self.build_config(bin_count_q=8, bin_count_s=10))
 
         self.assertEqual(analysis.ref_indices.tolist(), [0])
         self.assertEqual(sorted(analysis.obs_indices.tolist()), [1, 2, 3, 4])
-        self.assertEqual(analysis.ref_selection.local_indices, (4,))
-        self.assertEqual(analysis.obs_selections_by_key[("H4O", (), "tetra")].local_indices, (0, 1, 2, 3))
-        self.assertEqual(tuple(analysis.ref_type.canonical_labels[i] for i in analysis.ref_selection.local_indices), ("O1",))
+        self.assertEqual(analysis.tetra_selector.ref_selection.local_indices, (4,))
+        self.assertEqual(analysis.tetra_selector.obs_selections[0].local_indices, (0, 1, 2, 3))
+        self.assertEqual(tuple(analysis.ref_type.canonical_labels[i] for i in analysis.tetra_selector.ref_selection.local_indices), ("O1",))
 
     def test_run_writes_q_and_s_outputs(self):
         analysis = TetrahedralOrderAnalysis(DummyTrajectory(), input_provider=NullInputProvider())
-        analysis.configure(
-            TetrahedralOrderConfig(
-                ref_compound_index=0,
-                ref_labels=["O"],
-                obs_compound_indices=[0],
-                obs_labels_per_compound={0: ["H"]},
-                use_cutoff=False,
-                bin_count_q=10,
-                bin_count_s=10,
-            )
-        )
+        analysis.configure(self.build_config(bin_count_q=10, bin_count_s=10))
         analysis.configure_frame_loop(FrameLoopConfig(start_frame=1, nframes=1, frame_stride=1, update_compounds=False))
 
         with tempfile.TemporaryDirectory() as tmp:

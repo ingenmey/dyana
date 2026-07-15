@@ -174,6 +174,7 @@ class DistanceChannel:
     obs_local_indices: tuple[int, ...]
     max_distance: float
     bin_edges: np.ndarray
+    include_intramolecular: bool = False
     output_name: str = "r"
 
     def __post_init__(self):
@@ -187,6 +188,7 @@ class DistanceChannel:
         self._obs_tree = None
         self._obs_coords = None
         self._obs_context_ids = np.empty(0, dtype=np.int32)
+        self.excluded_obs_per_reference = 0
 
     def prepare(self, traj, ref_compound_type) -> None:
         return None
@@ -209,6 +211,8 @@ class DistanceChannel:
         self.ref_molecule_atom_ids = ref_molecule_atom_ids
         self.ref_atom_ids = topology_frame.get_atom_ids_for_local_indices(self.ref_type, self.ref_local_indices)
         self.obs_atom_ids = topology_frame.get_atom_ids_for_local_indices(self.obs_type, self.obs_local_indices)
+        exclude_intramolecular = self.ref_key == self.obs_key and not self.include_intramolecular
+        self.excluded_obs_per_reference = len(self.obs_local_indices) if exclude_intramolecular else 0
         if len(obs_molecule_atom_ids) > 0 and len(self.obs_local_indices) > 0:
             self._obs_context_ids = np.repeat(
                 np.arange(len(obs_molecule_atom_ids), dtype=np.int32),
@@ -290,6 +294,10 @@ class DistanceChannel:
                 continue
 
             neighbor_ids = np.asarray(neighbor_ids, dtype=np.intp)
+            if self.excluded_obs_per_reference:
+                neighbor_ids = neighbor_ids[self._obs_context_ids[neighbor_ids] != ref_molecule_index]
+                if neighbor_ids.size == 0:
+                    continue
             deltas = minimum_image(self._obs_coords[neighbor_ids] - ref_coords[ref_index], batch.box)
             distances = np.linalg.norm(deltas, axis=1)
             mask = distances > 1e-12

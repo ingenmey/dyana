@@ -9,21 +9,17 @@
 # Accept these molecules (y) or change something (n) [Yes]
 
 # Choose an analysis:
-rdf
-# Choose the reference compound (number):  [1]
+q6
+# Choose the site compound (number):  [1]
 
-# Choose the observed compound (number):  [1]
-
-# Which atom(s) in reference compound 1 (H2O)? (comma-separated)
+# Which atom(s) define the molecular site? (comma-separated)
 O
-# Which atom(s) in observed compound 1 (H2O)? (comma-separated)
-H
-# Include intramolecular distances in the RDF distance channel? [No]
-n
-# Enter the maximum distance for RDF calculation (in Angstrom):  [10.0]
+# Optional neighbour cutoff distance Angstrom (leave blank for none):
 
-# Enter the number of bins for RDF calculation:  [1000]
-1000
+# Enter the number of nearest neighbours to include per site:  [4]
+
+# Enter the number of bins for local q6 distribution:  [100]
+
 # Perform molecule recognition and update compound list in each frame? [No]
 
 # In which trajectory frame to start processing the trajectory? [1]
@@ -31,3 +27,4 @@ n
 # How many trajectory frames to read (from this position on)? [all]
 
 # Use every n-th read trajectory frame for the analysis: [1]
+

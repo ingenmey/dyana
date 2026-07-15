@@ -13,7 +13,7 @@ class RunHeaderTests(unittest.TestCase):
             "io_support.run_header.importlib.metadata.version",
             side_effect=run_header.importlib.metadata.PackageNotFoundError,
         ):
-            self.assertEqual(run_header.resolve_dyana_version(), "0.1.0")
+            self.assertEqual(run_header.resolve_dyana_version(), "0.1.1")
 
     def test_build_run_header_uses_absolute_paths(self):
         with patch("io_support.run_header.resolve_dyana_version", return_value="0.1.0"):
@@ -23,6 +23,7 @@ class RunHeaderTests(unittest.TestCase):
                     traj_format="xyz",
                     output_dir="results",
                     console_log_path="results/dyana.log",
+                    command_line="python main.py tests/fixtures/water128.xyz -o results",
                     input_log_path="results/input.log",
                     prepared_setup="setup.json",
                 )
@@ -36,8 +37,9 @@ class RunHeaderTests(unittest.TestCase):
         )
         self.assertEqual(header.lines[2], f"Output dir: {(Path.cwd() / 'results').resolve()}")
         self.assertEqual(header.lines[3], f"Console log: {(Path.cwd() / 'results' / 'dyana.log').resolve()}")
-        self.assertEqual(header.lines[4], f"Input log: {(Path.cwd() / 'results' / 'input.log').resolve()}")
-        self.assertEqual(header.lines[5], f"Prepared setup: {(Path.cwd() / 'setup.json').resolve()}")
+        self.assertEqual(header.lines[4], "Command: python main.py tests/fixtures/water128.xyz -o results")
+        self.assertEqual(header.lines[5], f"Input log: {(Path.cwd() / 'results' / 'input.log').resolve()}")
+        self.assertEqual(header.lines[6], f"Prepared setup: {(Path.cwd() / 'setup.json').resolve()}")
 
     def test_render_run_header_falls_back_for_non_unicode_streams(self):
         class Cp1252Stream(io.StringIO):

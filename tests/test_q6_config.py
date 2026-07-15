@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from analyses.common.pair_selectors import ObservedAtomGroupSpec, PairSelectorSpec
 from core.topology import CompoundType, CompoundTypeRegistry, TopologyFrame
 from framework.config_schema import FrameLoopConfig
 from io_support.input_providers import FileInputProvider, NullInputProvider
@@ -53,23 +54,59 @@ class DummyTrajectory:
         raise ValueError("End of trajectory")
 
 
+class SparseDummyTrajectory(DummyTrajectory):
+    def __init__(self):
+        super().__init__()
+        self.coords = np.array(
+            [
+                [10.0, 10.0, 10.0],
+                [11.0, 10.0, 10.0],
+                [10.0, 11.0, 10.0],
+                [10.0, 10.0, 11.0],
+                [16.0, 16.0, 16.0],
+            ],
+            dtype=float,
+        )
+
+
 @unittest.skipIf(Q6Config is None, "scipy is not installed")
 class Q6ConfigTests(unittest.TestCase):
+    def build_config(self, **overrides):
+        config = dict(
+            compound_index=0,
+            selector=PairSelectorSpec(
+                ref_labels=["O"],
+                observed_groups=[ObservedAtomGroupSpec(compound_index=0, labels=["O"])],
+                min_rank=1,
+                max_rank=4,
+            ),
+            ignore_if_fewer_within_cutoff=False,
+            bin_count_local=50,
+        )
+        config.update(overrides)
+        return Q6Config(**config)
+
     def test_q6_config_validates_inputs(self):
-        Q6Config(compound_index=0, site_labels=["O"], cutoff=3.5, bin_count_local=50)
+        self.build_config()
 
         with self.assertRaises(ValueError):
-            Q6Config(compound_index=-1, site_labels=["O"], cutoff=3.5, bin_count_local=50)
+            self.build_config(compound_index=-1)
         with self.assertRaises(ValueError):
-            Q6Config(compound_index=0, site_labels=[], cutoff=3.5, bin_count_local=50)
+            self.build_config(
+                ignore_if_fewer_within_cutoff=True,
+                selector=PairSelectorSpec(
+                    ref_labels=["O"],
+                    observed_groups=[ObservedAtomGroupSpec(compound_index=0, labels=["O"])],
+                    min_rank=1,
+                    max_rank=4,
+                ),
+            )
         with self.assertRaises(ValueError):
-            Q6Config(compound_index=0, site_labels=["O"], cutoff=0.0, bin_count_local=50)
-        with self.assertRaises(ValueError):
-            Q6Config(compound_index=0, site_labels=["O"], cutoff=3.5, bin_count_local=0)
+            self.build_config(bin_count_local=0)
 
     def test_prompt_config_builds_custom_config(self):
         provider = FileInputProvider(
-            lines=["1", "O", "4.5", "12"],
+            lines=["1", "O", "1", "O", "y", "0.0", "4.5", "y", "1", "6", "y", "12"],
             fallback=NullInputProvider(),
         )
         analysis = Q6Analysis(DummyTrajectory(), input_provider=provider)
@@ -80,37 +117,30 @@ class Q6ConfigTests(unittest.TestCase):
             config,
             Q6Config(
                 compound_index=0,
-                site_labels=["O"],
-                cutoff=4.5,
+                selector=PairSelectorSpec(
+                    ref_labels=["O"],
+                    observed_groups=[ObservedAtomGroupSpec(compound_index=0, labels=["O"])],
+                    min_distance=0.0,
+                    max_distance=4.5,
+                    min_rank=1,
+                    max_rank=6,
+                ),
+                ignore_if_fewer_within_cutoff=True,
                 bin_count_local=12,
             ),
         )
 
     def test_configure_sets_up_runtime_site_selection(self):
         analysis = Q6Analysis(DummyTrajectory())
-        analysis.configure(
-            Q6Config(
-                compound_index=0,
-                site_labels=["O"],
-                cutoff=4.5,
-                bin_count_local=10,
-            )
-        )
+        analysis.configure(self.build_config(bin_count_local=10))
 
         self.assertEqual(analysis.site_indices.tolist(), [0, 1, 2, 3, 4])
-        self.assertEqual(analysis.site_selection.local_indices, (0,))
-        self.assertEqual(tuple(analysis.compound_type.canonical_labels[i] for i in analysis.site_selection.local_indices), ("O1",))
+        self.assertEqual(analysis.site_selector.ref_selection.local_indices, (0,))
+        self.assertEqual(tuple(analysis.compound_type.canonical_labels[i] for i in analysis.site_selector.ref_selection.local_indices), ("O1",))
 
     def test_run_writes_q6_qbar6_and_global_q6_outputs(self):
         analysis = Q6Analysis(DummyTrajectory(), input_provider=NullInputProvider())
-        analysis.configure(
-            Q6Config(
-                compound_index=0,
-                site_labels=["O"],
-                cutoff=4.5,
-                bin_count_local=10,
-            )
-        )
+        analysis.configure(self.build_config(bin_count_local=10))
         analysis.configure_frame_loop(FrameLoopConfig(start_frame=1, nframes=1, frame_stride=1, update_compounds=False))
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -136,6 +166,52 @@ class Q6ConfigTests(unittest.TestCase):
         self.assertIn("P(qbar6)", qbar_local_text)
         self.assertIn("frame", global_text)
         self.assertIn("Q6", global_text)
+
+    def test_process_frame_uses_available_cutoff_neighbors_when_not_ignoring_sparse_shells(self):
+        analysis = Q6Analysis(SparseDummyTrajectory(), input_provider=NullInputProvider())
+        analysis.configure(
+            self.build_config(
+                selector=PairSelectorSpec(
+                    ref_labels=["O"],
+                    observed_groups=[ObservedAtomGroupSpec(compound_index=0, labels=["O"])],
+                    min_distance=0.0,
+                    max_distance=1.5,
+                    min_rank=1,
+                    max_rank=4,
+                ),
+                ignore_if_fewer_within_cutoff=False,
+                bin_count_local=10,
+            )
+        )
+
+        analysis.process_frame()
+
+        self.assertEqual(int(analysis.q6_local_hist.counts.sum()), 4)
+        self.assertEqual(int(analysis.qbar6_local_hist.counts.sum()), 4)
+        self.assertEqual(len(analysis.global_q6_rows), 1)
+
+    def test_process_frame_can_ignore_cutoff_shells_smaller_than_requested_neighbor_count(self):
+        analysis = Q6Analysis(SparseDummyTrajectory(), input_provider=NullInputProvider())
+        analysis.configure(
+            self.build_config(
+                selector=PairSelectorSpec(
+                    ref_labels=["O"],
+                    observed_groups=[ObservedAtomGroupSpec(compound_index=0, labels=["O"])],
+                    min_distance=0.0,
+                    max_distance=1.5,
+                    min_rank=1,
+                    max_rank=4,
+                ),
+                ignore_if_fewer_within_cutoff=True,
+                bin_count_local=10,
+            )
+        )
+
+        analysis.process_frame()
+
+        self.assertEqual(int(analysis.q6_local_hist.counts.sum()), 0)
+        self.assertEqual(int(analysis.qbar6_local_hist.counts.sum()), 0)
+        self.assertEqual(len(analysis.global_q6_rows), 0)
 
 
 if __name__ == "__main__":

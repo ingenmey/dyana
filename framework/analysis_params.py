@@ -40,6 +40,15 @@ class IntParam(Param):
 
 
 @dataclass(frozen=True)
+class IntListParam(Param):
+    """Prompt for a comma-separated list of integers."""
+
+    minval: int | None = None
+    maxval: int | None = None
+    min_items: int = 1
+
+
+@dataclass(frozen=True)
 class FloatParam(Param):
     minval: float | None = None
     maxval: float | None = None

@@ -4,6 +4,8 @@
 import argparse
 import importlib
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 from core import constants
@@ -15,17 +17,19 @@ from io_support.run_header import build_run_header, render_run_header
 from workflow.workflow_prompts import WorkflowPrompts
 
 AVAILABLE_ANALYSES = [
-    ("s", "Pair Correlation"),
+    ("s", "Static:"),
     ("a", "rdf", "Radial distribution function", "analyses.rdf_analysis", "RDF"),
     ("a", "adf", "Angular distribution function", "analyses.adf_analysis", "ADF"),
     ("a", "cdf", "Combined distribution function", "analyses.cdf_analysis", "CDFAnalysis"),
-
-    ("s", "Density / Counting"),
     ("a", "dens", "Particle density", "analyses.density_analysis", "DensityAnalysis"),
     ("a", "ncount", "Resolved neighbour-count probability", "analyses.neighbor_count_analysis", "NeighborCountAnalysis"),
-
-    ("s", "Clustering"),
+    ("a", "perc", "Hydrogen-bond percolation pathway analysis", "analyses.percolation_analysis", "PercolationAnalysis"),
     ("a", "cluster", "Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
+
+    ("s", "Dynamic:"),
+    ("a", "pccf", "Proton coupling / transfer-chain correlation", "analyses.pccf_analysis", "PCCFAnalysis"),
+    ("a", "dacf", "Dimer existence autocorrelation function", "analyses.dacf_analysis", "DACFAnalysis"),
+    ("a", "idcf", "Identity autocorrelation function", "analyses.idcf_analysis", "IDCFAnalysis"),
 
     ("s", "Local Structure"),
     ("a", "top", "Tetrahedral order parameter", "analyses.top_analysis", "TetrahedralOrderAnalysis"),
@@ -34,8 +38,6 @@ AVAILABLE_ANALYSES = [
 
     # ("s", "Legacy"),
     # ("a", "adf3b", "Threebody Angular distribution function", "analyses.adf3b_analysis", "ADFThreeBody"),
-    # ("a", "percolation", "Hydrogen bond percolation", "analyses.percolation_analysis", "PercolationAnalysis"),
-    # ("a", "dacf", "Dimer existence auto-correlation function", "analyses.dacf_analysis", "DACFAnalysis"),
     # ("a", "pccf", "Proton coupling correlation function", "analyses.pccf_analysis", "PCCFAnalysis"),
     # ("a", "cmsd", "Charge mean square displacement", "analyses.charge_msd_analysis", "ChargeMSDAnalysis"),
 ]
@@ -89,6 +91,7 @@ def main(
     output_dir=".",
     force_overwrite=False,
     console_log_path=None,
+    command_line=None,
 ):
     """Run the interactive workflow for one trajectory file."""
     workflow_prompts = WorkflowPrompts(input_provider=input_provider)
@@ -113,6 +116,7 @@ def main(
             traj_format=traj_format,
             output_dir=output_dir,
             console_log_path=resolved_console_log_path,
+            command_line=command_line,
             input_log_path=getattr(input_log_path, "name", None),
             prepared_setup=prepared_setup,
         )
@@ -175,6 +179,7 @@ def cli():
         )
     else:
         input_provider = InteractiveInputProvider(log_path=log_path)
+    command_line = subprocess.list2cmdline(getattr(sys, "orig_argv", sys.argv))
 
     try:
         main(
@@ -185,6 +190,7 @@ def cli():
             output_dir=output_dir,
             force_overwrite=args.force,
             console_log_path=console_log_path,
+            command_line=command_line,
         )
     finally:
         close = getattr(input_provider, "close", None)

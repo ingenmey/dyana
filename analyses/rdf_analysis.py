@@ -95,10 +95,11 @@ class RDF(BaseAnalysis):
 
         bin_edges = self.hist.bin_edges[0]
         shell_volumes = radial_shell_volumes(bin_edges)
-        norm_factor = self.n_ref * self.n_obs * self.processed_frames
+        effective_n_obs = max(self.n_obs - self.channel.excluded_obs_per_reference, 0)
+        norm_factor = self.n_ref * effective_n_obs * self.processed_frames
         self.hist.counts = self.hist.counts / (shell_volumes * norm_factor / self.box_volume)
 
-        obs_density = self.n_obs / self.box_volume if self.box_volume else 0.0
+        obs_density = effective_n_obs / self.box_volume if self.box_volume else 0.0
         number_integral = obs_density * np.cumsum(self.hist.counts * shell_volumes)
         self.hist.data["number_integral"] = number_integral
 

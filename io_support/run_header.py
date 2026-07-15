@@ -47,6 +47,7 @@ def build_run_header(
     traj_format: str | None,
     output_dir: str | Path,
     console_log_path: str | Path,
+    command_line: str | None = None,
     input_log_path: str | Path | None = None,
     prepared_setup: str | Path | None = None,
 ) -> RunHeader:
@@ -59,6 +60,8 @@ def build_run_header(
         f"Output dir: {_resolve_absolute_path(output_dir)}",
         f"Console log: {_resolve_absolute_path(console_log_path)}",
     ]
+    if command_line:
+        header_lines.append(f"Command: {command_line}")
     if input_log_path is not None:
         header_lines.append(f"Input log: {_resolve_absolute_path(input_log_path)}")
     if prepared_setup is not None:

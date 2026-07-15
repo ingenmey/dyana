@@ -18,6 +18,8 @@ rdf
 O
 # Which atom(s) in observed compound 2 (H3O2)? (comma-separated)
 H1
+# Include intramolecular distances in the RDF distance channel? [No]
+n
 # Enter the maximum distance for RDF calculation (in Angstrom):  [10.0]
 
 # Enter the number of bins for RDF calculation:  [1000]
@@ -29,4 +31,3 @@ y
 # How many trajectory frames to read (from this position on)? [all]
 
 # Use every n-th read trajectory frame for the analysis: [1]
-

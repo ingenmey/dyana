@@ -4,8 +4,7 @@ import numpy as np
 from collections import defaultdict
 from scipy.spatial import cKDTree
 
-from analyses.common.base_analysis import BaseAnalysis
-from core.geometry import minimum_image
+from analyses.base_analysis import BaseAnalysis
 from utils import (
     prompt,
     prompt_int,
@@ -185,8 +184,7 @@ class PCCFAnalysis(BaseAnalysis):
 
             if neighbors:
                 # pick nearest acceptor (by distance)
-                deltas = minimum_image(acceptor_coords[neighbors] - p_coord, self.traj.box_size)
-                dists = np.linalg.norm(deltas, axis=1)
+                dists = np.linalg.norm(acceptor_coords[neighbors] - p_coord, axis=1)
                 nearest = neighbors[np.argmin(dists)]
                 if self.is_molecule_mode:
                     acceptor_id = self.atom_to_mol[nearest]
@@ -305,3 +303,4 @@ def squash(events, tau):
         else:
             stack.append((f, d, a))
     return stack
+

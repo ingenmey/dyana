@@ -134,6 +134,7 @@ class ReferenceChannelTests(unittest.TestCase):
             obs_key=("OH", (), "dist"),
             ref_local_indices=(1,),
             obs_local_indices=(0,),
+            include_intramolecular=True,
             max_distance=4.1,
             bin_edges=np.array([0.0, 1.0, 2.0, 5.0]),
         )
@@ -152,6 +153,28 @@ class ReferenceChannelTests(unittest.TestCase):
         np.testing.assert_allclose(second.contexts[0].values, [2.0])
         np.testing.assert_allclose(second.contexts[1].values, [1.0])
 
+    def test_distance_channel_ignores_intramolecular_pairs_by_default(self):
+        traj = DistanceTrajectory()
+        channel = DistanceChannel(
+            ref_key=("OH", (), "dist"),
+            obs_key=("OH", (), "dist"),
+            ref_local_indices=(1,),
+            obs_local_indices=(0,),
+            max_distance=4.1,
+            bin_edges=np.array([0.0, 1.0, 2.0, 5.0]),
+        )
+        channel.rebuild_runtime_state(traj)
+        batch = channel.build_batch(traj)
+        channel.begin_batch(batch)
+
+        first = channel.samples_for_reference(batch, 0)
+        second = channel.samples_for_reference(batch, 1)
+
+        self.assertEqual([context.context_id for context in first.contexts], [1])
+        np.testing.assert_allclose(first.contexts[0].values, [4.0])
+        self.assertEqual([context.context_id for context in second.contexts], [0])
+        np.testing.assert_allclose(second.contexts[0].values, [2.0])
+
     def test_distance_channel_collects_all_grouped_values_for_reference_molecule(self):
         traj = DistanceTrajectory()
         channel = DistanceChannel(
@@ -159,6 +182,7 @@ class ReferenceChannelTests(unittest.TestCase):
             obs_key=("OH", (), "dist"),
             ref_local_indices=(1,),
             obs_local_indices=(0,),
+            include_intramolecular=True,
             max_distance=4.1,
             bin_edges=np.array([0.0, 1.0, 2.0, 5.0]),
         )
@@ -179,6 +203,7 @@ class ReferenceChannelTests(unittest.TestCase):
             obs_key=("OH", (), "dist"),
             ref_local_indices=(1,),
             obs_local_indices=(0,),
+            include_intramolecular=True,
             max_distance=4.1,
             bin_edges=np.array([0.0, 1.0, 2.0, 5.0]),
         )

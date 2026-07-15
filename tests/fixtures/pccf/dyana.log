@@ -1,0 +1,176 @@
+
+  ╔═════════════════════════════════════╗
+  ║                            (        ║
+  ║                             \       ║
+  ║        Đ Y A N A             )      ║
+  ║    Dynamics Analyzer    »»------->  ║
+  ║       ver. 0.1.1             )      ║
+  ║                             /       ║
+  ║                            (        ║
+  ╚═════════════════════════════════════╝
+
+Started: 2026-07-13 15:41:53 CEST
+Trajectory: /mnt/d/python/dyana/tests/fixtures/koh_h2o.xyz (xyz)
+Output dir: /mnt/d/python/dyana/tests/fixtures/pccf
+Console log: /mnt/d/python/dyana/tests/fixtures/pccf/dyana.log
+Input log: /mnt/d/python/dyana/tests/fixtures/pccf/input.log
+
+Topology Setup
+Enter cell vector length in X dimension (in Angstrom):  22.7274
+Enter cell vector length in Y dimension (in Angstrom):  22.7274
+Enter cell vector length in Z dimension (in Angstrom):  22.7274
+
+Cell vectors: a=22.7274  b=22.7274  c=22.7274
+
+> Running compound recognition...
+
+Detected compound types:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+
+Compound 1 (H2O) bond length matrix:
+           H1       H2       O1
+   H1      -        -     1.0272
+   H2      -        -     1.0314
+   O1   1.0272   1.0314      -  
+
+Compound 2 (H3O2) bond length matrix:
+           H1       H2       H3       O1       O2
+   H1      -        -        -     1.2189   1.2237
+   H2      -        -        -     0.9752      -  
+   H3      -        -        -        -     0.9667
+   O1   1.2189   0.9752      -        -        -  
+   O2   1.2237      -     0.9667      -        -  
+
+Compound 3 (HO) bond length matrix:
+           H1       O1
+   H1      -     0.9759
+   O1   0.9759      -  
+
+Compound 4 (K) bond length matrix:
+           K1
+   K1      -  
+
+Draw compounds to PDF? [No] 
+Accept these molecules (y) or change something (n) [Yes] n
+Break bonds (1) or repeat molecule recognition at specific frame (2)? [1] 
+
+Current compounds:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 1
+Break specific bonds (1) or all bonds (2) in compound 1 (H2O)? [1] 2
++ Added forbidden bonds for all bonds in compound 1 (H2O).
+
+Current compounds:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 2
+Break specific bonds (1) or all bonds (2) in compound 2 (H3O2)? [1] 2
++ Added forbidden bonds for all bonds in compound 2 (H3O2).
+
+Current compounds:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 3
+Break specific bonds (1) or all bonds (2) in compound 3 (HO)? [1] 2
++ Added forbidden bonds for all bonds in compound 3 (HO).
+
+Current compounds:
+  1: H2O (Number: 139)
+  2: H3O2 (Number: 11)
+  3: HO (Number: 139)
+  4: K (Number: 150)
+Which compound to modify? [[done]] 
+
+> Running compound recognition...
+
+Detected compound types:
+  1: H (Number: 450)
+  2: K (Number: 150)
+  3: O (Number: 300)
+
+Compound 1 (H) bond length matrix:
+           H1
+   H1      -  
+
+Compound 2 (K) bond length matrix:
+           K1
+   K1      -  
+
+Compound 3 (O) bond length matrix:
+           O1
+   O1      -  
+
+Draw compounds to PDF? [No] 
+Accept these molecules (y) or change something (n) [Yes] 
++ Accepted compound list.
+
+Available Analyses
+Pair Correlation
+  rdf: Radial distribution function
+  adf: Angular distribution function
+  cdf: Combined distribution function
+  pccf: Proton coupling / transfer-chain correlation
+Density / Counting
+  dens: Particle density
+  ncount: Resolved neighbour-count probability
+Clustering
+  cluster: Cluster composition histogram
+Local Structure
+  top: Tetrahedral order parameter
+  lsi: Local structure index
+  q6: Steinhardt q6/Q6 order parameter
+
+Choose an analysis:  pccf
+
+Analysis Setup
+> PCCF assumes a static topology with transferable protons already separated during the initial topology setup.
+> Per-frame molecule recognition is disabled; only coordinates are updated during the frame loop.
+
+Available compounds:
+  1: H (Number: 450)
+  2: K (Number: 150)
+  3: O (Number: 300)
+
+Choose the compounds with transferable protons (comma-separated numbers):  1
+Available labels: H1
+Which atom(s) in proton compound 1 (H)? (comma-separated)  H
+
+Available compounds:
+  1: H (Number: 450)
+  2: K (Number: 150)
+  3: O (Number: 300)
+
+Choose the compounds that may accept protons (comma-separated numbers):  3
+Available labels: O1
+Which atom(s) in acceptor compound 3 (O)? (comma-separated)  O
+Track acceptor contexts by molecule or by individual site? (molecule/site) [molecule] 
+Enter maximum proton-acceptor bond distance (in Angstrom):  [1.2] 1.28
+Enter minimum dwell time on an acceptor (in assigned frames):  [2] 
+Enter the maximum number of unassigned frames to bridge between stable residences:  [2] 
+Enter one or more maximum chain gaps (in frames, comma-separated):  [100] 
+
+Frame Loop
+> Per-frame molecule recognition is disabled for this analysis.
+In which trajectory frame to start processing the trajectory? [1] 
+How many trajectory frames to read (from this position on)? [all] 
+Use every n-th read trajectory frame for the analysis: [1] 
+
+Run
+Running analysis...
+> End of trajectory reached.
+
+Results
+Processed frames: 14
+Stable transfer events: 287
+! Output file pccf_molecule_gap100.dat already existed; moved the previous file to #1#pccf_molecule_gap100.dat.
++ Saved PCCF chain distribution for gap 100 to pccf_molecule_gap100.dat

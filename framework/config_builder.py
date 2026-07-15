@@ -10,6 +10,7 @@ from framework.analysis_params import (
     FloatParam,
     ForEach,
     Group,
+    IntListParam,
     IntParam,
     Repeat,
     Variant,
@@ -42,7 +43,7 @@ def prompt_config_from_schema(owner, schema, config_class, provider=None):
 
 
 def prompt_step(step, context):
-    if isinstance(step, (CompoundParam, AtomLabelsParam, IntParam, FloatParam, BoolParam, ChoiceParam)):
+    if isinstance(step, (CompoundParam, AtomLabelsParam, IntParam, IntListParam, FloatParam, BoolParam, ChoiceParam)):
         context.values[step.name] = prompt_param(step, context)
         return
     if isinstance(step, Group):
@@ -76,6 +77,8 @@ def prompt_param(param, context):
             minval=param.minval,
             maxval=param.maxval,
         )
+    if isinstance(param, IntListParam):
+        return _prompt_int_list(param, context)
     if isinstance(param, FloatParam):
         if param.allow_none:
             return _prompt_optional_float(param, context)
@@ -291,6 +294,48 @@ def _prompt_optional_float(param, context):
                 console.warn(f"Please enter a number <= {param.maxval}, or leave blank.")
             continue
         return value
+
+
+def _prompt_int_list(param, context):
+    default = _format_int_list_default(param.default)
+    display_default = param.display_default
+    if display_default is None and default is not None:
+        display_default = default
+
+    while True:
+        answer = context.input_provider.ask_str(
+            _format_prompt_text(param.prompt, context),
+            default=default,
+            display_default=display_default,
+        ).strip()
+        parts = [part.strip() for part in answer.split(",")]
+        values = [part for part in parts if part]
+        if len(values) < param.min_items:
+            if param.min_items == 1:
+                console.warn("Please enter at least one integer.")
+            else:
+                console.warn(f"Please enter at least {param.min_items} integers.")
+            continue
+
+        try:
+            numbers = [int(value) for value in values]
+        except ValueError:
+            console.warn("Please enter a comma-separated list of integers.")
+            continue
+
+        if param.minval is not None and any(number < param.minval for number in numbers):
+            console.warn(_range_error_message("integer", minval=param.minval))
+            continue
+        if param.maxval is not None and any(number > param.maxval for number in numbers):
+            console.warn(_range_error_message("integer", maxval=param.maxval))
+            continue
+        return numbers
+
+
+def _format_int_list_default(default):
+    if default is None:
+        return None
+    return ", ".join(str(int(value)) for value in default)
 
 
 def _format_prompt_text(prompt, context):

@@ -1,0 +1,84 @@
+
+  ╔═════════════════════════════════════╗
+  ║                            (        ║
+  ║                             \       ║
+  ║        Đ Y A N A             )      ║
+  ║    Dynamics Analyzer    »»------->  ║
+  ║       ver. 0.1.1             )      ║
+  ║                             /       ║
+  ║                            (        ║
+  ╚═════════════════════════════════════╝
+
+Started: 2026-07-10 13:38:27 CEST
+Trajectory: /mnt/d/python/dyana/tests/fixtures/water128.xyz (xyz)
+Output dir: /mnt/d/python/dyana/tests/fixtures/q6
+Console log: /mnt/d/python/dyana/tests/fixtures/q6/dyana.log
+Input log: /mnt/d/python/dyana/tests/fixtures/q6/input.log
+
+Topology Setup
+Enter cell vector length in X dimension (in Angstrom):  15.67
+Enter cell vector length in Y dimension (in Angstrom):  15.67
+Enter cell vector length in Z dimension (in Angstrom):  15.67
+
+Cell vectors: a=15.6700  b=15.6700  c=15.6700
+
+> Running compound recognition...
+
+Detected compound types:
+  1: H2O (Number: 128)
+
+Compound 1 (H2O) bond length matrix:
+           H1       H2       O1
+   H1      -        -     0.9967
+   H2      -        -     0.9971
+   O1   0.9967   0.9971      -  
+
+Draw compounds to PDF? [No] 
+Accept these molecules (y) or change something (n) [Yes] 
++ Accepted compound list.
+
+Available Analyses
+Pair Correlation
+  rdf: Radial distribution function
+  adf: Angular distribution function
+  cdf: Combined distribution function
+  pccf: Proton coupling / transfer-chain correlation
+Density / Counting
+  dens: Particle density
+  ncount: Resolved neighbour-count probability
+Clustering
+  cluster: Cluster composition histogram
+Local Structure
+  top: Tetrahedral order parameter
+  lsi: Local structure index
+  q6: Steinhardt q6/Q6 order parameter
+
+Choose an analysis:  q6
+
+Analysis Setup
+
+Available compounds:
+  1: H2O (Number: 128)
+
+Choose the site compound (number):  [1] 
+Available labels: H1, H2, O1
+Which atom(s) define the molecular site? (comma-separated)  O
+Optional neighbour cutoff distance Angstrom (leave blank for none):  
+Enter the number of nearest neighbours to include per site:  [4] 
+Enter the number of bins for local q6 distribution:  [100] 
+
+Frame Loop
+Perform molecule recognition and update compound list in each frame? [No] 
+In which trajectory frame to start processing the trajectory? [1] 
+How many trajectory frames to read (from this position on)? [all] 
+Use every n-th read trajectory frame for the analysis: [1] 
+
+Run
+Running analysis...
+> End of trajectory reached.
+
+Results
+Processed frames: 10
++ Saved local q6 distribution to q6_local_O-H2O.dat
++ Saved local qbar6 distribution to qbar6_local_O-H2O.dat
++ Saved global Q6 time series to q6_global_O-H2O.dat

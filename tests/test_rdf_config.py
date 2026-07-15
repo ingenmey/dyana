@@ -105,7 +105,7 @@ class RDFConfigTests(unittest.TestCase):
         np.testing.assert_allclose(rdf.hist.bin_edges[0], [0.0, 1.0, 2.0])
 
     def test_prompt_config_uses_shared_schema_and_provider(self):
-        provider = FileInputProvider(lines=["1", "1", "O", "H", "2.5", "4"], fallback=NullInputProvider())
+        provider = FileInputProvider(lines=["1", "1", "O", "H", "n", "2.5", "4"], fallback=NullInputProvider())
         rdf = RDF(DummyTrajectory(), input_provider=provider)
 
         config = rdf.prompt_config()
@@ -118,6 +118,7 @@ class RDFConfigTests(unittest.TestCase):
                     obs_compound_index=0,
                     ref_labels=["O"],
                     obs_labels=["H"],
+                    include_intramolecular=False,
                     max_distance=2.5,
                     bin_count=4,
                 ),
@@ -151,6 +152,7 @@ class RDFConfigTests(unittest.TestCase):
                     obs_compound_index=0,
                     ref_labels=["O"],
                     obs_labels=["H"],
+                    include_intramolecular=True,
                     max_distance=2.0,
                     bin_count=2,
                 ),
@@ -183,6 +185,7 @@ class RDFConfigTests(unittest.TestCase):
                     obs_compound_index=0,
                     ref_labels=["O"],
                     obs_labels=["H"],
+                    include_intramolecular=True,
                     max_distance=2.0,
                     bin_count=2,
                 ),
