@@ -17,7 +17,7 @@ from io_support.run_header import build_run_header, render_run_header
 from workflow.workflow_prompts import WorkflowPrompts
 
 AVAILABLE_ANALYSES = [
-    ("s", "Static:"),
+    ("s", "Static"),
     ("a", "rdf", "Radial distribution function", "analyses.rdf_analysis", "RDF"),
     ("a", "adf", "Angular distribution function", "analyses.adf_analysis", "ADF"),
     ("a", "cdf", "Combined distribution function", "analyses.cdf_analysis", "CDFAnalysis"),
@@ -26,7 +26,7 @@ AVAILABLE_ANALYSES = [
     ("a", "perc", "Hydrogen-bond percolation pathway analysis", "analyses.percolation_analysis", "PercolationAnalysis"),
     ("a", "cluster", "Cluster composition histogram", "analyses.cluster_analysis", "ClusterAnalysis"),
 
-    ("s", "Dynamic:"),
+    ("s", "Dynamic"),
     ("a", "pccf", "Proton coupling / transfer-chain correlation", "analyses.pccf_analysis", "PCCFAnalysis"),
     ("a", "dacf", "Dimer existence autocorrelation function", "analyses.dacf_analysis", "DACFAnalysis"),
     ("a", "idcf", "Identity autocorrelation function", "analyses.idcf_analysis", "IDCFAnalysis"),
